@@ -28,6 +28,7 @@ func NewDB(ctx context.Context, databaseURL string) (*DB, error) {
 
 func (db *DB) RunMigrations(databaseURL string, migrationsPath string) error {
 	sqlDB := stdlib.OpenDBFromPool(db.Pool)
+	defer sqlDB.Close()
 	driver, err := pgmigrate.WithInstance(sqlDB, &pgmigrate.Config{})
 	if err != nil {
 		return fmt.Errorf("migration driver: %w", err)

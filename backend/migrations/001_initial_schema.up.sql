@@ -23,7 +23,7 @@ CREATE TABLE sector_configs (
     config_json JSONB NOT NULL,
     is_active BOOLEAN NOT NULL DEFAULT false,
     published_at TIMESTAMPTZ,
-    created_by UUID REFERENCES users(id),
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE(sector_id, version)
 );
@@ -39,7 +39,7 @@ CREATE TABLE companies (
 
 CREATE TABLE financials (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    company_id UUID NOT NULL REFERENCES companies(id),
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
     period TEXT NOT NULL,
     period_type TEXT NOT NULL,
     data_json JSONB NOT NULL,
@@ -49,8 +49,8 @@ CREATE TABLE financials (
 
 CREATE TABLE scores (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    company_id UUID NOT NULL REFERENCES companies(id),
-    sector_config_id UUID NOT NULL REFERENCES sector_configs(id),
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    sector_config_id UUID NOT NULL REFERENCES sector_configs(id) ON DELETE CASCADE,
     composite_score DECIMAL(5,2) NOT NULL,
     rating TEXT NOT NULL,
     breakdown_json JSONB NOT NULL,
@@ -59,8 +59,8 @@ CREATE TABLE scores (
 
 CREATE TABLE watchlist_items (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id),
-    company_id UUID NOT NULL REFERENCES companies(id),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
     added_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE(user_id, company_id)
 );
@@ -71,4 +71,3 @@ CREATE INDEX idx_financials_company ON financials(company_id);
 CREATE INDEX idx_sector_configs_active ON sector_configs(sector_id, is_active) WHERE is_active = true;
 CREATE INDEX idx_watchlist_user ON watchlist_items(user_id);
 CREATE INDEX idx_companies_sector ON companies(sector_id);
-CREATE INDEX idx_companies_symbol ON companies(symbol);
