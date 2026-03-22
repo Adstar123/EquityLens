@@ -1,8 +1,10 @@
 package api
 
 import (
+	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/Adstar123/equitylens/backend/internal/auth"
 	"github.com/go-chi/chi/v5"
@@ -48,6 +50,13 @@ func (s *Server) getTickerDetail(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// Cache the freshly computed score
+		if s.cache != nil && score != nil {
+			if err := s.cache.SetScore(r.Context(), symbol, *score, time.Hour); err != nil {
+				log.Printf("cache set error: %v", err)
+			}
+		}
+
 		// Re-fetch the company after scoring
 		company, err = s.db.GetCompanyBySymbol(r.Context(), symbol)
 		if err != nil || company == nil {
@@ -62,11 +71,29 @@ func (s *Server) getTickerDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check cache first
+	if s.cache != nil {
+		if cached, _ := s.cache.GetScore(r.Context(), symbol); cached != nil {
+			writeJSON(w, http.StatusOK, map[string]any{
+				"company": company,
+				"score":   cached,
+			})
+			return
+		}
+	}
+
 	// Get latest score for the existing company
 	score, err := s.db.GetLatestScore(r.Context(), company.ID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to get score")
 		return
+	}
+
+	// Cache the score
+	if s.cache != nil && score != nil {
+		if err := s.cache.SetScore(r.Context(), symbol, *score, time.Hour); err != nil {
+			log.Printf("cache set error: %v", err)
+		}
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -88,6 +115,14 @@ func (s *Server) getTickerScores(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check cache first
+	if s.cache != nil {
+		if cached, _ := s.cache.GetScore(r.Context(), symbol); cached != nil {
+			writeJSON(w, http.StatusOK, cached)
+			return
+		}
+	}
+
 	score, err := s.db.GetLatestScore(r.Context(), company.ID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to get score")
@@ -96,6 +131,13 @@ func (s *Server) getTickerScores(w http.ResponseWriter, r *http.Request) {
 	if score == nil {
 		writeError(w, http.StatusNotFound, "no scores found")
 		return
+	}
+
+	// Cache the score
+	if s.cache != nil {
+		if err := s.cache.SetScore(r.Context(), symbol, *score, time.Hour); err != nil {
+			log.Printf("cache set error: %v", err)
+		}
 	}
 
 	writeJSON(w, http.StatusOK, score)

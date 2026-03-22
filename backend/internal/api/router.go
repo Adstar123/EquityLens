@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/cors"
 
 	"github.com/Adstar123/equitylens/backend/internal/auth"
+	"github.com/Adstar123/equitylens/backend/internal/cache"
 	"github.com/Adstar123/equitylens/backend/internal/scheduler"
 	"github.com/Adstar123/equitylens/backend/internal/storage"
 )
@@ -14,15 +15,17 @@ type Server struct {
 	db          *storage.DB
 	scheduler   *scheduler.Scheduler
 	authHandler *auth.AuthHandler
+	cache       *cache.Cache
 	jwtSecret   string
 	superAdmins []string
 }
 
-func NewServer(db *storage.DB, sched *scheduler.Scheduler, authHandler *auth.AuthHandler, jwtSecret string, superAdmins []string) *Server {
+func NewServer(db *storage.DB, sched *scheduler.Scheduler, authHandler *auth.AuthHandler, appCache *cache.Cache, jwtSecret string, superAdmins []string) *Server {
 	return &Server{
 		db:          db,
 		scheduler:   sched,
 		authHandler: authHandler,
+		cache:       appCache,
 		jwtSecret:   jwtSecret,
 		superAdmins: superAdmins,
 	}

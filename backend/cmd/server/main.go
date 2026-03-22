@@ -10,6 +10,7 @@ import (
 
 	"github.com/Adstar123/equitylens/backend/internal/api"
 	"github.com/Adstar123/equitylens/backend/internal/auth"
+	"github.com/Adstar123/equitylens/backend/internal/cache"
 	"github.com/Adstar123/equitylens/backend/internal/ingestion"
 	"github.com/Adstar123/equitylens/backend/internal/scheduler"
 	"github.com/Adstar123/equitylens/backend/internal/storage"
@@ -87,8 +88,20 @@ func main() {
 	c.Start()
 	defer c.Stop()
 
+	redisURL := os.Getenv("REDIS_URL")
+	var appCache *cache.Cache
+	if redisURL != "" {
+		c, err := cache.NewCache(redisURL)
+		if err != nil {
+			fmt.Printf("warning: redis unavailable: %v\n", err)
+		} else {
+			appCache = c
+			defer appCache.Close()
+		}
+	}
+
 	authHandler := auth.NewAuthHandler(db, jwtSecret, frontendURL)
-	srv := api.NewServer(db, sched, authHandler, jwtSecret, superAdmins)
+	srv := api.NewServer(db, sched, authHandler, appCache, jwtSecret, superAdmins)
 	router := srv.Router()
 
 	fmt.Println("server starting on :8080")
