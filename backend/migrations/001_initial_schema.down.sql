@@ -1,0 +1,8 @@
+DROP TABLE IF EXISTS watchlist_items;
+DROP TABLE IF EXISTS scores;
+DROP TABLE IF EXISTS financials;
+DROP TABLE IF EXISTS companies;
+DROP TABLE IF EXISTS sector_configs;
+DROP TABLE IF EXISTS sectors;
+DROP TABLE IF EXISTS users;
+DROP EXTENSION IF EXISTS "uuid-ossp";
