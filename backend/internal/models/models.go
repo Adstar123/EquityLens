@@ -54,3 +54,15 @@ type RatioResult struct {
 	Weight        float64 `json:"weight"`
 	WeightedScore float64 `json:"weighted_score"`
 }
+
+// ScreenerItem is an enriched score row with company info for the screener page.
+type ScreenerItem struct {
+	Symbol         string    `json:"symbol"`
+	CompanyName    string    `json:"company_name"`
+	SectorKey      string    `json:"sector_key"`
+	SectorName     string    `json:"sector_name"`
+	CompositeScore float64   `json:"composite_score"`
+	Rating         string    `json:"rating"`
+	Breakdown      Breakdown `json:"breakdown"`
+	ScoredAt       time.Time `json:"scored_at"`
+}

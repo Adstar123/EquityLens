@@ -44,6 +44,19 @@ export interface TickerDetail {
   score: Score | null;
 }
 
+export interface ScreenerItem {
+  symbol: string;
+  company_name: string;
+  sector_key: string;
+  sector_name: string;
+  composite_score: number;
+  rating: string;
+  breakdown: {
+    ratios: RatioResult[];
+  };
+  scored_at: string;
+}
+
 export interface SectorConfig {
   sector: string;
   display_name: string;
@@ -78,8 +91,8 @@ export class ApiService {
     return this.http.get<Score[]>(`${this.baseUrl}/sectors/${sectorId}/rankings`);
   }
 
-  screener(params: Record<string, string>): Observable<Score[]> {
-    return this.http.get<Score[]>(`${this.baseUrl}/screener`, { params });
+  screener(params: Record<string, string> = {}): Observable<ScreenerItem[]> {
+    return this.http.get<ScreenerItem[]>(`${this.baseUrl}/screener`, { params });
   }
 
   // Authenticated

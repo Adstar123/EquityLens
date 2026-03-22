@@ -17,7 +17,7 @@ func (s *Server) screener(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	limit := 50
+	limit := 100
 	if l := q.Get("limit"); l != "" {
 		if v, err := strconv.Atoi(l); err == nil && v > 0 {
 			limit = v
@@ -33,7 +33,7 @@ func (s *Server) screener(w http.ResponseWriter, r *http.Request) {
 
 	sectorKey := q.Get("sector")
 
-	var sectorID uuid.UUID
+	var sectorID *uuid.UUID
 	if sectorKey != "" {
 		sector, err := s.db.GetSectorByKey(r.Context(), sectorKey)
 		if err != nil {
@@ -44,23 +44,17 @@ func (s *Server) screener(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusNotFound, "sector not found")
 			return
 		}
-		sectorID = sector.ID
-	} else {
-		// If no sector specified, we need a sector ID for the query.
-		// Return all sectors' scores by iterating, or return empty.
-		// For now, require sector param.
-		writeError(w, http.StatusBadRequest, "sector parameter is required")
-		return
+		sectorID = &sector.ID
 	}
 
-	scores, err := s.db.ListScoresBySector(r.Context(), sectorID, minScore, limit, offset)
+	items, err := s.db.ListScreenerItems(r.Context(), sectorID, minScore, limit, offset)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to query scores")
+		writeError(w, http.StatusInternalServerError, "failed to query screener")
 		return
 	}
-	if scores == nil {
+	if items == nil {
 		writeJSON(w, http.StatusOK, []any{})
 		return
 	}
-	writeJSON(w, http.StatusOK, scores)
+	writeJSON(w, http.StatusOK, items)
 }

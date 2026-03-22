@@ -51,6 +51,48 @@ func (db *DB) UpsertScore(ctx context.Context, score models.Score) error {
 	return err
 }
 
+func (db *DB) ListScreenerItems(ctx context.Context, sectorID *uuid.UUID, minScore float64, limit, offset int) ([]models.ScreenerItem, error) {
+	query := `SELECT c.symbol, c.name, sec.key, sec.display_name,
+	                  s.composite_score, s.rating, s.breakdown_json, s.scored_at
+	           FROM scores s
+	           JOIN companies c ON c.id = s.company_id
+	           JOIN sectors sec ON sec.id = c.sector_id
+	           WHERE s.composite_score >= $1
+	           AND s.scored_at = (
+	               SELECT MAX(s2.scored_at) FROM scores s2 WHERE s2.company_id = s.company_id
+	           )`
+	args := []any{minScore}
+
+	if sectorID != nil {
+		query += ` AND c.sector_id = $2 ORDER BY s.composite_score DESC LIMIT $3 OFFSET $4`
+		args = append(args, *sectorID, limit, offset)
+	} else {
+		query += ` ORDER BY s.composite_score DESC LIMIT $2 OFFSET $3`
+		args = append(args, limit, offset)
+	}
+
+	rows, err := db.Pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []models.ScreenerItem
+	for rows.Next() {
+		var item models.ScreenerItem
+		var breakdownBytes []byte
+		if err := rows.Scan(&item.Symbol, &item.CompanyName, &item.SectorKey, &item.SectorName,
+			&item.CompositeScore, &item.Rating, &breakdownBytes, &item.ScoredAt); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(breakdownBytes, &item.Breakdown); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
 func (db *DB) ListScoresBySector(ctx context.Context, sectorID uuid.UUID, minScore float64, limit, offset int) ([]models.Score, error) {
 	rows, err := db.Pool.Query(ctx,
 		`SELECT s.id, s.company_id, s.sector_config_id, s.composite_score, s.rating, s.breakdown_json, s.scored_at
