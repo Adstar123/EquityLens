@@ -1,0 +1,43 @@
+{
+  "quoteSummary": {
+    "result": [
+      {
+        "defaultKeyStatistics": {
+          "enterpriseToEbitda": {"raw": 5.8, "fmt": "5.80"},
+          "returnOnEquity": {"raw": 0.28, "fmt": "28.00%"},
+          "forwardPE": {"raw": 12.3, "fmt": "12.30"},
+          "pegRatio": {"raw": 1.2, "fmt": "1.20"},
+          "priceToBook": {"raw": 3.1, "fmt": "3.10"}
+        },
+        "financialData": {
+          "freeCashflow": {"raw": 8500000000, "fmt": "8.5B", "longFmt": "8,500,000,000"},
+          "totalDebt": {"raw": 12800000000, "fmt": "12.8B", "longFmt": "12,800,000,000"},
+          "returnOnEquity": {"raw": 0.28, "fmt": "28.00%"},
+          "debtToEquity": {"raw": 42.5, "fmt": "42.50"},
+          "operatingMargins": {"raw": 0.35, "fmt": "35.00%"},
+          "revenueGrowth": {"raw": 0.08, "fmt": "8.00%"}
+        },
+        "summaryDetail": {
+          "trailingPE": {"raw": 14.5, "fmt": "14.50"},
+          "forwardPE": {"raw": 12.3, "fmt": "12.30"},
+          "dividendYield": {"raw": 0.052, "fmt": "5.20%"},
+          "payoutRatio": {"raw": 0.72, "fmt": "72.00%"},
+          "fiftyTwoWeekLow": {"raw": 36.5, "fmt": "36.50"},
+          "fiftyTwoWeekHigh": {"raw": 50.2, "fmt": "50.20"}
+        },
+        "price": {
+          "shortName": "BHP Group Limited",
+          "longName": "BHP Group Limited",
+          "symbol": "BHP.AX",
+          "currency": "AUD",
+          "exchange": "ASX",
+          "marketCap": {"raw": 145000000000, "fmt": "145B", "longFmt": "145,000,000,000"},
+          "regularMarketPrice": {"raw": 44.85, "fmt": "44.85"},
+          "regularMarketChange": {"raw": 0.35, "fmt": "0.35"},
+          "regularMarketChangePercent": {"raw": 0.0079, "fmt": "0.79%"}
+        }
+      }
+    ],
+    "error": null
+  }
+}

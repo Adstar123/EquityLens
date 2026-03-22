@@ -20,4 +20,5 @@ require (
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	golang.org/x/sync v0.18.0 // indirect
 	golang.org/x/text v0.31.0 // indirect
+	golang.org/x/time v0.15.0 // indirect
 )
