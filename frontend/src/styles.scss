@@ -1,1 +1,88 @@
-/* You can add global styles to this file, and also import other style files */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&family=DM+Serif+Display&display=swap');
+
+@import "tailwindcss" layer(tailwind);
+
+@layer tailwind.theme {
+  @theme {
+    --color-bg-primary: #0f0f1a;
+    --color-bg-secondary: #1a1a2e;
+    --color-bg-tertiary: #252540;
+
+    --color-accent: #d4930d;
+    --color-accent-light: #f0b429;
+    --color-accent-dim: #8a6108;
+
+    --color-text-primary: #e8e8ed;
+    --color-text-secondary: #8888a0;
+    --color-text-muted: #555570;
+
+    --color-rating-strong-buy: #22c55e;
+    --color-rating-buy: #84cc16;
+    --color-rating-hold: #d4930d;
+    --color-rating-sell: #ef4444;
+    --color-rating-strong-sell: #dc2626;
+
+    --font-sans: 'Inter', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --font-display: 'DM Serif Display', serif;
+  }
+}
+
+body {
+  background-color: #0f0f1a;
+  color: #e8e8ed;
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  padding: 0;
+}
+
+// Score typography
+.score-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 900;
+  color: #d4930d;
+  letter-spacing: -0.02em;
+}
+
+// Dense table defaults
+table {
+  width: 100%;
+  border-collapse: collapse;
+
+  th, td {
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    font-size: 0.875rem;
+    border-bottom: 1px solid #252540;
+  }
+
+  th {
+    color: #555570;
+    font-weight: 500;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+  }
+
+  tr:hover td {
+    background-color: #1a1a2e;
+  }
+}
+
+// Scrollbar styling (dark theme)
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0f0f1a;
+}
+::-webkit-scrollbar-thumb {
+  background: #252540;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #555570;
+}

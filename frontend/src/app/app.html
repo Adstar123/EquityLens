@@ -1,1 +1,8 @@
-<router-outlet />
+<div class="flex h-screen">
+  @if (!isLandingPage()) {
+    <app-sidebar />
+  }
+  <main class="flex-1 overflow-auto">
+    <router-outlet />
+  </main>
+</div>
