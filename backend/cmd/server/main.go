@@ -6,12 +6,13 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
+	"github.com/Adstar123/equitylens/backend/internal/api"
+	"github.com/Adstar123/equitylens/backend/internal/auth"
 	"github.com/Adstar123/equitylens/backend/internal/ingestion"
 	"github.com/Adstar123/equitylens/backend/internal/scheduler"
 	"github.com/Adstar123/equitylens/backend/internal/storage"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/joho/godotenv"
 	"github.com/robfig/cron/v3"
 )
@@ -22,6 +23,25 @@ func main() {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
 		log.Fatal("DATABASE_URL is required")
+	}
+
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		log.Fatal("JWT_SECRET is required")
+	}
+
+	frontendURL := os.Getenv("FRONTEND_URL")
+	if frontendURL == "" {
+		frontendURL = "http://localhost:4200"
+	}
+
+	var superAdmins []string
+	if sa := os.Getenv("SUPERADMIN_EMAILS"); sa != "" {
+		for _, email := range strings.Split(sa, ",") {
+			if trimmed := strings.TrimSpace(email); trimmed != "" {
+				superAdmins = append(superAdmins, trimmed)
+			}
+		}
 	}
 
 	ctx := context.Background()
@@ -67,15 +87,10 @@ func main() {
 	c.Start()
 	defer c.Stop()
 
-	r := chi.NewRouter()
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
-
-	r.Get("/api/v1/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"status":"ok"}`))
-	})
+	authHandler := auth.NewAuthHandler(db, jwtSecret, frontendURL)
+	srv := api.NewServer(db, sched, authHandler, jwtSecret, superAdmins)
+	router := srv.Router()
 
 	fmt.Println("server starting on :8080")
-	log.Fatal(http.ListenAndServe(":8080", r))
+	log.Fatal(http.ListenAndServe(":8080", router))
 }
