@@ -1,0 +1,35 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: equitylens
+      POSTGRES_PASSWORD: equitylens
+      POSTGRES_DB: equitylens
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: ./backend
+    ports:
+      - "8080:8080"
+    env_file: .env
+    depends_on:
+      - postgres
+      - redis
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "4200:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
