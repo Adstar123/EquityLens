@@ -37,7 +37,7 @@ type Score struct {
 	SectorConfigID uuid.UUID `json:"sector_config_id" db:"sector_config_id"`
 	CompositeScore float64   `json:"composite_score" db:"composite_score"`
 	Rating         string    `json:"rating" db:"rating"`
-	Breakdown      Breakdown `json:"breakdown"`
+	Breakdown      Breakdown `json:"breakdown" db:"breakdown_json"`
 	ScoredAt       time.Time `json:"scored_at" db:"scored_at"`
 }
 

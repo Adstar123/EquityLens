@@ -15,7 +15,7 @@ display_name: "Mining & Resources"
 ratios:
   - key: pe_ratio
     name: "P/E Ratio"
-    weight: 0.20
+    weight: 0.60
     lower_is_better: true
     ranges:
       strong: { max: 12 }
@@ -25,7 +25,7 @@ ratios:
       poor: { min: 35 }
   - key: debt_to_equity
     name: "Debt to Equity"
-    weight: 0.20
+    weight: 0.40
     lower_is_better: true
     ranges:
       strong: { max: 0.3 }
@@ -74,8 +74,8 @@ rating_scale:
 	if pe.Key != "pe_ratio" {
 		t.Errorf("expected key 'pe_ratio', got %q", pe.Key)
 	}
-	if pe.Weight != 0.20 {
-		t.Errorf("expected weight 0.20, got %f", pe.Weight)
+	if pe.Weight != 0.60 {
+		t.Errorf("expected weight 0.60, got %f", pe.Weight)
 	}
 	if !pe.LowerIsBetter {
 		t.Error("expected lower_is_better true for pe_ratio")
@@ -95,8 +95,8 @@ rating_scale:
 	if de.Key != "debt_to_equity" {
 		t.Errorf("expected key 'debt_to_equity', got %q", de.Key)
 	}
-	if de.Weight != 0.20 {
-		t.Errorf("expected weight 0.20, got %f", de.Weight)
+	if de.Weight != 0.40 {
+		t.Errorf("expected weight 0.40, got %f", de.Weight)
 	}
 
 	// Check edge cases
@@ -232,7 +232,17 @@ func TestLoadSeedConfigs_MultipleFiles(t *testing.T) {
 	yaml1 := `
 sector: mining
 display_name: "Mining"
-ratios: []
+ratios:
+  - key: pe_ratio
+    name: "P/E Ratio"
+    weight: 1.0
+    lower_is_better: true
+    ranges:
+      strong: { max: 12 }
+      good: { min: 12, max: 18 }
+      neutral: { min: 18, max: 25 }
+      weak: { min: 25, max: 35 }
+      poor: { min: 35 }
 edge_cases:
   negative_earnings: "skip"
   missing_data_threshold: 0.5
@@ -246,7 +256,17 @@ rating_scale:
 	yaml2 := `
 sector: tech
 display_name: "Technology"
-ratios: []
+ratios:
+  - key: pe_ratio
+    name: "P/E Ratio"
+    weight: 1.0
+    lower_is_better: true
+    ranges:
+      strong: { max: 20 }
+      good: { min: 20, max: 30 }
+      neutral: { min: 30, max: 40 }
+      weak: { min: 40, max: 50 }
+      poor: { min: 50 }
 edge_cases:
   negative_earnings: "skip"
   missing_data_threshold: 0.5

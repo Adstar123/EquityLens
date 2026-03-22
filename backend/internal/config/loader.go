@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 
@@ -50,8 +51,39 @@ func LoadSeedConfigs(dir string) ([]models.SectorConfig, error) {
 			return nil, fmt.Errorf("parsing %s: %w", filepath.Base(path), err)
 		}
 
+		if err := validateConfig(cfg, path); err != nil {
+			return nil, err
+		}
+
 		configs = append(configs, cfg)
 	}
 
 	return configs, nil
+}
+
+func validateConfig(cfg models.SectorConfig, path string) error {
+	name := filepath.Base(path)
+	if cfg.Sector == "" {
+		return fmt.Errorf("%s: sector key is required", name)
+	}
+	if cfg.DisplayName == "" {
+		return fmt.Errorf("%s: display_name is required", name)
+	}
+	if len(cfg.Ratios) == 0 {
+		return fmt.Errorf("%s: at least one ratio is required", name)
+	}
+	var totalWeight float64
+	for _, r := range cfg.Ratios {
+		if r.Key == "" {
+			return fmt.Errorf("%s: ratio key is required", name)
+		}
+		if r.Name == "" {
+			return fmt.Errorf("%s: ratio %s name is required", name, r.Key)
+		}
+		totalWeight += r.Weight
+	}
+	if math.Abs(totalWeight-1.0) > 0.001 {
+		return fmt.Errorf("%s: ratio weights must sum to 1.0, got %.3f", name, totalWeight)
+	}
+	return nil
 }
