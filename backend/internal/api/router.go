@@ -70,7 +70,12 @@ func (s *Server) Router() chi.Router {
 		r.Group(func(r chi.Router) {
 			r.Use(auth.RequireAuth(s.jwtSecret))
 			r.Use(auth.RequireSuperAdmin(s.superAdmins))
-			// Admin config routes will be added in Task 9
+			r.Get("/admin/configs", s.listConfigs)
+			r.Get("/admin/configs/{sector}", s.getConfig)
+			r.Put("/admin/configs/{sector}", s.updateConfig)
+			r.Post("/admin/configs/{sector}/preview", s.previewConfig)
+			r.Post("/admin/configs/{sector}/publish", s.publishConfig)
+			r.Get("/admin/configs/{sector}/versions", s.listConfigVersions)
 		})
 	})
 
