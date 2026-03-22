@@ -52,7 +52,7 @@ func ScoreCompany(config models.SectorConfig, financials map[string]float64) (*S
 	}
 
 	// Check missing data threshold.
-	if totalRatios == 0 || float64(skippedCount)/float64(totalRatios) > config.EdgeCases.MissingDataThreshold {
+	if totalRatios == 0 || len(results) == 0 || float64(skippedCount)/float64(totalRatios) > config.EdgeCases.MissingDataThreshold {
 		return &ScoreResult{
 			CompositeScore: 0,
 			Rating:         "insufficient_data",
@@ -90,6 +90,12 @@ func ScoreCompany(config models.SectorConfig, financials map[string]float64) (*S
 	}
 
 	compositeScore := weightedSum / 5.0 * 100.0
+	if compositeScore > 100 {
+		compositeScore = 100
+	}
+	if compositeScore < 0 {
+		compositeScore = 0
+	}
 	rating := mapRating(compositeScore, config.RatingScale)
 
 	return &ScoreResult{
