@@ -57,12 +57,74 @@ export interface ScreenerItem {
   scored_at: string;
 }
 
+export interface RangeConfig {
+  min?: number | null;
+  max?: number | null;
+}
+
+export interface RangeSetConfig {
+  strong: RangeConfig;
+  good: RangeConfig;
+  neutral: RangeConfig;
+  weak: RangeConfig;
+  poor: RangeConfig;
+}
+
+export interface RatioConfig {
+  key: string;
+  name: string;
+  weight: number;
+  lower_is_better: boolean;
+  ranges: RangeSetConfig;
+}
+
+export interface EdgeCasesConfig {
+  negative_earnings: string;
+  missing_data_threshold: number;
+}
+
+export interface RatingScaleConfig {
+  strong_buy: RangeConfig;
+  buy: RangeConfig;
+  hold: RangeConfig;
+  sell: RangeConfig;
+  strong_sell: RangeConfig;
+}
+
 export interface SectorConfig {
   sector: string;
   display_name: string;
-  ratios: any[];
-  edge_cases: any;
-  rating_scale: any;
+  ratios: RatioConfig[];
+  edge_cases: EdgeCasesConfig;
+  rating_scale: RatingScaleConfig;
+}
+
+export interface SectorWithConfig {
+  sector: Sector;
+  active_config: ConfigVersionRow | null;
+}
+
+export interface ConfigVersionRow {
+  id: string;
+  sector_id: string;
+  version: number;
+  config_json: SectorConfig;
+  is_active: boolean;
+  published_at: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface PreviewResult {
+  current: PreviewScore[];
+  preview: PreviewScore[];
+}
+
+export interface PreviewScore {
+  symbol: string;
+  company_name: string;
+  composite_score: number;
+  rating: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -113,23 +175,27 @@ export class ApiService {
   }
 
   // Admin
-  getConfigs(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.baseUrl}/admin/configs`);
+  getConfigs(): Observable<SectorWithConfig[]> {
+    return this.http.get<SectorWithConfig[]>(`${this.baseUrl}/admin/configs`);
   }
 
-  getConfig(sector: string): Observable<any> {
-    return this.http.get(`${this.baseUrl}/admin/configs/${sector}`);
+  getConfig(sector: string): Observable<ConfigVersionRow> {
+    return this.http.get<ConfigVersionRow>(`${this.baseUrl}/admin/configs/${sector}`);
   }
 
-  updateConfig(sector: string, config: SectorConfig): Observable<void> {
-    return this.http.put<void>(`${this.baseUrl}/admin/configs/${sector}`, config);
+  updateConfig(sector: string, config: SectorConfig): Observable<ConfigVersionRow> {
+    return this.http.put<ConfigVersionRow>(`${this.baseUrl}/admin/configs/${sector}`, config);
   }
 
-  previewConfig(sector: string, config: SectorConfig): Observable<any> {
-    return this.http.post(`${this.baseUrl}/admin/configs/${sector}/preview`, config);
+  previewConfig(sector: string, config: SectorConfig): Observable<PreviewResult> {
+    return this.http.post<PreviewResult>(`${this.baseUrl}/admin/configs/${sector}/preview`, config);
   }
 
-  publishConfig(sector: string): Observable<void> {
-    return this.http.post<void>(`${this.baseUrl}/admin/configs/${sector}/publish`, {});
+  publishConfig(sector: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.baseUrl}/admin/configs/${sector}/publish`, {});
+  }
+
+  getConfigVersions(sector: string): Observable<ConfigVersionRow[]> {
+    return this.http.get<ConfigVersionRow[]>(`${this.baseUrl}/admin/configs/${sector}/versions`);
   }
 }
