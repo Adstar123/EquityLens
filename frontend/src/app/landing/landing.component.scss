@@ -1,0 +1,560 @@
+// ════════════════════════════════════════════════════════════════
+// LANDING PAGE — EquityLens Hero
+// Bloomberg terminal meets editorial luxury.
+// ════════════════════════════════════════════════════════════════
+
+$near-black: #0a0a14;
+$surface: #1a1a2e;
+$border: #252540;
+$amber: #d4930d;
+$amber-light: #f0b429;
+$text-primary: #e8e8ed;
+$text-secondary: #8888a0;
+$text-muted: #555570;
+$data-dim: #1e1e35;
+$data-visible: #555570;
+
+// ────────────────────────────────────────────────────────
+// Container
+// ────────────────────────────────────────────────────────
+.landing {
+  background: $near-black;
+  color: $text-primary;
+  overflow-x: hidden;
+  position: relative;
+}
+
+// ────────────────────────────────────────────────────────
+// SECTION 0 — HERO
+// ────────────────────────────────────────────────────────
+.section-hero {
+  position: relative;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: $near-black;
+}
+
+// Data stream — matrix rain of financial data
+.data-stream {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.data-stream-ambient {
+  opacity: 0.6;
+}
+
+.data-column {
+  position: absolute;
+  top: 0;
+  width: 120px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  animation: streamScroll linear infinite;
+  will-change: transform;
+}
+
+.data-column-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.data-item {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: $data-dim;
+  white-space: nowrap;
+  line-height: 1.6;
+  letter-spacing: 0.02em;
+
+  &.ticker {
+    color: #2b2b48;
+    font-weight: 500;
+  }
+}
+
+@keyframes streamScroll {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(-50%);
+  }
+}
+
+// Hero typography
+.hero-type {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  user-select: none;
+}
+
+.hero-title-wrap {
+  position: relative;
+  line-height: 0.88;
+}
+
+.hero-line {
+  font-family: 'DM Serif Display', serif;
+  font-size: clamp(4rem, 12vw, 14rem);
+  font-weight: 400;
+  color: $text-primary;
+  margin: 0;
+  padding: 0;
+  letter-spacing: -0.02em;
+  line-height: 0.88;
+  display: block;
+}
+
+// LENS row — contains text + overlaid aperture
+.hero-line-lens-row {
+  position: relative;
+  display: inline-block;
+}
+
+// The aperture — circular portal revealing brighter data
+.aperture {
+  position: absolute;
+  // Positioned at center of "LENS" text
+  top: 50%;
+  left: 50%;
+  transform: translate(
+    calc(-50% + var(--aperture-offset-x, 0px)),
+    calc(-50% + var(--aperture-offset-y, 0px))
+  );
+  width: var(--aperture-diameter, 80px);
+  height: var(--aperture-diameter, 80px);
+  border-radius: 50%;
+  overflow: hidden;
+  pointer-events: none;
+  // Subtle ring
+  box-shadow: inset 0 0 0 1px rgba(212, 147, 13, 0.15);
+  z-index: 3;
+}
+
+.aperture-data {
+  position: absolute;
+  // Center data within aperture
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 400px;
+  height: 400px;
+  overflow: hidden;
+
+  .data-item {
+    color: #3a3a58;
+    &.ticker {
+      color: #4a4a68;
+    }
+  }
+}
+
+.hero-subtitle {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 0.8rem;
+  font-variant: small-caps;
+  letter-spacing: 0.3em;
+  color: $amber;
+  margin-top: 1.5rem;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+// Scroll cue
+.scroll-cue {
+  position: absolute;
+  bottom: 2.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+}
+
+.scroll-cue-line {
+  width: 1px;
+  height: 48px;
+  background: linear-gradient(to bottom, transparent, $text-muted);
+  animation: scrollPulse 2s ease-in-out infinite;
+}
+
+@keyframes scrollPulse {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scaleY(0.6);
+    transform-origin: top;
+  }
+  50% {
+    opacity: 1;
+    transform: scaleY(1);
+    transform-origin: top;
+  }
+}
+
+
+// ────────────────────────────────────────────────────────
+// SECTION 1 — THE PROBLEM
+// ────────────────────────────────────────────────────────
+.section-problem {
+  position: relative;
+  height: 200vh;
+  background: $near-black;
+}
+
+.problem-inner {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.data-stream-full {
+  opacity: 0;
+  will-change: filter, opacity;
+  .data-item {
+    color: $data-visible;
+    &.ticker {
+      color: #696984;
+    }
+  }
+}
+
+.problem-statement {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  opacity: 0;
+  padding: 0 2rem;
+
+  h2 {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(1.5rem, 4vw, 3.5rem);
+    color: $text-primary;
+    text-align: center;
+    max-width: 700px;
+    line-height: 1.2;
+    margin: 0;
+  }
+}
+
+
+// ────────────────────────────────────────────────────────
+// SECTION 2 — THE SOLUTION
+// ────────────────────────────────────────────────────────
+.section-solution {
+  position: relative;
+  min-height: 100vh;
+  background: $near-black;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6rem 2rem;
+}
+
+.solution-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3rem;
+}
+
+// Demo stock card
+.demo-card {
+  background: #161629;
+  border: 1px solid $border;
+  padding: 2rem;
+  width: min(420px, 90vw);
+  opacity: 0;
+  transform: translateY(40px);
+}
+
+.demo-card-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 1.5rem;
+}
+
+.demo-card-symbol {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1rem;
+  font-weight: 700;
+  color: $text-primary;
+  letter-spacing: 0.02em;
+}
+
+.demo-card-sector {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 0.7rem;
+  color: $text-muted;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.demo-card-score-area {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 2rem;
+}
+
+.demo-card-score {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 900;
+  font-size: 4rem;
+  color: $amber;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.demo-card-rating {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #84cc16;
+  background: rgba(132, 204, 22, 0.12);
+  padding: 4px 10px;
+  opacity: 0;
+  transform: scale(0.7);
+}
+
+// Ratio rows
+.demo-card-ratios {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.demo-ratio-row {
+  display: grid;
+  grid-template-columns: 120px 60px 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #1d1d36;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.demo-ratio-label {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 0.75rem;
+  color: $text-muted;
+}
+
+.demo-ratio-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  color: $text-secondary;
+  text-align: right;
+}
+
+.demo-ratio-bar {
+  height: 4px;
+  background: #1f1f3a;
+  overflow: hidden;
+  width: 100%;
+}
+
+.demo-ratio-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--fill-color, $amber);
+  transition: none;
+}
+
+// Solution caption
+.solution-caption {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 0.95rem;
+  color: $text-secondary;
+  text-align: center;
+  max-width: 500px;
+  line-height: 1.6;
+  opacity: 0;
+}
+
+
+// ────────────────────────────────────────────────────────
+// SECTION 3 — HOW IT WORKS
+// ────────────────────────────────────────────────────────
+.section-how {
+  position: relative;
+  min-height: 100vh;
+  background: $near-black;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6rem 2rem;
+}
+
+.how-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 5rem;
+  max-width: 600px;
+  width: 100%;
+}
+
+.how-step {
+  opacity: 0;
+  transform: translateY(50px);
+}
+
+.step-number {
+  font-family: 'DM Serif Display', serif;
+  font-size: clamp(3rem, 8vw, 8rem);
+  color: $amber;
+  line-height: 1;
+  display: block;
+  margin-bottom: 0.25rem;
+  letter-spacing: -0.03em;
+}
+
+.step-heading {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: $text-primary;
+  margin: 0 0 0.5rem 0;
+}
+
+.step-desc {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 0.9rem;
+  color: $text-secondary;
+  margin: 0;
+  line-height: 1.5;
+}
+
+
+// ────────────────────────────────────────────────────────
+// SECTION 4 — CTA
+// ────────────────────────────────────────────────────────
+.section-cta {
+  position: relative;
+  min-height: 100vh;
+  background: $near-black;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6rem 2rem;
+}
+
+.cta-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2.5rem;
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.cta-headline {
+  font-family: 'DM Serif Display', serif;
+  font-size: clamp(2rem, 5vw, 4rem);
+  color: $text-primary;
+  text-align: center;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.cta-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(320px, 85vw);
+}
+
+.cta-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 24px;
+  background: transparent;
+  border: 1px solid $border;
+  color: $text-primary;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+
+  &:hover {
+    border-color: $amber;
+    transform: scale(1.02);
+  }
+}
+
+.cta-btn-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.cta-explore {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 0.8rem;
+  color: $amber;
+  text-decoration: none;
+  letter-spacing: 0.01em;
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: $amber-light;
+  }
+}
+
+.landing-footer {
+  position: absolute;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+
+  span {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 0.7rem;
+    color: $text-muted;
+    letter-spacing: 0.02em;
+  }
+}
+
+// ────────────────────────────────────────────────────────
+// Responsive
+// ────────────────────────────────────────────────────────
+@media (max-width: 640px) {
+  .demo-ratio-row {
+    grid-template-columns: 90px 50px 1fr;
+    gap: 8px;
+  }
+
+  .demo-card {
+    padding: 1.25rem;
+  }
+
+  .how-inner {
+    gap: 3.5rem;
+  }
+}
