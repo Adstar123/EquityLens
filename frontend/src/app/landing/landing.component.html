@@ -78,42 +78,14 @@
       <span class="lens-hint" #lensHint>hold to magnify</span>
     </div>
 
+    <!-- Problem statement (revealed during pinned scroll transition) -->
+    <div class="problem-statement" #problemStatement>
+      <h2>Raw data doesn't tell you what to buy.</h2>
+    </div>
+
     <!-- Scroll cue -->
     <div class="scroll-cue" #scrollCue>
       <div class="scroll-cue-line"></div>
-    </div>
-  </section>
-
-
-  <!-- ═══════════════════════════════════════════════════════════════
-       SECTION 1 — THE PROBLEM (viewport 2-3)
-       Aperture expands → data overwhelms → blur → statement
-       ═══════════════════════════════════════════════════════════════ -->
-  <section class="section-problem" #problemSection>
-    <div class="problem-inner">
-      <div class="data-stream data-stream-full" #dataStreamFull>
-        @for (col of dataColumnsFull; track col.id) {
-          <div
-            class="data-column"
-            [style.left]="col.left + '%'"
-          >
-            <div class="data-column-inner"
-              [style.animation-duration]="col.speed + 's'"
-              [style.animation-delay]="col.delay + 's'"
-            >
-              @for (item of col.items; track $index) {
-                <span class="data-item" [class.ticker]="item.isTicker">{{ item.text }}</span>
-              }
-              @for (item of col.items; track $index) {
-                <span class="data-item" [class.ticker]="item.isTicker">{{ item.text }}</span>
-              }
-            </div>
-          </div>
-        }
-      </div>
-      <div class="problem-statement" #problemStatement>
-        <h2>Raw data doesn't tell you what to buy.</h2>
-      </div>
     </div>
   </section>
 

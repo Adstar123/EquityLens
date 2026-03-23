@@ -80,7 +80,7 @@ function buildColumns(count: number, baseSpeed: number): DataColumn[] {
 export class LandingComponent implements AfterViewInit, OnDestroy {
   private zone = inject(NgZone);
 
-  // Template refs — GSAP targets
+  // Template refs
   @ViewChild('landingContainer') landingContainer!: ElementRef<HTMLDivElement>;
   @ViewChild('heroSection') heroSection!: ElementRef<HTMLElement>;
   @ViewChild('heroType') heroType!: ElementRef<HTMLDivElement>;
@@ -92,8 +92,6 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   @ViewChild('dataStreamLens') dataStreamLens!: ElementRef<HTMLDivElement>;
   @ViewChild('lensEl') lensEl!: ElementRef<HTMLDivElement>;
   @ViewChild('lensHint') lensHint!: ElementRef<HTMLSpanElement>;
-  @ViewChild('problemSection') problemSection!: ElementRef<HTMLElement>;
-  @ViewChild('dataStreamFull') dataStreamFull!: ElementRef<HTMLDivElement>;
   @ViewChild('problemStatement') problemStatement!: ElementRef<HTMLDivElement>;
   @ViewChild('solutionSection') solutionSection!: ElementRef<HTMLElement>;
   @ViewChild('demoCard') demoCard!: ElementRef<HTMLDivElement>;
@@ -107,15 +105,14 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   @ViewChild('ctaSection') ctaSection!: ElementRef<HTMLElement>;
   @ViewChild('ctaInner') ctaInner!: ElementRef<HTMLDivElement>;
 
-  // Data columns for different sections
+  // Data columns
   dataColumns = buildColumns(12, 18);
-  dataColumnsFull = buildColumns(16, 14);
 
   // Auth URLs
   googleAuthUrl = 'http://localhost:8080/api/v1/auth/google/login';
   githubAuthUrl = 'http://localhost:8080/api/v1/auth/github/login';
 
-  // GSAP context for cleanup
+  // GSAP context
   private gsapCtx: gsap.Context | null = null;
 
   // Lens state
@@ -125,12 +122,13 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   private lensPosY = 50;
   private lensTargetR = 0;
   private lensCurR = 0;
+  private lensScale = 1.2;
   private lensRaf: number | null = null;
   private lensExpanded = false;
   private hintDismissed = false;
 
   // ──────────────────────────────────────────────
-  // Lens interaction handlers
+  // Lens interaction
   // ──────────────────────────────────────────────
 
   onHeroMouseMove(event: MouseEvent): void {
@@ -191,13 +189,11 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
 
       // Update bright data stream — clip + magnification
       if (this.dataStreamLens) {
-        const lensEl = this.dataStreamLens.nativeElement;
-        // Clip to lens circle
-        lensEl.style.clipPath =
+        const el = this.dataStreamLens.nativeElement;
+        el.style.clipPath =
           `circle(${this.lensCurR}px at ${this.lensPosX}% ${this.lensPosY}%)`;
-        // Scale up from the lens center point — simulates real magnification
-        lensEl.style.transformOrigin = `${this.lensPosX}% ${this.lensPosY}%`;
-        lensEl.style.transform = 'scale(1.2)';
+        el.style.transformOrigin = `${this.lensPosX}% ${this.lensPosY}%`;
+        el.style.transform = `scale(${this.lensScale})`;
       }
 
       // Update lens ring position and size
@@ -237,7 +233,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
       ScrollTrigger.refresh();
 
       // ──────────────────────────────────────────
-      // SECTION 0: Hero entrance
+      // Hero entrance (plays on load, no scroll)
       // ──────────────────────────────────────────
 
       const heroTl = gsap.timeline();
@@ -254,7 +250,6 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
           duration: 1,
           ease: 'power3.out',
         }, '-=0.7')
-        // Lens appears — expand clip radius from 0 to default
         .add(() => {
           this.lensTargetR = 70;
         }, '-=0.3')
@@ -274,95 +269,115 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
           duration: 1,
           ease: 'power1.out',
         }, '-=0.3')
-        // Show hint after everything settles
         .to(this.lensHint.nativeElement, {
           opacity: 1,
           duration: 0.5,
           ease: 'power1.out',
         }, '+=0.3');
 
-      // Fade scroll cue on scroll
-      gsap.to(this.scrollCue.nativeElement, {
-        opacity: 0,
+      // ──────────────────────────────────────────
+      // Pinned hero scroll transition
+      // The lens expansion IS the transition.
+      // ──────────────────────────────────────────
+
+      // GSAP drives these via proxy, rAF loop reads them
+      const expandProxy = { r: 70, scale: 1.2 };
+
+      const scrollTl = gsap.timeline({
         scrollTrigger: {
           trigger: this.heroSection.nativeElement,
+          pin: true,
           start: 'top top',
-          end: '30% top',
-          scrub: true,
-        },
-      });
-
-      // ──────────────────────────────────────────
-      // SECTION 1: Problem — data overwhelms
-      // ──────────────────────────────────────────
-
-      const problemTl = gsap.timeline({
-        scrollTrigger: {
-          trigger: this.problemSection.nativeElement,
-          start: 'top bottom',
-          end: 'bottom bottom',
+          end: '+=250%',
           scrub: 1,
+          onUpdate: (self) => {
+            // Lock lens to center during scroll
+            if (self.progress > 0.01) {
+              this.lensTargetX = 50;
+              this.lensTargetY = 50;
+            }
+          },
         },
       });
 
-      // Phase 1: Hero fades, full data stream emerges
-      problemTl
-        .to(this.heroType.nativeElement, {
+      // Phase 1 (0 → 0.03): Scroll cue + hint vanish
+      scrollTl
+        .to(this.scrollCue.nativeElement, { opacity: 0, duration: 0.03 }, 0)
+        .to(this.lensHint.nativeElement, { opacity: 0, duration: 0.02 }, 0)
+
+      // Phase 2 (0 → 0.15): Hero text zooms past you
+        .to(this.heroEquity.nativeElement, {
+          scale: 2.5,
           opacity: 0,
-          scale: 1.05,
-          duration: 0.2,
-          ease: 'none',
-        }, 0)
-        .to(this.dataStream.nativeElement, {
+          duration: 0.13,
+          ease: 'power2.in',
+        }, 0.01)
+        .to(this.heroLens.nativeElement, {
+          scale: 2.5,
           opacity: 0,
-          duration: 0.15,
-          ease: 'none',
-        }, 0)
-        // Fade out the lens elements too
-        .to(this.dataStreamLens.nativeElement, {
+          duration: 0.13,
+          ease: 'power2.in',
+        }, 0.02)
+        .to(this.heroSubtitle.nativeElement, {
           opacity: 0,
-          duration: 0.15,
-          ease: 'none',
-        }, 0)
+          y: -15,
+          duration: 0.08,
+        }, 0.01)
+
+      // Phase 3 (0.05 → 0.12): Lens ring dissolves
         .to(this.lensEl.nativeElement, {
           opacity: 0,
-          duration: 0.15,
-          ease: 'none',
-        }, 0)
-        // Full data stream fades in
-        .to(this.dataStreamFull.nativeElement, {
-          opacity: 1,
-          duration: 0.2,
-          ease: 'none',
+          duration: 0.08,
         }, 0.05)
-        // Problem statement
+
+      // Phase 4 (0.05 → 0.45): THE LENS OPENS
+      // clip-path expands from 70px circle to cover entire viewport
+      // magnification normalizes from 1.2x to 1.0x
+        .to(expandProxy, {
+          r: 2500,
+          scale: 1.0,
+          duration: 0.40,
+          ease: 'power2.inOut',
+          onUpdate: () => {
+            this.lensTargetR = expandProxy.r;
+            this.lensScale = expandProxy.scale;
+          },
+        }, 0.05)
+
+      // Phase 4b (0.1 → 0.3): Dim data fades as bright takes over
+        .to(this.dataStream.nativeElement, {
+          opacity: 0,
+          duration: 0.20,
+        }, 0.10)
+
+      // Phase 5 (0.48 → 0.65): Data overwhelms — blur
+        .to(this.dataStreamLens.nativeElement, {
+          filter: 'blur(14px)',
+          opacity: 0.5,
+          duration: 0.17,
+          ease: 'none',
+        }, 0.48)
+
+      // Phase 6 (0.60 → 0.75): Problem statement
         .to(this.problemStatement.nativeElement, {
           opacity: 1,
-          duration: 0.15,
+          duration: 0.12,
           ease: 'none',
-        }, 0.3)
-        // Blur the data
-        .to(this.dataStreamFull.nativeElement, {
-          filter: 'blur(12px)',
-          opacity: 0.5,
-          duration: 0.3,
-          ease: 'none',
-        }, 0.45)
-        // Fade everything out
+        }, 0.60)
+
+      // Phase 7 (0.82 → 0.95): Everything fades to black
         .to(this.problemStatement.nativeElement, {
           opacity: 0,
           y: -30,
-          duration: 0.15,
-          ease: 'none',
-        }, 0.8)
-        .to(this.dataStreamFull.nativeElement, {
+          duration: 0.08,
+        }, 0.82)
+        .to(this.dataStreamLens.nativeElement, {
           opacity: 0,
-          duration: 0.15,
-          ease: 'none',
-        }, 0.8);
+          duration: 0.12,
+        }, 0.85);
 
       // ──────────────────────────────────────────
-      // SECTION 2: Solution card
+      // Solution card
       // ──────────────────────────────────────────
 
       const scoreObj = { val: 0 };
@@ -391,7 +406,6 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
           },
         }, '-=0.5');
 
-      // Ratio bars staggered fill
       const ratioFills = this.demoRatios.nativeElement.querySelectorAll('.demo-ratio-fill');
       ratioFills.forEach((fill: Element, i: number) => {
         const el = fill as HTMLElement;
@@ -405,7 +419,6 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
         }, `${0.5 + i * 0.15}`);
       });
 
-      // Rating stamp
       solutionTl.to(this.demoRating.nativeElement, {
         opacity: 1,
         scale: 1,
@@ -413,7 +426,6 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
         ease: 'back.out(3)',
       }, '-=0.3');
 
-      // Caption
       solutionTl.to(this.solutionCaption.nativeElement, {
         opacity: 1,
         duration: 0.6,
@@ -421,7 +433,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
       }, '-=0.2');
 
       // ──────────────────────────────────────────
-      // SECTION 3: How it works
+      // How it works
       // ──────────────────────────────────────────
 
       [this.howStep1, this.howStep2, this.howStep3].forEach((ref, i) => {
@@ -440,7 +452,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
       });
 
       // ──────────────────────────────────────────
-      // SECTION 4: CTA
+      // CTA
       // ──────────────────────────────────────────
 
       gsap.to(this.ctaInner.nativeElement, {

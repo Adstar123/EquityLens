@@ -377,36 +377,7 @@ $data-visible: #555570;
 }
 
 
-// ────────────────────────────────────────────────────────
-// SECTION 1 — THE PROBLEM
-// ────────────────────────────────────────────────────────
-.section-problem {
-  position: relative;
-  height: 200vh;
-  background: $near-black;
-}
-
-.problem-inner {
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-
-.data-stream-full {
-  opacity: 0;
-  will-change: filter, opacity;
-  .data-item {
-    color: $data-visible;
-    &.ticker {
-      color: #696984;
-    }
-  }
-}
-
+// Problem statement (inside pinned hero)
 .problem-statement {
   position: absolute;
   inset: 0;
