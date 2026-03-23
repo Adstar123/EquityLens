@@ -85,7 +85,7 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
       @if (loading()) {
         <div class="loading-state">Loading...</div>
       } @else {
-        <div class="table-wrap" @tableStagger>
+        <div class="table-wrap">
           <table>
             <thead>
               <tr>
@@ -134,6 +134,11 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
     </div>
   `,
   styles: [`
+    :host {
+      display: block;
+      height: 100%;
+    }
+
     .screener-container {
       height: 100%;
       display: flex;
