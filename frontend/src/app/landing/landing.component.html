@@ -4,17 +4,45 @@
        SECTION 0 — ENTRY (viewport 1)
        The typography IS the design.
        ═══════════════════════════════════════════════════════════════ -->
-  <section class="section-hero" #heroSection (mousemove)="onMouseMove($event)">
+  <section class="section-hero" #heroSection
+    (mousemove)="onHeroMouseMove($event)"
+    (mousedown)="onHeroMouseDown($event)"
+    (mouseup)="onHeroMouseUp()"
+    (mouseleave)="onHeroMouseLeave()"
+  >
     <!-- Data stream behind everything (faint ambient columns) -->
     <div class="data-stream data-stream-ambient" #dataStream>
       @for (col of dataColumns; track col.id) {
         <div
           class="data-column"
-          [style.animation-duration]="col.speed + 's'"
-          [style.animation-delay]="col.delay + 's'"
           [style.left]="col.left + '%'"
         >
-          <div class="data-column-inner">
+          <div class="data-column-inner"
+            [style.animation-duration]="col.speed + 's'"
+            [style.animation-delay]="col.delay + 's'"
+          >
+            @for (item of col.items; track $index) {
+              <span class="data-item" [class.ticker]="item.isTicker">{{ item.text }}</span>
+            }
+            @for (item of col.items; track $index) {
+              <span class="data-item" [class.ticker]="item.isTicker">{{ item.text }}</span>
+            }
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- Bright data stream — same columns, revealed through the lens -->
+    <div class="data-stream data-stream-lens" #dataStreamLens>
+      @for (col of dataColumns; track col.id) {
+        <div
+          class="data-column"
+          [style.left]="col.left + '%'"
+        >
+          <div class="data-column-inner"
+            [style.animation-duration]="col.speed + 's'"
+            [style.animation-delay]="col.delay + 's'"
+          >
             @for (item of col.items; track $index) {
               <span class="data-item" [class.ticker]="item.isTicker">{{ item.text }}</span>
             }
@@ -32,31 +60,22 @@
         <h1 class="hero-line hero-line-equity" #heroEquity>EQUITY</h1>
         <div class="hero-line-lens-row">
           <h1 class="hero-line hero-line-lens" #heroLens>LENS</h1>
-          <!-- The aperture — a circular portal over the "E" of LENS, revealing brighter data -->
-          <div class="aperture" #aperture>
-            <div class="aperture-data">
-              @for (col of apertureColumns; track col.id) {
-                <div
-                  class="data-column"
-                  [style.animation-duration]="col.speed + 's'"
-                  [style.animation-delay]="col.delay + 's'"
-                  [style.left]="col.left + '%'"
-                >
-                  <div class="data-column-inner">
-                    @for (item of col.items; track $index) {
-                      <span class="data-item" [class.ticker]="item.isTicker">{{ item.text }}</span>
-                    }
-                    @for (item of col.items; track $index) {
-                      <span class="data-item" [class.ticker]="item.isTicker">{{ item.text }}</span>
-                    }
-                  </div>
-                </div>
-              }
-            </div>
-          </div>
         </div>
       </div>
       <p class="hero-subtitle" #heroSubtitle>ASX Stock Intelligence</p>
+    </div>
+
+    <!-- The interactive lens -->
+    <div class="lens" #lensEl>
+      <div class="lens-bezel"></div>
+      <div class="lens-refraction"></div>
+      <div class="lens-inner-rim"></div>
+      <div class="lens-glass"></div>
+      <div class="lens-caustic"></div>
+      <div class="lens-ticks">
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <span class="lens-hint" #lensHint>hold to magnify</span>
     </div>
 
     <!-- Scroll cue -->
@@ -76,11 +95,12 @@
         @for (col of dataColumnsFull; track col.id) {
           <div
             class="data-column"
-            [style.animation-duration]="col.speed + 's'"
-            [style.animation-delay]="col.delay + 's'"
             [style.left]="col.left + '%'"
           >
-            <div class="data-column-inner">
+            <div class="data-column-inner"
+              [style.animation-duration]="col.speed + 's'"
+              [style.animation-delay]="col.delay + 's'"
+            >
               @for (item of col.items; track $index) {
                 <span class="data-item" [class.ticker]="item.isTicker">{{ item.text }}</span>
               }

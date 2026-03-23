@@ -36,6 +36,7 @@ $data-visible: #555570;
   justify-content: center;
   overflow: hidden;
   background: $near-black;
+  cursor: crosshair;
 }
 
 // Data stream — matrix rain of financial data
@@ -55,11 +56,6 @@ $data-visible: #555570;
   position: absolute;
   top: 0;
   width: 120px;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  animation: streamScroll linear infinite;
-  will-change: transform;
 }
 
 .data-column-inner {
@@ -67,6 +63,8 @@ $data-visible: #555570;
   flex-direction: column;
   gap: 12px;
   padding: 8px 0;
+  animation: streamScroll linear infinite;
+  will-change: transform;
 }
 
 .data-item {
@@ -117,47 +115,224 @@ $data-visible: #555570;
   display: block;
 }
 
-// LENS row — contains text + overlaid aperture
+// LENS row
 .hero-line-lens-row {
   position: relative;
   display: inline-block;
 }
 
-// The aperture — circular portal revealing brighter data
-.aperture {
-  position: absolute;
-  // Positioned at center of "LENS" text
-  top: 50%;
-  left: 50%;
-  transform: translate(
-    calc(-50% + var(--aperture-offset-x, 0px)),
-    calc(-50% + var(--aperture-offset-y, 0px))
-  );
-  width: var(--aperture-diameter, 80px);
-  height: var(--aperture-diameter, 80px);
-  border-radius: 50%;
-  overflow: hidden;
-  pointer-events: none;
-  // Subtle ring
-  box-shadow: inset 0 0 0 1px rgba(212, 147, 13, 0.15);
-  z-index: 3;
-}
-
-.aperture-data {
-  position: absolute;
-  // Center data within aperture
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 400px;
-  height: 400px;
-  overflow: hidden;
+// Bright data stream — revealed through the lens clip
+.data-stream-lens {
+  z-index: 1;
+  // clip-path set via JS for smooth tracking
+  clip-path: circle(0px at 50% 50%);
 
   .data-item {
-    color: #3a3a58;
+    color: rgba(136, 136, 160, 0.85);
     &.ticker {
-      color: #4a4a68;
+      color: $amber;
+      font-weight: 600;
     }
+  }
+}
+
+// The interactive lens
+.lens {
+  position: absolute;
+  z-index: 4;
+  pointer-events: none;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+}
+
+// Outer bezel — brushed metal ring
+.lens-bezel {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  // Metallic gradient border using background trick
+  background: conic-gradient(
+    from 0deg,
+    rgba(212, 147, 13, 0.5),
+    rgba(212, 147, 13, 0.2) 25%,
+    rgba(212, 147, 13, 0.55) 50%,
+    rgba(212, 147, 13, 0.2) 75%,
+    rgba(212, 147, 13, 0.5)
+  );
+  -webkit-mask: radial-gradient(
+    circle,
+    transparent calc(100% - 4px),
+    black calc(100% - 4px)
+  );
+  mask: radial-gradient(
+    circle,
+    transparent calc(100% - 4px),
+    black calc(100% - 4px)
+  );
+  box-shadow:
+    0 0 40px rgba(212, 147, 13, 0.12),
+    0 0 80px rgba(212, 147, 13, 0.06);
+  animation: lensPulse 3s ease-in-out infinite;
+}
+
+// Inner rim — gives depth between bezel and glass
+.lens-inner-rim {
+  position: absolute;
+  inset: 1px;
+  border-radius: 50%;
+  border: 1px solid rgba(212, 147, 13, 0.12);
+  box-shadow: inset 0 0 8px rgba(212, 147, 13, 0.04);
+}
+
+// Edge refraction ring — bright ring just inside the bezel (light bending at lens edge)
+.lens-refraction {
+  position: absolute;
+  inset: -1px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  box-shadow:
+    inset 0 0 12px rgba(212, 147, 13, 0.06),
+    inset 0 -4px 12px rgba(212, 147, 13, 0.03);
+}
+
+// Glass surface — convex glass look
+.lens-glass {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  // Radial vignette — darker at edges, clear in center (convex lens)
+  background: radial-gradient(
+    circle at 45% 40%,
+    transparent 40%,
+    rgba(10, 10, 20, 0.15) 65%,
+    rgba(10, 10, 20, 0.45) 90%,
+    rgba(10, 10, 20, 0.65) 100%
+  );
+
+  // Main glare — broad light reflection top-left
+  &::before {
+    content: '';
+    position: absolute;
+    top: 6%;
+    left: 10%;
+    width: 45%;
+    height: 22%;
+    border-radius: 50%;
+    background: linear-gradient(
+      150deg,
+      rgba(255, 255, 255, 0.12) 0%,
+      rgba(255, 255, 255, 0.04) 40%,
+      transparent 100%
+    );
+    transform: rotate(-15deg);
+    filter: blur(2px);
+  }
+  // Secondary sharp glare
+  &::after {
+    content: '';
+    position: absolute;
+    top: 12%;
+    left: 20%;
+    width: 22%;
+    height: 6%;
+    border-radius: 50%;
+    background: linear-gradient(
+      150deg,
+      rgba(255, 255, 255, 0.15) 0%,
+      rgba(255, 255, 255, 0.03) 60%,
+      transparent 100%
+    );
+    transform: rotate(-15deg);
+  }
+}
+
+// Curved caustic — the signature arc of light across the glass surface
+.lens-caustic {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: -20%;
+    left: -20%;
+    width: 140%;
+    height: 140%;
+    border-radius: 50%;
+    border: 1px solid transparent;
+    border-top-color: rgba(255, 255, 255, 0.06);
+    border-right-color: rgba(255, 255, 255, 0.03);
+    transform: rotate(-30deg);
+  }
+  // Bottom highlight (light wrap)
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: 8%;
+    right: 12%;
+    width: 30%;
+    height: 10%;
+    border-radius: 50%;
+    background: radial-gradient(
+      ellipse,
+      rgba(212, 147, 13, 0.04) 0%,
+      transparent 70%
+    );
+    filter: blur(3px);
+  }
+}
+
+// Tick marks — precision instrument feel
+.lens-ticks {
+  position: absolute;
+  inset: 0;
+
+  span {
+    position: absolute;
+    background: rgba(212, 147, 13, 0.3);
+
+    &:nth-child(1) { top: -4px; left: 50%; width: 1px; height: 12px; transform: translateX(-50%); }
+    &:nth-child(2) { bottom: -4px; left: 50%; width: 1px; height: 12px; transform: translateX(-50%); }
+    &:nth-child(3) { left: -4px; top: 50%; height: 1px; width: 12px; transform: translateY(-50%); }
+    &:nth-child(4) { right: -4px; top: 50%; height: 1px; width: 12px; transform: translateY(-50%); }
+  }
+}
+
+.lens-hint {
+  position: absolute;
+  bottom: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.55rem;
+  color: rgba(212, 147, 13, 0.45);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+}
+
+@keyframes lensPulse {
+  0%, 100% {
+    border-color: rgba(212, 147, 13, 0.25);
+    box-shadow:
+      0 0 20px rgba(212, 147, 13, 0.04),
+      0 0 50px rgba(212, 147, 13, 0.02),
+      inset 0 0 25px rgba(212, 147, 13, 0.015);
+  }
+  50% {
+    border-color: rgba(212, 147, 13, 0.45);
+    box-shadow:
+      0 0 30px rgba(212, 147, 13, 0.1),
+      0 0 70px rgba(212, 147, 13, 0.05),
+      inset 0 0 40px rgba(212, 147, 13, 0.04);
   }
 }
 

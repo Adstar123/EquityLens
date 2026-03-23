@@ -46,7 +46,7 @@ const VALUES = [
 
 function buildItems(seed: number): DataItem[] {
   const items: DataItem[] = [];
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 60; i++) {
     if (i % 3 === 0) {
       items.push({ text: TICKERS[(i + seed) % TICKERS.length], isTicker: true });
     } else {
@@ -86,10 +86,12 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   @ViewChild('heroType') heroType!: ElementRef<HTMLDivElement>;
   @ViewChild('heroEquity') heroEquity!: ElementRef<HTMLHeadingElement>;
   @ViewChild('heroLens') heroLens!: ElementRef<HTMLHeadingElement>;
-  @ViewChild('aperture') aperture!: ElementRef<HTMLDivElement>;
   @ViewChild('heroSubtitle') heroSubtitle!: ElementRef<HTMLParagraphElement>;
   @ViewChild('scrollCue') scrollCue!: ElementRef<HTMLDivElement>;
   @ViewChild('dataStream') dataStream!: ElementRef<HTMLDivElement>;
+  @ViewChild('dataStreamLens') dataStreamLens!: ElementRef<HTMLDivElement>;
+  @ViewChild('lensEl') lensEl!: ElementRef<HTMLDivElement>;
+  @ViewChild('lensHint') lensHint!: ElementRef<HTMLSpanElement>;
   @ViewChild('problemSection') problemSection!: ElementRef<HTMLElement>;
   @ViewChild('dataStreamFull') dataStreamFull!: ElementRef<HTMLDivElement>;
   @ViewChild('problemStatement') problemStatement!: ElementRef<HTMLDivElement>;
@@ -108,7 +110,6 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   // Data columns for different sections
   dataColumns = buildColumns(12, 18);
   dataColumnsFull = buildColumns(16, 14);
-  apertureColumns = buildColumns(6, 12);
 
   // Auth URLs
   googleAuthUrl = 'http://localhost:8080/api/v1/auth/google/login';
@@ -117,28 +118,101 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   // GSAP context for cleanup
   private gsapCtx: gsap.Context | null = null;
 
-  onMouseMove(event: MouseEvent): void {
-    if (!this.aperture) return;
+  // Lens state
+  private lensTargetX = 50;
+  private lensTargetY = 50;
+  private lensPosX = 50;
+  private lensPosY = 50;
+  private lensTargetR = 0;
+  private lensCurR = 0;
+  private lensRaf: number | null = null;
+  private lensExpanded = false;
+  private hintDismissed = false;
+
+  // ──────────────────────────────────────────────
+  // Lens interaction handlers
+  // ──────────────────────────────────────────────
+
+  onHeroMouseMove(event: MouseEvent): void {
     const section = this.heroSection.nativeElement;
     const rect = section.getBoundingClientRect();
-    const x = (event.clientX - rect.left) / rect.width;
-    const y = (event.clientY - rect.top) / rect.height;
-    // Subtle parallax shift on aperture
-    const offsetX = (x - 0.5) * 8;
-    const offsetY = (y - 0.5) * 12;
-    this.aperture.nativeElement.style.setProperty('--aperture-offset-x', `${offsetX}px`);
-    this.aperture.nativeElement.style.setProperty('--aperture-offset-y', `${offsetY}px`);
+    this.lensTargetX = ((event.clientX - rect.left) / rect.width) * 100;
+    this.lensTargetY = ((event.clientY - rect.top) / rect.height) * 100;
   }
+
+  onHeroMouseDown(event: MouseEvent): void {
+    if (event.button !== 0) return;
+    this.lensExpanded = true;
+    this.lensTargetR = 120;
+    if (!this.hintDismissed) {
+      this.hintDismissed = true;
+      gsap.to(this.lensHint.nativeElement, { opacity: 0, duration: 0.2 });
+    }
+  }
+
+  onHeroMouseUp(): void {
+    if (!this.lensExpanded) return;
+    this.lensExpanded = false;
+    this.lensTargetR = 70;
+  }
+
+  onHeroMouseLeave(): void {
+    this.lensTargetX = 50;
+    this.lensTargetY = 50;
+    if (this.lensExpanded) {
+      this.lensExpanded = false;
+      this.lensTargetR = 70;
+    }
+  }
+
+  // ──────────────────────────────────────────────
+  // Lifecycle
+  // ──────────────────────────────────────────────
 
   ngAfterViewInit(): void {
     this.zone.runOutsideAngular(() => {
-      // Small delay to let layout settle
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           this.initAnimations();
+          this.startLensLoop();
         });
       });
     });
+  }
+
+  private startLensLoop(): void {
+    const animate = (): void => {
+      const posEase = 0.08;
+      const rEase = 0.1;
+
+      this.lensPosX += (this.lensTargetX - this.lensPosX) * posEase;
+      this.lensPosY += (this.lensTargetY - this.lensPosY) * posEase;
+      this.lensCurR += (this.lensTargetR - this.lensCurR) * rEase;
+
+      // Update bright data stream — clip + magnification
+      if (this.dataStreamLens) {
+        const lensEl = this.dataStreamLens.nativeElement;
+        // Clip to lens circle
+        lensEl.style.clipPath =
+          `circle(${this.lensCurR}px at ${this.lensPosX}% ${this.lensPosY}%)`;
+        // Scale up from the lens center point — simulates real magnification
+        lensEl.style.transformOrigin = `${this.lensPosX}% ${this.lensPosY}%`;
+        lensEl.style.transform = 'scale(1.2)';
+      }
+
+      // Update lens ring position and size
+      if (this.lensEl) {
+        const el = this.lensEl.nativeElement;
+        el.style.left = `${this.lensPosX}%`;
+        el.style.top = `${this.lensPosY}%`;
+        const d = this.lensCurR * 2;
+        el.style.width = `${d}px`;
+        el.style.height = `${d}px`;
+      }
+
+      this.lensRaf = requestAnimationFrame(animate);
+    };
+    this.lensRaf = requestAnimationFrame(animate);
   }
 
   private getScroller(): HTMLElement {
@@ -180,12 +254,15 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
           duration: 1,
           ease: 'power3.out',
         }, '-=0.7')
-        .from(this.aperture.nativeElement, {
-          scale: 0,
+        // Lens appears — expand clip radius from 0 to default
+        .add(() => {
+          this.lensTargetR = 70;
+        }, '-=0.3')
+        .from(this.lensEl.nativeElement, {
           opacity: 0,
           duration: 0.8,
           ease: 'power2.out',
-        }, '-=0.4')
+        }, '-=0.3')
         .from(this.heroSubtitle.nativeElement, {
           y: 20,
           opacity: 0,
@@ -196,7 +273,13 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
           opacity: 0,
           duration: 1,
           ease: 'power1.out',
-        }, '-=0.3');
+        }, '-=0.3')
+        // Show hint after everything settles
+        .to(this.lensHint.nativeElement, {
+          opacity: 1,
+          duration: 0.5,
+          ease: 'power1.out',
+        }, '+=0.3');
 
       // Fade scroll cue on scroll
       gsap.to(this.scrollCue.nativeElement, {
@@ -210,7 +293,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
       });
 
       // ──────────────────────────────────────────
-      // SECTION 1: Aperture expands + problem
+      // SECTION 1: Problem — data overwhelms
       // ──────────────────────────────────────────
 
       const problemTl = gsap.timeline({
@@ -231,6 +314,17 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
           ease: 'none',
         }, 0)
         .to(this.dataStream.nativeElement, {
+          opacity: 0,
+          duration: 0.15,
+          ease: 'none',
+        }, 0)
+        // Fade out the lens elements too
+        .to(this.dataStreamLens.nativeElement, {
+          opacity: 0,
+          duration: 0.15,
+          ease: 'none',
+        }, 0)
+        .to(this.lensEl.nativeElement, {
           opacity: 0,
           duration: 0.15,
           ease: 'none',
@@ -365,6 +459,9 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (this.lensRaf !== null) {
+      cancelAnimationFrame(this.lensRaf);
+    }
     if (this.gsapCtx) {
       this.gsapCtx.revert();
     }
