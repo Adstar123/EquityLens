@@ -10,7 +10,8 @@ import {
 } from '@angular/animations';
 import { NgxEchartsDirective } from 'ngx-echarts';
 import { EChartsCoreOption } from 'echarts/core';
-import { ApiService, TickerDetail } from '../core/api.service';
+import { ApiService, TickerDetail, Company } from '../core/api.service';
+import { AuthService } from '../core/auth.service';
 import { RatioBarComponent } from '../shared/components/ratio-bar.component';
 
 @Component({
@@ -50,6 +51,20 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
             <span class="company-symbol">{{ detail()!.company.symbol }}</span>
             @if (detail()!.company.sector_id) {
               <span class="sector-pill">{{ detail()!.company.sector_id }}</span>
+            }
+            @if (auth.isLoggedIn()) {
+              <button
+                class="watchlist-btn"
+                [class.active]="inWatchlist()"
+                (click)="toggleWatchlist()"
+                [title]="inWatchlist() ? 'Remove from watchlist' : 'Add to watchlist'"
+              >
+                @if (inWatchlist()) {
+                  &#9733;
+                } @else {
+                  &#9734;
+                }
+              </button>
             }
           </div>
         </header>
@@ -206,6 +221,32 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
       background: rgba(136, 136, 160, 0.12);
       color: #8888a0;
       white-space: nowrap;
+    }
+
+    .watchlist-btn {
+      background: none;
+      border: 1px solid transparent;
+      color: #555570;
+      font-size: 1.25rem;
+      line-height: 1;
+      width: 32px;
+      height: 32px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: color 200ms ease, border-color 200ms ease, transform 150ms ease;
+      margin-left: 0.25rem;
+    }
+
+    .watchlist-btn:hover {
+      color: #d4930d;
+      border-color: rgba(212, 147, 13, 0.3);
+      transform: scale(1.15);
+    }
+
+    .watchlist-btn.active {
+      color: #d4930d;
     }
 
     /* Score section */
@@ -406,11 +447,14 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
 export class TickerComponent implements OnInit, AfterViewInit {
   private route = inject(ActivatedRoute);
   private api = inject(ApiService);
+  readonly auth = inject(AuthService);
 
   detail = signal<TickerDetail | null>(null);
   loading = signal(true);
   displayScore = signal(0);
   expandedRatio = signal<string | null>(null);
+  inWatchlist = signal(false);
+  private watchlistSymbols = signal<Set<string>>(new Set());
 
   ratios = computed(() => {
     const d = this.detail();
@@ -499,6 +543,7 @@ export class TickerComponent implements OnInit, AfterViewInit {
       const symbol = params.get('symbol');
       if (symbol) {
         this.loadTicker(symbol);
+        this.checkWatchlistStatus(symbol);
       }
     });
   }
@@ -522,6 +567,35 @@ export class TickerComponent implements OnInit, AfterViewInit {
     if (Math.abs(value) >= 1000) return value.toFixed(0);
     if (Math.abs(value) >= 100) return value.toFixed(1);
     return value.toFixed(2);
+  }
+
+  toggleWatchlist(): void {
+    const symbol = this.detail()?.company.symbol;
+    if (!symbol) return;
+
+    if (this.inWatchlist()) {
+      this.api.removeFromWatchlist(symbol).subscribe({
+        next: () => this.inWatchlist.set(false),
+        error: () => {},
+      });
+    } else {
+      this.api.addToWatchlist(symbol).subscribe({
+        next: () => this.inWatchlist.set(true),
+        error: () => {},
+      });
+    }
+  }
+
+  private checkWatchlistStatus(symbol: string): void {
+    if (!this.auth.isLoggedIn()) return;
+    this.api.getWatchlist().subscribe({
+      next: (companies: Company[]) => {
+        const symbols = new Set(companies.map(c => c.symbol));
+        this.watchlistSymbols.set(symbols);
+        this.inWatchlist.set(symbols.has(symbol.toUpperCase()));
+      },
+      error: () => {},
+    });
   }
 
   private loadTicker(symbol: string): void {
