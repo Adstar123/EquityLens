@@ -126,6 +126,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   private lensRaf: number | null = null;
   private lensExpanded = false;
   private hintDismissed = false;
+  private scrollActive = false;
 
   // ──────────────────────────────────────────────
   // Lens interaction
@@ -196,8 +197,8 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
         el.style.transform = `scale(${this.lensScale})`;
       }
 
-      // Update lens ring position and size
-      if (this.lensEl) {
+      // Update lens visual ring — only when NOT in scroll transition
+      if (this.lensEl && !this.scrollActive) {
         const el = this.lensEl.nativeElement;
         el.style.left = `${this.lensPosX}%`;
         el.style.top = `${this.lensPosY}%`;
@@ -234,45 +235,49 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
 
       // ──────────────────────────────────────────
       // Hero entrance (plays on load, no scroll)
+      // Uses set+to instead of from() to avoid stale inline styles
       // ──────────────────────────────────────────
 
-      const heroTl = gsap.timeline();
+      const heroEls = [
+        this.heroType.nativeElement,
+        this.heroEquity.nativeElement,
+        this.heroLens.nativeElement,
+        this.heroSubtitle.nativeElement,
+        this.scrollCue.nativeElement,
+      ];
+
+      // Set initial hidden state
+      gsap.set(this.heroEquity.nativeElement, { y: 40, opacity: 0 });
+      gsap.set(this.heroLens.nativeElement, { y: 40, opacity: 0 });
+      gsap.set(this.heroSubtitle.nativeElement, { y: 20, opacity: 0 });
+      gsap.set(this.scrollCue.nativeElement, { opacity: 0 });
+
+      const heroTl = gsap.timeline({
+        onComplete: () => {
+          // Remove all inline styles — elements return to CSS defaults (visible)
+          // Scroll timeline then has a perfectly clean slate
+          gsap.set(heroEls, { clearProps: 'all' });
+        },
+      });
+
       heroTl
-        .from(this.heroEquity.nativeElement, {
-          y: 40,
-          opacity: 0,
-          duration: 1,
-          ease: 'power3.out',
+        .to(this.heroEquity.nativeElement, {
+          y: 0, opacity: 1, duration: 1, ease: 'power3.out',
         })
-        .from(this.heroLens.nativeElement, {
-          y: 40,
-          opacity: 0,
-          duration: 1,
-          ease: 'power3.out',
+        .to(this.heroLens.nativeElement, {
+          y: 0, opacity: 1, duration: 1, ease: 'power3.out',
         }, '-=0.7')
         .add(() => {
           this.lensTargetR = 70;
         }, '-=0.3')
-        .from(this.lensEl.nativeElement, {
-          opacity: 0,
-          duration: 0.8,
-          ease: 'power2.out',
-        }, '-=0.3')
-        .from(this.heroSubtitle.nativeElement, {
-          y: 20,
-          opacity: 0,
-          duration: 0.8,
-          ease: 'power2.out',
+        .to(this.heroSubtitle.nativeElement, {
+          y: 0, opacity: 1, duration: 0.8, ease: 'power2.out',
         }, '-=0.5')
-        .from(this.scrollCue.nativeElement, {
-          opacity: 0,
-          duration: 1,
-          ease: 'power1.out',
+        .to(this.scrollCue.nativeElement, {
+          opacity: 1, duration: 1, ease: 'power1.out',
         }, '-=0.3')
         .to(this.lensHint.nativeElement, {
-          opacity: 1,
-          duration: 0.5,
-          ease: 'power1.out',
+          opacity: 1, duration: 0.5, ease: 'power1.out',
         }, '+=0.3');
 
       // ──────────────────────────────────────────
@@ -282,6 +287,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
 
       // GSAP drives these via proxy, rAF loop reads them
       const expandProxy = { r: 70, scale: 1.2 };
+      let entranceKilled = false;
 
       const scrollTl = gsap.timeline({
         scrollTrigger: {
@@ -291,79 +297,97 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
           end: '+=250%',
           scrub: 1,
           onUpdate: (self) => {
-            // Lock lens to center during scroll
-            if (self.progress > 0.01) {
+            // Kill entrance + clear props on first scroll
+            if (self.progress > 0.003 && !entranceKilled) {
+              entranceKilled = true;
+              heroTl.progress(1).kill();
+              gsap.set(heroEls, { clearProps: 'all' });
+            }
+            // Hide/show lens glass instantly (no scrub lag)
+            const wasActive = this.scrollActive;
+            this.scrollActive = self.progress > 0.003;
+            if (this.scrollActive) {
+              this.lensEl.nativeElement.style.visibility = 'hidden';
+              // Collapse the bright data circle immediately
+              this.lensTargetR = 0;
               this.lensTargetX = 50;
               this.lensTargetY = 50;
+            } else {
+              this.lensEl.nativeElement.style.visibility = '';
+              // Reset lens state when scrolling back to hero
+              if (wasActive) {
+                this.lensTargetR = 70;
+                this.lensScale = 1.2;
+                expandProxy.r = 0;
+                expandProxy.scale = 1.2;
+              }
             }
           },
         },
       });
 
-      // Phase 1 (0 → 0.03): Scroll cue + hint vanish
+      // Anchor visible state at timeline start so scrub-back restores it
       scrollTl
-        .to(this.scrollCue.nativeElement, { opacity: 0, duration: 0.03 }, 0)
+        .set(this.heroType.nativeElement, { scale: 1 }, 0)
+        .set(this.heroEquity.nativeElement, { opacity: 1 }, 0)
+        .set(this.heroLens.nativeElement, { opacity: 1 }, 0)
+        .set(this.heroSubtitle.nativeElement, { opacity: 1 }, 0)
+        .set(this.dataStream.nativeElement, { opacity: 0.6 }, 0)
+        .set(this.dataStreamLens.nativeElement, { filter: 'blur(0px)', opacity: 1 }, 0)
+
+      // Phase 0 (0 → 0.02): Scroll cue + hint vanish
+        .to(this.scrollCue.nativeElement, { opacity: 0, duration: 0.02 }, 0)
         .to(this.lensHint.nativeElement, { opacity: 0, duration: 0.02 }, 0)
 
-      // Phase 2 (0 → 0.15): Hero text zooms past you
-        .to(this.heroEquity.nativeElement, {
-          scale: 2.5,
-          opacity: 0,
-          duration: 0.13,
-          ease: 'power2.in',
-        }, 0.01)
-        .to(this.heroLens.nativeElement, {
-          scale: 2.5,
-          opacity: 0,
-          duration: 0.13,
-          ease: 'power2.in',
-        }, 0.02)
-        .to(this.heroSubtitle.nativeElement, {
-          opacity: 0,
-          y: -15,
-          duration: 0.08,
-        }, 0.01)
+      // Phase 1 (0.01 → 0.15): Hero zooms past you
+      // Container handles scale (guarantees both words reverse together)
+        .to(this.heroType.nativeElement,
+          { scale: 2.5, duration: 0.14, ease: 'power2.in' },
+          0.01)
+      // Individual opacity for stagger effect — EQUITY first, then LENS
+        .to(this.heroEquity.nativeElement,
+          { opacity: 0, duration: 0.08, ease: 'power2.in' },
+          0.01)
+        .to(this.heroLens.nativeElement,
+          { opacity: 0, duration: 0.08, ease: 'power2.in' },
+          0.05)
+        .to(this.heroSubtitle.nativeElement,
+          { opacity: 0, duration: 0.06 },
+          0.02)
 
-      // Phase 3 (0.05 → 0.12): Lens ring dissolves
-        .to(this.lensEl.nativeElement, {
-          opacity: 0,
-          duration: 0.08,
-        }, 0.05)
-
-      // Phase 4 (0.05 → 0.45): THE LENS OPENS
-      // clip-path expands from 70px circle to cover entire viewport
+      // Phase 2 (0.05 → 0.45): THE LENS OPENS
+      // clip-path expands from 0 to cover entire viewport
       // magnification normalizes from 1.2x to 1.0x
-        .to(expandProxy, {
-          r: 2500,
-          scale: 1.0,
-          duration: 0.40,
-          ease: 'power2.inOut',
-          onUpdate: () => {
-            this.lensTargetR = expandProxy.r;
-            this.lensScale = expandProxy.scale;
+        .fromTo(expandProxy,
+          { r: 0, scale: 1.2 },
+          {
+            r: 2500,
+            scale: 1.0,
+            duration: 0.40,
+            ease: 'power2.inOut',
+            immediateRender: false,
+            onUpdate: () => {
+              this.lensTargetR = expandProxy.r;
+              this.lensScale = expandProxy.scale;
+            },
           },
-        }, 0.05)
+          0.05)
 
       // Phase 4b (0.1 → 0.3): Dim data fades as bright takes over
-        .to(this.dataStream.nativeElement, {
-          opacity: 0,
-          duration: 0.20,
-        }, 0.10)
+        .to(this.dataStream.nativeElement,
+          { opacity: 0, duration: 0.20 },
+          0.10)
 
       // Phase 5 (0.48 → 0.65): Data overwhelms — blur
-        .to(this.dataStreamLens.nativeElement, {
-          filter: 'blur(14px)',
-          opacity: 0.5,
-          duration: 0.17,
-          ease: 'none',
-        }, 0.48)
+        .to(this.dataStreamLens.nativeElement,
+          { filter: 'blur(14px)', opacity: 0.5, duration: 0.17, ease: 'none' },
+          0.48)
 
       // Phase 6 (0.60 → 0.75): Problem statement
-        .to(this.problemStatement.nativeElement, {
-          opacity: 1,
-          duration: 0.12,
-          ease: 'none',
-        }, 0.60)
+        .fromTo(this.problemStatement.nativeElement,
+          { opacity: 0, y: 0 },
+          { opacity: 1, duration: 0.12, ease: 'none', immediateRender: false },
+          0.60)
 
       // Phase 7 (0.82 → 0.95): Everything fades to black
         .to(this.problemStatement.nativeElement, {
