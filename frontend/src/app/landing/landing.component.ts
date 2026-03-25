@@ -317,6 +317,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
               // Reset lens state when scrolling back to hero
               if (wasActive) {
                 this.lensTargetR = 70;
+                this.lensCurR = 70;
                 this.lensScale = 1.2;
                 expandProxy.r = 0;
                 expandProxy.scale = 1.2;
