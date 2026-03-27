@@ -128,14 +128,14 @@ interface WatchlistRow {
       font-family: 'Inter', system-ui, sans-serif;
       font-weight: 700;
       font-size: 1.5rem;
-      color: #e8e8ed;
+      color: var(--text-primary);
       margin: 0 0 0.25rem;
       line-height: 1.3;
     }
 
     .greeting-sub {
       font-size: 0.8125rem;
-      color: #555570;
+      color: var(--text-muted);
       margin: 0;
     }
 
@@ -150,9 +150,9 @@ interface WatchlistRow {
 
     .search-input {
       width: 100%;
-      background: #1a1a2e;
-      border: 2px solid #252540;
-      color: #e8e8ed;
+      background: var(--bg-surface);
+      border: 2px solid var(--border);
+      color: var(--text-primary);
       font-family: 'JetBrains Mono', monospace;
       font-size: 1rem;
       padding: 0.75rem 1rem;
@@ -162,11 +162,11 @@ interface WatchlistRow {
     }
 
     .search-input::placeholder {
-      color: #555570;
+      color: var(--text-muted);
     }
 
     .search-input:focus {
-      border-color: #d4930d;
+      border-color: var(--accent);
     }
 
     .search-dropdown {
@@ -174,8 +174,8 @@ interface WatchlistRow {
       top: 100%;
       left: 0;
       right: 0;
-      background: #1a1a2e;
-      border: 1px solid #252540;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
       border-top: none;
       z-index: 20;
       max-height: 280px;
@@ -192,20 +192,20 @@ interface WatchlistRow {
     }
 
     .search-result:hover {
-      background: #252540;
+      background: var(--border);
     }
 
     .sr-symbol {
       font-family: 'JetBrains Mono', monospace;
       font-weight: 700;
       font-size: 0.8125rem;
-      color: #e8e8ed;
+      color: var(--text-primary);
       min-width: 60px;
     }
 
     .sr-name {
       font-size: 0.8125rem;
-      color: #8888a0;
+      color: var(--text-secondary);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -227,14 +227,14 @@ interface WatchlistRow {
       font-size: 0.75rem;
       font-weight: 600;
       letter-spacing: 0.12em;
-      color: #555570;
+      color: var(--text-muted);
       margin: 0;
       text-transform: uppercase;
     }
 
     .view-all {
       font-size: 0.75rem;
-      color: #d4930d;
+      color: var(--accent);
       text-decoration: none;
       transition: color 150ms ease;
     }
@@ -244,7 +244,7 @@ interface WatchlistRow {
     }
 
     .wl-table {
-      border: 1px solid #252540;
+      border: 1px solid var(--border);
       overflow: hidden;
     }
 
@@ -253,13 +253,13 @@ interface WatchlistRow {
       grid-template-columns: 100px 1fr 140px;
       gap: 0;
       padding: 0.5rem 0.75rem;
-      background: #1a1a2e;
+      background: var(--bg-surface);
       font-size: 0.6875rem;
       font-weight: 500;
       text-transform: uppercase;
       letter-spacing: 0.06em;
-      color: #555570;
-      border-bottom: 1px solid #252540;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
     }
 
     .wl-row {
@@ -270,7 +270,7 @@ interface WatchlistRow {
       align-items: center;
       cursor: pointer;
       transition: background 100ms ease;
-      border-bottom: 1px solid #1a1a2e;
+      border-bottom: 1px solid var(--bg-surface);
     }
 
     .wl-row:last-child {
@@ -278,20 +278,20 @@ interface WatchlistRow {
     }
 
     .wl-row:hover {
-      background: #1a1a2e;
+      background: var(--bg-surface);
     }
 
     .wc-symbol {
       font-family: 'JetBrains Mono', monospace;
       font-weight: 700;
       font-size: 0.8125rem;
-      color: #e8e8ed;
+      color: var(--text-primary);
       letter-spacing: 0.02em;
     }
 
     .wc-name {
       font-size: 0.8125rem;
-      color: #8888a0;
+      color: var(--text-secondary);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -303,16 +303,16 @@ interface WatchlistRow {
 
     .no-score {
       font-family: 'JetBrains Mono', monospace;
-      color: #555570;
+      color: var(--text-muted);
     }
 
     .loading-state,
     .empty-state {
       text-align: center;
-      color: #555570;
+      color: var(--text-muted);
       padding: 2rem 1rem;
       font-size: 0.8125rem;
-      border: 1px solid #252540;
+      border: 1px solid var(--border);
     }
   `],
 })

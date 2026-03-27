@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { shareReplay, tap } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 
 export interface Company {
@@ -131,6 +132,9 @@ export interface PreviewScore {
 export class ApiService {
   private http = inject(HttpClient);
   private baseUrl = environment.apiUrl;
+  private sectorsCache$?: Observable<Sector[]>;
+  private screenerCache = new Map<string, { data: ScreenerItem[]; ts: number }>();
+  private readonly CACHE_TTL = 60_000; // 1 minute
 
   // Public
   searchTickers(query: string): Observable<Company[]> {
@@ -146,7 +150,12 @@ export class ApiService {
   }
 
   listSectors(): Observable<Sector[]> {
-    return this.http.get<Sector[]>(`${this.baseUrl}/sectors`);
+    if (!this.sectorsCache$) {
+      this.sectorsCache$ = this.http.get<Sector[]>(`${this.baseUrl}/sectors`).pipe(
+        shareReplay(1)
+      );
+    }
+    return this.sectorsCache$;
   }
 
   getSectorRankings(sectorId: string): Observable<Score[]> {
@@ -154,7 +163,17 @@ export class ApiService {
   }
 
   screener(params: Record<string, string> = {}): Observable<ScreenerItem[]> {
-    return this.http.get<ScreenerItem[]>(`${this.baseUrl}/screener`, { params });
+    const key = params['sector'] || '__all__';
+    const cached = this.screenerCache.get(key);
+    if (cached && Date.now() - cached.ts < this.CACHE_TTL) {
+      return new Observable<ScreenerItem[]>(sub => {
+        sub.next(cached.data);
+        sub.complete();
+      });
+    }
+    return this.http.get<ScreenerItem[]>(`${this.baseUrl}/screener`, { params }).pipe(
+      tap(data => this.screenerCache.set(key, { data, ts: Date.now() }))
+    );
   }
 
   // Authenticated

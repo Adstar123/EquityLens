@@ -22,7 +22,7 @@ import { Component, input, computed } from '@angular/core';
       font-family: 'JetBrains Mono', monospace;
       font-weight: 900;
       font-size: 1.125rem;
-      color: #d4930d;
+      color: var(--accent);
       letter-spacing: -0.02em;
       line-height: 1;
     }

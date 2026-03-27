@@ -143,12 +143,12 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
       height: 100%;
       display: flex;
       flex-direction: column;
-      background: #0f0f1a;
+      background: var(--bg-base);
     }
 
     .screener-header {
       padding: 1rem 1.5rem 0.75rem;
-      border-bottom: 1px solid #252540;
+      border-bottom: 1px solid var(--border);
       flex-shrink: 0;
     }
 
@@ -156,7 +156,7 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
       font-size: 0.75rem;
       font-weight: 600;
       letter-spacing: 0.12em;
-      color: #555570;
+      color: var(--text-muted);
       margin: 0 0 0.75rem;
       text-transform: uppercase;
     }
@@ -178,15 +178,15 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
       font-size: 0.625rem;
       font-weight: 500;
       letter-spacing: 0.08em;
-      color: #555570;
+      color: var(--text-muted);
       text-transform: uppercase;
     }
 
     .filter-select,
     .filter-input {
-      background: #1a1a2e;
-      border: 1px solid #252540;
-      color: #e8e8ed;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.8125rem;
       padding: 0.375rem 0.5rem;
@@ -197,17 +197,24 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
     .filter-input {
       min-width: 80px;
       max-width: 100px;
+      -moz-appearance: textfield;
+    }
+
+    .filter-input::-webkit-outer-spin-button,
+    .filter-input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
     }
 
     .filter-select:focus,
     .filter-input:focus {
-      border-color: #d4930d;
+      border-color: var(--accent);
     }
 
     .result-count {
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.75rem;
-      color: #555570;
+      color: var(--text-muted);
       padding-bottom: 0.375rem;
       margin-left: auto;
     }
@@ -225,7 +232,7 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
     th {
       position: sticky;
       top: 0;
-      background: #0f0f1a;
+      background: var(--bg-base);
       z-index: 10;
       padding: 0.5rem 0.75rem;
       text-align: left;
@@ -233,8 +240,8 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
       font-weight: 500;
       text-transform: uppercase;
       letter-spacing: 0.06em;
-      color: #555570;
-      border-bottom: 1px solid #252540;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
       white-space: nowrap;
     }
 
@@ -244,33 +251,33 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
     }
 
     tbody tr:hover td {
-      background: #1a1a2e;
+      background: var(--bg-surface);
     }
 
     td {
       padding: 0.4rem 0.75rem;
       font-size: 0.8125rem;
-      color: #e8e8ed;
-      border-bottom: 1px solid #1a1a2e;
+      color: var(--text-primary);
+      border-bottom: 1px solid var(--bg-surface);
       white-space: nowrap;
     }
 
     .cell-symbol {
       font-family: 'JetBrains Mono', monospace;
       font-weight: 700;
-      color: #e8e8ed;
+      color: var(--text-primary);
       letter-spacing: 0.02em;
     }
 
     .cell-name {
-      color: #8888a0;
+      color: var(--text-secondary);
       max-width: 200px;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
     .cell-sector {
-      color: #555570;
+      color: var(--text-muted);
       font-size: 0.75rem;
     }
 
@@ -292,12 +299,12 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
     .ratio-value {
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.75rem;
-      color: #8888a0;
+      color: var(--text-secondary);
     }
 
     .empty-state {
       text-align: center;
-      color: #555570;
+      color: var(--text-muted);
       padding: 3rem 1rem !important;
       font-size: 0.875rem;
     }
@@ -307,7 +314,7 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
       align-items: center;
       justify-content: center;
       flex: 1;
-      color: #555570;
+      color: var(--text-muted);
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.875rem;
     }

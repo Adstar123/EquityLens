@@ -1,13 +1,24 @@
 import { Injectable, signal, computed } from '@angular/core';
+import { environment } from '../../environments/environment';
+
+const MOCK_USERS: Record<string, { id: string; email: string; name: string; admin: boolean }> = {
+  admin: { id: 'mock-admin', email: 'admin@equitylens.dev', name: 'Adam Jarick', admin: true },
+  user: { id: 'mock-user', email: 'user@equitylens.dev', name: 'Test User', admin: false },
+};
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private tokenSignal = signal<string | null>(localStorage.getItem('token'));
+  private mockRole = environment.mockAuth as string;
 
-  readonly isLoggedIn = computed(() => !!this.tokenSignal());
+  readonly isLoggedIn = computed(() => !!this.mockRole || !!this.tokenSignal());
   readonly token = computed(() => this.tokenSignal());
 
   readonly user = computed(() => {
+    if (this.mockRole && MOCK_USERS[this.mockRole]) {
+      const m = MOCK_USERS[this.mockRole];
+      return { id: m.id, email: m.email, name: m.name };
+    }
     const token = this.tokenSignal();
     if (!token) return null;
     try {
@@ -19,9 +30,9 @@ export class AuthService {
   });
 
   readonly isSuperAdmin = computed(() => {
-    // This is checked server-side; client just uses it for UI visibility
+    if (this.mockRole) return MOCK_USERS[this.mockRole]?.admin ?? false;
     const email = this.user()?.email;
-    return !!email; // All logged-in users see admin UI; server enforces access
+    return !!email;
   });
 
   login(token: string): void {

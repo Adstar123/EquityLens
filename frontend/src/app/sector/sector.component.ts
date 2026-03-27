@@ -10,7 +10,9 @@ import {
 } from '@angular/animations';
 import { NgxEchartsDirective } from 'ngx-echarts';
 import { EChartsCoreOption } from 'echarts/core';
+import { forkJoin } from 'rxjs';
 import { ApiService, Sector, ScreenerItem } from '../core/api.service';
+import { ThemeService } from '../core/theme.service';
 import { ScoreBadgeComponent } from '../shared/components/score-badge.component';
 import { RatioBarComponent } from '../shared/components/ratio-bar.component';
 
@@ -147,7 +149,7 @@ type SortDir = 'asc' | 'desc';
       align-items: center;
       justify-content: center;
       height: 100%;
-      color: #555570;
+      color: var(--text-muted);
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.875rem;
     }
@@ -167,14 +169,14 @@ type SortDir = 'asc' | 'desc';
       font-family: 'Inter', system-ui, sans-serif;
       font-weight: 700;
       font-size: 1.75rem;
-      color: #e8e8ed;
+      color: var(--text-primary);
       margin: 0 0 0.375rem;
       line-height: 1.2;
     }
 
     .sector-desc {
       font-size: 0.875rem;
-      color: #8888a0;
+      color: var(--text-secondary);
       margin: 0 0 0.75rem;
       line-height: 1.5;
     }
@@ -182,7 +184,7 @@ type SortDir = 'asc' | 'desc';
     .sector-stats {
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.8125rem;
-      color: #555570;
+      color: var(--text-muted);
     }
 
     /* Table */
@@ -202,7 +204,7 @@ type SortDir = 'asc' | 'desc';
     th {
       position: sticky;
       top: 0;
-      background: #0f0f1a;
+      background: var(--bg-base);
       z-index: 10;
       padding: 0.5rem 0.75rem;
       text-align: left;
@@ -210,8 +212,8 @@ type SortDir = 'asc' | 'desc';
       font-weight: 500;
       text-transform: uppercase;
       letter-spacing: 0.06em;
-      color: #555570;
-      border-bottom: 1px solid #252540;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
       white-space: nowrap;
       user-select: none;
     }
@@ -222,11 +224,11 @@ type SortDir = 'asc' | 'desc';
     }
 
     th.sortable:hover {
-      color: #8888a0;
+      color: var(--text-secondary);
     }
 
     th.active-sort {
-      color: #d4930d;
+      color: var(--accent);
     }
 
     .sort-arrow {
@@ -240,20 +242,20 @@ type SortDir = 'asc' | 'desc';
     }
 
     tbody tr:hover td {
-      background: #1a1a2e;
+      background: var(--bg-surface);
     }
 
     td {
       padding: 0.4rem 0.75rem;
       font-size: 0.8125rem;
-      color: #e8e8ed;
-      border-bottom: 1px solid #1a1a2e;
+      color: var(--text-primary);
+      border-bottom: 1px solid var(--bg-surface);
       white-space: nowrap;
     }
 
     .cell-rank {
       font-family: 'JetBrains Mono', monospace;
-      color: #555570;
+      color: var(--text-muted);
       font-size: 0.75rem;
       width: 40px;
     }
@@ -261,12 +263,12 @@ type SortDir = 'asc' | 'desc';
     .cell-symbol {
       font-family: 'JetBrains Mono', monospace;
       font-weight: 700;
-      color: #e8e8ed;
+      color: var(--text-primary);
       letter-spacing: 0.02em;
     }
 
     .cell-name {
-      color: #8888a0;
+      color: var(--text-secondary);
       max-width: 200px;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -304,12 +306,12 @@ type SortDir = 'asc' | 'desc';
     .ratio-value {
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.75rem;
-      color: #8888a0;
+      color: var(--text-secondary);
     }
 
     .empty-state {
       text-align: center;
-      color: #555570;
+      color: var(--text-muted);
       padding: 3rem 1rem;
       font-size: 0.875rem;
     }
@@ -323,7 +325,7 @@ type SortDir = 'asc' | 'desc';
       font-size: 0.75rem;
       font-weight: 600;
       letter-spacing: 0.12em;
-      color: #555570;
+      color: var(--text-muted);
       text-transform: uppercase;
       margin: 0 0 0.75rem;
     }
@@ -339,6 +341,7 @@ export class SectorComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private api = inject(ApiService);
+  private theme = inject(ThemeService);
 
   loading = signal(true);
   sector = signal<Sector | null>(null);
@@ -413,6 +416,12 @@ export class SectorComponent implements OnInit {
     }
 
     const dynamicHeight = Math.max(300, sorted.length * 24 + 120);
+    const isDark = this.theme.theme() === 'dark';
+    const labelColor = isDark ? '#8888a0' : '#4a4a65';
+    const borderCol = isDark ? '#0f0f1a' : '#f5f5f9';
+    const heatColors = isDark
+      ? ['#1e1e35', '#2e2e50', '#6b5b1e', '#b8860b', '#d4930d']
+      : ['#e0e0ec', '#c8c8d8', '#c9a84c', '#b8960b', '#d4930d'];
 
     return {
       tooltip: {
@@ -422,20 +431,21 @@ export class SectorComponent implements OnInit {
           return `<b>${symbols[d[1]]}</b><br/>${names[d[0]]}: ${d[2]}/5`;
         },
       },
-      grid: { top: 30, bottom: 80, left: 100, right: 20 },
+      grid: { top: 40, bottom: 100, left: 100, right: 20 },
       xAxis: {
         type: 'category',
         data: names,
-        axisLabel: { color: '#8888a0', rotate: 45, fontSize: 10 },
+        position: 'top',
+        axisLabel: { color: labelColor, rotate: 0, fontSize: 11, fontFamily: 'Inter' },
         axisTick: { show: false },
-        axisLine: { lineStyle: { color: '#252540' } },
+        axisLine: { show: false },
       },
       yAxis: {
         type: 'category',
         data: symbols,
-        axisLabel: { color: '#8888a0', fontFamily: 'JetBrains Mono', fontSize: 10 },
+        axisLabel: { color: labelColor, fontFamily: 'JetBrains Mono', fontSize: 11 },
         axisTick: { show: false },
-        axisLine: { lineStyle: { color: '#252540' } },
+        axisLine: { show: false },
       },
       visualMap: {
         min: 1,
@@ -443,19 +453,25 @@ export class SectorComponent implements OnInit {
         calculable: false,
         orient: 'horizontal',
         left: 'center',
-        bottom: 10,
-        inRange: {
-          color: ['#1a1a2e', '#252540', '#555570', '#8a6108', '#d4930d'],
-        },
-        textStyle: { color: '#8888a0' },
+        bottom: 15,
+        itemWidth: 16,
+        itemHeight: 140,
+        text: ['Strong', 'Weak'],
+        inRange: { color: heatColors },
+        textStyle: { color: labelColor, fontSize: 11 },
       },
       series: [{
         type: 'heatmap',
         data,
+        itemStyle: {
+          borderColor: borderCol,
+          borderWidth: 2,
+          borderRadius: 3,
+        },
         emphasis: {
           itemStyle: {
             borderColor: '#d4930d',
-            borderWidth: 1,
+            borderWidth: 2,
           },
         },
       }],
@@ -533,31 +549,20 @@ export class SectorComponent implements OnInit {
   private loadSector(key: string): void {
     this.loading.set(true);
 
-    // First get the sector info
-    this.api.listSectors().subscribe({
-      next: (sectors) => {
+    // Load sector info and rankings in parallel
+    forkJoin({
+      sectors: this.api.listSectors(),
+      items: this.api.screener({ sector: key }),
+    }).subscribe({
+      next: ({ sectors, items }) => {
         const found = sectors.find(s => s.key === key);
-        if (!found) {
-          this.sector.set(null);
-          this.loading.set(false);
-          return;
-        }
-        this.sector.set(found);
-
-        // Then load rankings via the screener endpoint filtered by sector key
-        this.api.screener({ sector: key }).subscribe({
-          next: (items) => {
-            this.items.set(items);
-            this.loading.set(false);
-          },
-          error: () => {
-            this.items.set([]);
-            this.loading.set(false);
-          },
-        });
+        this.sector.set(found ?? null);
+        this.items.set(found ? items : []);
+        this.loading.set(false);
       },
       error: () => {
         this.sector.set(null);
+        this.items.set([]);
         this.loading.set(false);
       },
     });

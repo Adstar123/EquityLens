@@ -12,6 +12,7 @@ import { NgxEchartsDirective } from 'ngx-echarts';
 import { EChartsCoreOption } from 'echarts/core';
 import { ApiService, TickerDetail, Company } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
+import { ThemeService } from '../core/theme.service';
 import { RatioBarComponent } from '../shared/components/ratio-bar.component';
 
 @Component({
@@ -160,7 +161,7 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
       align-items: center;
       justify-content: center;
       height: 100%;
-      color: #555570;
+      color: var(--text-muted);
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.875rem;
     }
@@ -174,14 +175,14 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
     .back-link {
       display: inline-block;
       font-size: 0.75rem;
-      color: #555570;
+      color: var(--text-muted);
       text-decoration: none;
       margin-bottom: 1.5rem;
       transition: color 150ms ease;
     }
 
     .back-link:hover {
-      color: #d4930d;
+      color: var(--accent);
     }
 
     /* Company header */
@@ -200,7 +201,7 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
       font-family: 'Inter', system-ui, sans-serif;
       font-weight: 700;
       font-size: 1.75rem;
-      color: #e8e8ed;
+      color: var(--text-primary);
       margin: 0;
       line-height: 1.2;
     }
@@ -208,7 +209,7 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
     .company-symbol {
       font-family: 'JetBrains Mono', monospace;
       font-size: 1rem;
-      color: #8888a0;
+      color: var(--text-secondary);
       font-weight: 500;
     }
 
@@ -219,14 +220,14 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
       letter-spacing: 0.04em;
       padding: 2px 8px;
       background: rgba(136, 136, 160, 0.12);
-      color: #8888a0;
+      color: var(--text-secondary);
       white-space: nowrap;
     }
 
     .watchlist-btn {
       background: none;
       border: 1px solid transparent;
-      color: #555570;
+      color: var(--text-muted);
       font-size: 1.25rem;
       line-height: 1;
       width: 32px;
@@ -240,13 +241,13 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
     }
 
     .watchlist-btn:hover {
-      color: #d4930d;
+      color: var(--accent);
       border-color: rgba(212, 147, 13, 0.3);
       transform: scale(1.15);
     }
 
     .watchlist-btn.active {
-      color: #d4930d;
+      color: var(--accent);
     }
 
     /* Score section */
@@ -272,7 +273,7 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
       font-family: 'JetBrains Mono', monospace;
       font-weight: 900;
       font-size: 4rem;
-      color: #d4930d;
+      color: var(--accent);
       letter-spacing: -0.03em;
       line-height: 1;
     }
@@ -291,7 +292,7 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
       font-size: 0.625rem;
       font-weight: 500;
       letter-spacing: 0.12em;
-      color: #555570;
+      color: var(--text-muted);
       text-transform: uppercase;
       margin-top: 0.5rem;
     }
@@ -314,13 +315,13 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
       font-size: 0.75rem;
       font-weight: 600;
       letter-spacing: 0.12em;
-      color: #555570;
+      color: var(--text-muted);
       text-transform: uppercase;
       margin: 0 0 0.75rem;
     }
 
     .breakdown-table {
-      border: 1px solid #252540;
+      border: 1px solid var(--border);
       overflow: hidden;
     }
 
@@ -329,17 +330,17 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
       grid-template-columns: 2fr 1fr 1fr 80px 0.75fr 1fr;
       gap: 0;
       padding: 0.5rem 0.75rem;
-      background: #1a1a2e;
+      background: var(--bg-surface);
       font-size: 0.6875rem;
       font-weight: 500;
       text-transform: uppercase;
       letter-spacing: 0.06em;
-      color: #555570;
-      border-bottom: 1px solid #252540;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
     }
 
     .ratio-row {
-      border-bottom: 1px solid #1a1a2e;
+      border-bottom: 1px solid var(--bg-surface);
       transition: background 100ms ease;
     }
 
@@ -348,7 +349,7 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
     }
 
     .ratio-row:hover {
-      background: #1a1a2e;
+      background: var(--bg-surface);
     }
 
     .ratio-main {
@@ -361,14 +362,14 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
     }
 
     .r-name {
-      color: #e8e8ed;
+      color: var(--text-primary);
       font-weight: 500;
     }
 
     .r-value {
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.8125rem;
-      color: #8888a0;
+      color: var(--text-secondary);
     }
 
     .r-bucket {
@@ -385,20 +386,20 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
     .r-weight {
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.75rem;
-      color: #555570;
+      color: var(--text-muted);
     }
 
     .r-contrib {
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.8125rem;
-      color: #d4930d;
+      color: var(--accent);
       font-weight: 600;
     }
 
     /* Expanded ratio detail */
     .ratio-detail {
       padding: 0.5rem 0.75rem 0.75rem;
-      background: rgba(26, 26, 46, 0.5);
+      background: var(--bg-surface);
     }
 
     .threshold-bar {
@@ -416,7 +417,7 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
 
     .threshold-segment.poor { background: #ef4444; }
     .threshold-segment.weak { background: #f97316; }
-    .threshold-segment.neutral { background: #d4930d; }
+    .threshold-segment.neutral { background: var(--accent); }
     .threshold-segment.good { background: #84cc16; }
     .threshold-segment.strong { background: #22c55e; }
 
@@ -424,7 +425,7 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
       display: flex;
       justify-content: space-between;
       font-size: 0.6875rem;
-      color: #8888a0;
+      color: var(--text-secondary);
     }
 
     .marker-label {
@@ -433,12 +434,12 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
 
     .marker-points {
       font-family: 'JetBrains Mono', monospace;
-      color: #d4930d;
+      color: var(--accent);
     }
 
     .no-score-state {
       text-align: center;
-      color: #555570;
+      color: var(--text-muted);
       padding: 3rem 1rem;
       font-size: 0.875rem;
     }
@@ -448,6 +449,7 @@ export class TickerComponent implements OnInit, AfterViewInit {
   private route = inject(ActivatedRoute);
   private api = inject(ApiService);
   readonly auth = inject(AuthService);
+  private theme = inject(ThemeService);
 
   detail = signal<TickerDetail | null>(null);
   loading = signal(true);
@@ -500,22 +502,24 @@ export class TickerComponent implements OnInit, AfterViewInit {
         })),
         shape: 'polygon' as const,
         axisName: {
-          color: '#8888a0',
+          color: this.theme.theme() === 'dark' ? '#8888a0' : '#4a4a65',
           fontSize: 10,
         },
         splitArea: {
           areaStyle: {
-            color: ['transparent', 'rgba(37, 37, 64, 0.3)'],
+            color: this.theme.theme() === 'dark'
+              ? ['transparent', 'rgba(37, 37, 64, 0.3)']
+              : ['transparent', 'rgba(200, 200, 220, 0.25)'],
           },
         },
         splitLine: {
           lineStyle: {
-            color: '#252540',
+            color: this.theme.theme() === 'dark' ? '#252540' : '#d8d8e4',
           },
         },
         axisLine: {
           lineStyle: {
-            color: '#252540',
+            color: this.theme.theme() === 'dark' ? '#252540' : '#d8d8e4',
           },
         },
       },

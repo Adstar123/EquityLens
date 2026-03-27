@@ -10,7 +10,9 @@ import {
   lucideHome,
 } from '@ng-icons/lucide';
 import { AuthService } from '../../core/auth.service';
+import { ThemeService } from '../../core/theme.service';
 import { ApiService, Sector } from '../../core/api.service';
+import { lucideSun, lucideMoon, lucideLogOut } from '@ng-icons/lucide';
 import { filter } from 'rxjs';
 
 @Component({
@@ -79,6 +81,33 @@ import { filter } from 'rxjs';
           </a>
         }
       </div>
+
+      <!-- Bottom: theme toggle + user -->
+      <div class="sidebar-bottom">
+        <div class="nav-item" (click)="theme.toggle()">
+          <ng-icon [svg]="theme.theme() === 'dark' ? icons.sun : icons.moon" class="nav-icon" size="20" />
+          @if (expanded()) {
+            <span class="nav-label">{{ theme.theme() === 'dark' ? 'Light mode' : 'Dark mode' }}</span>
+          }
+        </div>
+        <div class="user-area">
+          <div class="user-avatar">{{ userInitial() }}</div>
+          @if (expanded()) {
+            <div class="user-info">
+              <span class="user-name">{{ auth.isLoggedIn() ? (auth.user()?.name || 'User') : 'Guest' }}</span>
+              <span class="user-email">{{ auth.isLoggedIn() ? auth.user()?.email : 'Not signed in' }}</span>
+            </div>
+          }
+        </div>
+        @if (auth.isLoggedIn()) {
+          <div class="nav-item" (click)="logout()">
+            <ng-icon [svg]="icons.logOut" class="nav-icon" size="20" />
+            @if (expanded()) {
+              <span class="nav-label">Sign out</span>
+            }
+          </div>
+        }
+      </div>
     </nav>
   `,
   styles: [`
@@ -86,8 +115,8 @@ import { filter } from 'rxjs';
       width: 60px;
       min-width: 60px;
       height: 100vh;
-      background: #0a0a15;
-      border-right: 1px solid #1a1a2e;
+      background: var(--bg-deep);
+      border-right: 1px solid var(--bg-surface);
       display: flex;
       flex-direction: column;
       transition: width 200ms ease, min-width 200ms ease;
@@ -104,7 +133,7 @@ import { filter } from 'rxjs';
 
     .logo-area {
       padding: 1rem;
-      border-bottom: 1px solid #1a1a2e;
+      border-bottom: 1px solid var(--border);
       height: 56px;
       display: flex;
       align-items: center;
@@ -136,7 +165,7 @@ import { filter } from 'rxjs';
       align-items: center;
       gap: 0.75rem;
       padding: 0.625rem 1rem;
-      color: #8888a0;
+      color: var(--text-secondary);
       text-decoration: none;
       cursor: pointer;
       white-space: nowrap;
@@ -146,8 +175,8 @@ import { filter } from 'rxjs';
     }
 
     .nav-item:hover {
-      color: #e8e8ed;
-      background: #1a1a2e;
+      color: var(--text-primary);
+      background: var(--bg-surface);
     }
 
     .nav-item.active {
@@ -179,7 +208,7 @@ import { filter } from 'rxjs';
     .nav-sub-item {
       display: block;
       padding: 0.375rem 1rem;
-      color: #8888a0;
+      color: var(--text-secondary);
       text-decoration: none;
       font-size: 0.8125rem;
       white-space: nowrap;
@@ -187,21 +216,80 @@ import { filter } from 'rxjs';
     }
 
     .nav-sub-item:hover {
-      color: #e8e8ed;
+      color: var(--text-primary);
     }
 
     .nav-sub-item.active {
       color: #d4930d;
     }
+
+    .sidebar-bottom {
+      margin-top: auto;
+      border-top: 1px solid var(--border);
+      padding: 0.5rem 0;
+    }
+
+    .user-area {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.625rem 1rem;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
+    .user-avatar {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #0f0f1a;
+      font-weight: 700;
+      font-size: 0.6rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-left: 2px;
+    }
+
+    .user-info {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .user-name {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .user-email {
+      font-size: 0.6875rem;
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
   `],
 })
 export class SidebarComponent {
   readonly auth = inject(AuthService);
+  readonly theme = inject(ThemeService);
   private api = inject(ApiService);
+  private router = inject(Router);
 
   expanded = signal(false);
   sectorsOpen = signal(false);
   sectors = signal<Sector[]>([]);
+
+  userInitial = () => {
+    if (!this.auth.isLoggedIn()) return 'G';
+    const name = this.auth.user()?.name;
+    return name ? name.charAt(0).toUpperCase() : '?';
+  };
 
   icons = {
     barChart3: lucideBarChart3,
@@ -210,6 +298,9 @@ export class SidebarComponent {
     settings: lucideSettings,
     search: lucideSearch,
     home: lucideHome,
+    sun: lucideSun,
+    moon: lucideMoon,
+    logOut: lucideLogOut,
   };
 
   constructor() {
@@ -217,5 +308,10 @@ export class SidebarComponent {
       next: (sectors) => this.sectors.set(sectors),
       error: () => this.sectors.set([]),
     });
+  }
+
+  logout(): void {
+    this.auth.logout();
+    this.router.navigate(['/']);
   }
 }

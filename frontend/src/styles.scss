@@ -28,9 +28,36 @@
   }
 }
 
+// Theme variables
+:root, [data-theme="dark"] {
+  --bg-base: #0f0f1a;
+  --bg-deep: #0a0a15;
+  --bg-surface: #1a1a2e;
+  --bg-elevated: #161629;
+  --border: #252540;
+  --text-primary: #e8e8ed;
+  --text-secondary: #8888a0;
+  --text-muted: #555570;
+  --accent: #d4930d;
+  --accent-light: #f0b429;
+}
+
+[data-theme="light"] {
+  --bg-base: #f5f5f9;
+  --bg-deep: #eaeaf0;
+  --bg-surface: #ffffff;
+  --bg-elevated: #fafafe;
+  --border: #d8d8e4;
+  --text-primary: #1a1a30;
+  --text-secondary: #4a4a65;
+  --text-muted: #7a7a95;
+  --accent: #b37d0a;
+  --accent-light: #d4930d;
+}
+
 body {
-  background-color: #0f0f1a;
-  color: #e8e8ed;
+  background-color: var(--bg-base);
+  color: var(--text-primary);
   font-family: 'Inter', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -55,11 +82,11 @@ table {
     padding: 0.5rem 0.75rem;
     text-align: left;
     font-size: 0.875rem;
-    border-bottom: 1px solid #252540;
+    border-bottom: 1px solid var(--border);
   }
 
   th {
-    color: #555570;
+    color: var(--text-muted);
     font-weight: 500;
     text-transform: uppercase;
     font-size: 0.75rem;
@@ -67,22 +94,22 @@ table {
   }
 
   tr:hover td {
-    background-color: #1a1a2e;
+    background-color: var(--bg-surface);
   }
 }
 
-// Scrollbar styling (dark theme)
+// Scrollbar styling
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #0f0f1a;
+  background: var(--bg-base);
 }
 ::-webkit-scrollbar-thumb {
-  background: #252540;
+  background: var(--border);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #555570;
+  background: var(--text-muted);
 }

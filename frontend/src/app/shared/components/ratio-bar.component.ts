@@ -23,7 +23,7 @@ import { Component, input, computed } from '@angular/core';
     .ratio-bar-track {
       width: 100%;
       height: 4px;
-      background: #1a1a2e;
+      background: var(--bg-surface);
       overflow: hidden;
     }
 
