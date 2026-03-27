@@ -80,7 +80,16 @@
 
     <!-- Problem statement (revealed during pinned scroll transition) -->
     <div class="problem-statement" #problemStatement>
-      <h2>Raw data doesn't tell you what to buy.</h2>
+      <h2>
+        <span class="ps-word">Raw</span>
+        <span class="ps-word">data</span>
+        <span class="ps-word">doesn't</span>
+        <span class="ps-word">tell</span>
+        <span class="ps-word">you</span>
+        <span class="ps-word ps-break">what</span>
+        <span class="ps-word">to</span>
+        <span class="ps-word">buy.</span>
+      </h2>
     </div>
 
     <!-- Scroll cue -->
@@ -100,6 +109,23 @@
         <div class="demo-card-header">
           <span class="demo-card-symbol">BHP.AX</span>
           <span class="demo-card-sector">Materials</span>
+        </div>
+        <div class="demo-card-sparkline">
+          <svg viewBox="0 0 200 40" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#d4930d" stop-opacity="0.25"/>
+                <stop offset="100%" stop-color="#d4930d" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <path class="sparkline-area"
+              d="M0,35 L15,30 L30,28 L45,32 L60,25 L75,20 L90,22 L105,18 L120,15 L135,20 L150,12 L165,8 L180,10 L195,5 L200,7 L200,40 L0,40 Z"
+              fill="url(#sparkGrad)"/>
+            <polyline class="sparkline-line"
+              points="0,35 15,30 30,28 45,32 60,25 75,20 90,22 105,18 120,15 135,20 150,12 165,8 180,10 195,5 200,7"
+              fill="none" stroke="#d4930d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="sparkline-label">12M</span>
         </div>
         <div class="demo-card-score-area">
           <span class="demo-card-score" #demoScore>0</span>

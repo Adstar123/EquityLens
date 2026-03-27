@@ -394,8 +394,22 @@ $data-visible: #555570;
     color: $text-primary;
     text-align: center;
     max-width: 700px;
-    line-height: 1.2;
+    line-height: 1.3;
     margin: 0;
+  }
+}
+
+.ps-word {
+  display: inline-block;
+  margin-right: 0.25em;
+  will-change: transform, opacity;
+}
+
+.ps-break {
+  // Force line break before "what to buy."
+  &::before {
+    content: '\A';
+    white-space: pre;
   }
 }
 
@@ -451,6 +465,38 @@ $data-visible: #555570;
   color: $text-muted;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+}
+
+// Sparkline
+.demo-card-sparkline {
+  position: relative;
+  height: 44px;
+  margin-bottom: 1.25rem;
+
+  svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+}
+
+.sparkline-area {
+  opacity: 0;
+}
+
+.sparkline-line {
+  stroke-dasharray: 300;
+  stroke-dashoffset: 300;
+}
+
+.sparkline-label {
+  position: absolute;
+  right: 0;
+  top: -2px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.55rem;
+  color: $text-muted;
+  letter-spacing: 0.04em;
 }
 
 .demo-card-score-area {

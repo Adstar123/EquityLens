@@ -381,18 +381,44 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
       // Phase 4b (0.1 → 0.3): Dim data fades as bright takes over
         .to(this.dataStream.nativeElement,
           { opacity: 0, duration: 0.20 },
-          0.10)
+          0.10);
 
-      // Phase 5 (0.48 → 0.65): Data overwhelms — blur
-        .to(this.dataStreamLens.nativeElement,
-          { filter: 'blur(14px)', opacity: 0.5, duration: 0.17, ease: 'none' },
-          0.48)
+      // Phase 5a (0.44 → 0.65): Data disintegration — columns drift apart
+      const lensColumns = this.dataStreamLens.nativeElement.querySelectorAll('.data-column');
+      lensColumns.forEach((col: Element, i: number) => {
+        const angle = i * 2.39996; // golden angle for organic distribution
+        const xDrift = Math.sin(angle) * (70 + (i % 3) * 35);
+        const yDrift = Math.cos(angle) * (25 + (i % 2) * 30);
+        const rotDrift = Math.sin(angle * 1.7) * 14;
+        const staggerStart = 0.44 + (i % 5) * 0.022;
 
-      // Phase 6 (0.60 → 0.75): Problem statement
-        .fromTo(this.problemStatement.nativeElement,
-          { opacity: 0, y: 0 },
-          { opacity: 1, duration: 0.12, ease: 'none', immediateRender: false },
-          0.60)
+        scrollTl.to(col as HTMLElement, {
+          x: xDrift,
+          y: yDrift,
+          rotation: rotDrift,
+          opacity: 0,
+          duration: 0.22,
+          ease: 'power2.in',
+        }, staggerStart);
+      });
+
+      // Phase 5b (0.46 → 0.62): Blur intensifies on the drifting data
+      scrollTl.to(this.dataStreamLens.nativeElement,
+        { filter: 'blur(14px)', opacity: 0.5, duration: 0.16, ease: 'none' },
+        0.46);
+
+      // Phase 6 (0.58 → 0.78): Problem statement — word-by-word reveal
+      const psWords = this.problemStatement.nativeElement.querySelectorAll('.ps-word');
+      scrollTl
+        .set(psWords, { opacity: 0, y: 25 }, 0)
+        .set(this.problemStatement.nativeElement, { opacity: 1 }, 0.57)
+        .to(psWords, {
+          opacity: 1,
+          y: 0,
+          duration: 0.05,
+          stagger: 0.018,
+          ease: 'power2.out',
+        }, 0.60)
 
       // Phase 7 (0.82 → 0.95): Everything fades to black
         .to(this.problemStatement.nativeElement, {
@@ -419,14 +445,38 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
         },
       });
 
+      // Sparkline draw animation
+      const sparklineLine = this.demoCard.nativeElement.querySelector('.sparkline-line') as SVGGeometryElement | null;
+      const sparklineArea = this.demoCard.nativeElement.querySelector('.sparkline-area') as SVGElement | null;
+      if (sparklineLine) {
+        const len = sparklineLine.getTotalLength?.() ?? 300;
+        gsap.set(sparklineLine, { strokeDasharray: len, strokeDashoffset: len });
+      }
+
       solutionTl
         .to(this.demoCard.nativeElement, {
           opacity: 1,
           y: 0,
           duration: 0.8,
           ease: 'power3.out',
-        })
-        .to(scoreObj, {
+        });
+
+      if (sparklineLine) {
+        solutionTl.to(sparklineLine, {
+          strokeDashoffset: 0,
+          duration: 1.2,
+          ease: 'power2.out',
+        }, 0.3);
+      }
+      if (sparklineArea) {
+        solutionTl.to(sparklineArea, {
+          opacity: 1,
+          duration: 0.6,
+          ease: 'power1.out',
+        }, 0.8);
+      }
+
+      solutionTl.to(scoreObj, {
           val: 78,
           duration: 1.2,
           ease: 'power2.out',
