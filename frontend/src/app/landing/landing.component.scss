@@ -39,6 +39,29 @@ $data-visible: #555570;
   cursor: crosshair;
 }
 
+// Hero sign-in shortcut
+.hero-signin {
+  position: absolute;
+  top: 1.5rem;
+  right: 2rem;
+  z-index: 6;
+  background: none;
+  border: 1px solid rgba(212, 147, 13, 0.25);
+  color: $amber;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  padding: 6px 16px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease;
+
+  &:hover {
+    border-color: $amber;
+    color: $amber-light;
+  }
+}
+
 // Data stream — matrix rain of financial data
 .data-stream {
   position: absolute;

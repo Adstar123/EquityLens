@@ -10,6 +10,9 @@
     (mouseup)="onHeroMouseUp()"
     (mouseleave)="onHeroMouseLeave()"
   >
+    <!-- Quick sign-in shortcut -->
+    <button class="hero-signin" (click)="scrollToCta()">Sign in &darr;</button>
+
     <!-- Data stream behind everything (faint ambient columns) -->
     <div class="data-stream data-stream-ambient" #dataStream>
       @for (col of dataColumns; track col.id) {
@@ -232,7 +235,7 @@
       <a routerLink="/screener" class="cta-explore">or explore without an account &rarr;</a>
     </div>
     <footer class="landing-footer">
-      <span>Built by Adam & Marcus</span>
+      <span>Built by Adam Jarick · Models by Adam O'Brien</span>
     </footer>
   </section>
 

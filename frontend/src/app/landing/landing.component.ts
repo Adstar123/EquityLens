@@ -135,6 +135,14 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   private scrollActive = false;
 
   // ──────────────────────────────────────────────
+  // Navigation
+  // ──────────────────────────────────────────────
+
+  scrollToCta(): void {
+    this.ctaSection.nativeElement.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  // ──────────────────────────────────────────────
   // Lens interaction
   // ──────────────────────────────────────────────
 
