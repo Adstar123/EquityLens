@@ -308,8 +308,11 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
             this.scrollActive = self.progress > 0.003;
             if (this.scrollActive) {
               this.lensEl.nativeElement.style.visibility = 'hidden';
-              // Collapse the bright data circle immediately
-              this.lensTargetR = 0;
+              // Collapse the bright data circle only on first frame entering scroll
+              if (!wasActive) {
+                this.lensTargetR = 0;
+                this.lensCurR = 0;
+              }
               this.lensTargetX = 50;
               this.lensTargetY = 50;
             } else {
@@ -369,6 +372,7 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
             immediateRender: false,
             onUpdate: () => {
               this.lensTargetR = expandProxy.r;
+              this.lensCurR = expandProxy.r;
               this.lensScale = expandProxy.scale;
             },
           },
