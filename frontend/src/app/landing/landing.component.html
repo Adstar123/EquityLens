@@ -166,27 +166,42 @@
   </section>
 
 
+  <!-- Section divider -->
+  <div class="section-divider" #sectionDivider></div>
+
   <!-- ═══════════════════════════════════════════════════════════════
-       SECTION 3 — HOW IT WORKS (viewport 6-7)
-       Three steps, staggered scroll reveal
+       SECTION 3 — HOW IT WORKS
+       Pinned full-viewport step showcase
        ═══════════════════════════════════════════════════════════════ -->
-  <section class="section-how">
-    <div class="how-inner">
-      <div class="how-step" #howStep1>
-        <span class="step-number">01</span>
-        <h3 class="step-heading">Search any ASX ticker</h3>
-        <p class="step-desc">Enter a symbol and get instant analysis</p>
+  <section class="section-how" #howSection>
+    <div class="how-slide" #howStep1>
+      <span class="how-watermark">01</span>
+      <div class="how-slide-content">
+        <ng-icon name="lucideScanEye" class="how-icon"></ng-icon>
+        <h3 class="how-heading">Search any ASX ticker</h3>
+        <p class="how-desc">Enter a symbol and get instant analysis</p>
       </div>
-      <div class="how-step" #howStep2>
-        <span class="step-number">02</span>
-        <h3 class="step-heading">Sector-calibrated scoring</h3>
-        <p class="step-desc">Financial ratios weighted by industry benchmarks</p>
+    </div>
+    <div class="how-slide" #howStep2>
+      <span class="how-watermark">02</span>
+      <div class="how-slide-content">
+        <ng-icon name="lucideBrainCircuit" class="how-icon"></ng-icon>
+        <h3 class="how-heading">Sector-calibrated scoring</h3>
+        <p class="how-desc">Financial ratios weighted by industry benchmarks</p>
       </div>
-      <div class="how-step" #howStep3>
-        <span class="step-number">03</span>
-        <h3 class="step-heading">Compare, filter, decide</h3>
-        <p class="step-desc">Screen the entire ASX with one click</p>
+    </div>
+    <div class="how-slide" #howStep3>
+      <span class="how-watermark">03</span>
+      <div class="how-slide-content">
+        <ng-icon name="lucideRadar" class="how-icon"></ng-icon>
+        <h3 class="how-heading">Compare, filter, decide</h3>
+        <p class="how-desc">Screen the entire ASX with one click</p>
       </div>
+    </div>
+    <div class="how-indicators" #howIndicators>
+      <span class="how-dot"></span>
+      <span class="how-dot"></span>
+      <span class="how-dot"></span>
     </div>
   </section>
 

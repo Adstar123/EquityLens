@@ -8,6 +8,8 @@ import {
   inject,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { NgIcon, provideIcons } from '@ng-icons/core';
+import { lucideScanEye, lucideBrainCircuit, lucideRadar } from '@ng-icons/lucide';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
@@ -73,7 +75,8 @@ function buildColumns(count: number, baseSpeed: number): DataColumn[] {
 @Component({
   selector: 'app-landing',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, NgIcon],
+  viewProviders: [provideIcons({ lucideScanEye, lucideBrainCircuit, lucideRadar })],
   templateUrl: './landing.component.html',
   styleUrl: './landing.component.scss',
 })
@@ -99,9 +102,12 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   @ViewChild('demoRating') demoRating!: ElementRef<HTMLSpanElement>;
   @ViewChild('demoRatios') demoRatios!: ElementRef<HTMLDivElement>;
   @ViewChild('solutionCaption') solutionCaption!: ElementRef<HTMLParagraphElement>;
+  @ViewChild('sectionDivider') sectionDivider!: ElementRef<HTMLDivElement>;
+  @ViewChild('howSection') howSection!: ElementRef<HTMLElement>;
   @ViewChild('howStep1') howStep1!: ElementRef<HTMLDivElement>;
   @ViewChild('howStep2') howStep2!: ElementRef<HTMLDivElement>;
   @ViewChild('howStep3') howStep3!: ElementRef<HTMLDivElement>;
+  @ViewChild('howIndicators') howIndicators!: ElementRef<HTMLDivElement>;
   @ViewChild('ctaSection') ctaSection!: ElementRef<HTMLElement>;
   @ViewChild('ctaInner') ctaInner!: ElementRef<HTMLDivElement>;
 
@@ -512,23 +518,89 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
       }, '-=0.2');
 
       // ──────────────────────────────────────────
-      // How it works
+      // Section divider
       // ──────────────────────────────────────────
 
-      [this.howStep1, this.howStep2, this.howStep3].forEach((ref, i) => {
-        gsap.to(ref.nativeElement, {
-          opacity: 1,
-          y: 0,
-          duration: 0.8,
-          ease: 'power3.out',
-          scrollTrigger: {
-            trigger: ref.nativeElement,
-            start: 'top 85%',
-            toggleActions: 'play none none reverse',
-          },
-          delay: i * 0.1,
+      gsap.to(this.sectionDivider.nativeElement, {
+        scaleX: 1,
+        duration: 0.6,
+        ease: 'power2.out',
+        scrollTrigger: {
+          trigger: this.sectionDivider.nativeElement,
+          start: 'top 90%',
+          toggleActions: 'play none none reverse',
+        },
+      });
+
+      // ──────────────────────────────────────────
+      // How it works — pinned step showcase
+      // ──────────────────────────────────────────
+
+      const howSlides = [this.howStep1, this.howStep2, this.howStep3];
+
+      // Set up icon paths for stroke-draw animation
+      howSlides.forEach((slide) => {
+        const paths = slide.nativeElement.querySelectorAll('.how-icon svg path, .how-icon svg circle, .how-icon svg line');
+        paths.forEach((p: Element) => {
+          const el = p as SVGGeometryElement;
+          const len = el.getTotalLength?.() ?? 200;
+          gsap.set(el, { strokeDasharray: len, strokeDashoffset: len });
         });
       });
+
+      const howTl = gsap.timeline({
+        scrollTrigger: {
+          trigger: this.howSection.nativeElement,
+          pin: true,
+          start: 'top top',
+          end: '+=300%',
+          scrub: 1,
+          onUpdate: (self) => {
+            const dots = this.howIndicators.nativeElement.querySelectorAll('.how-dot');
+            const step = self.progress < 0.33 ? 0 : self.progress < 0.66 ? 1 : 2;
+            dots.forEach((d: Element, i: number) =>
+              d.classList.toggle('active', i === step));
+          },
+        },
+      });
+
+      // Initial states
+      howTl
+        .set(howSlides[0].nativeElement, { opacity: 1, y: 0 }, 0)
+        .set(howSlides[1].nativeElement, { opacity: 0, y: 80 }, 0)
+        .set(howSlides[2].nativeElement, { opacity: 0, y: 80 }, 0);
+
+      // Step animation helper
+      const addHowStep = (idx: number, enterAt: number, exitAt: number) => {
+        const slide = howSlides[idx].nativeElement;
+        const paths = slide.querySelectorAll('.how-icon svg path, .how-icon svg circle, .how-icon svg line');
+
+        // Entrance (step 0 is already visible)
+        if (idx > 0) {
+          howTl.to(slide, {
+            opacity: 1, y: 0, duration: 0.10, ease: 'power2.out',
+          }, enterAt);
+        }
+
+        // Draw icon strokes
+        howTl.to(paths, {
+          strokeDashoffset: 0,
+          duration: 0.12,
+          stagger: 0.03,
+          ease: 'power2.out',
+        }, enterAt + 0.02);
+
+        // Exit (last step stays)
+        if (exitAt < 1) {
+          howTl.to(slide, {
+            opacity: 0, y: -80, duration: 0.10, ease: 'power2.in',
+          }, exitAt);
+        }
+      };
+
+      addHowStep(0, 0.02, 0.28);
+      addHowStep(1, 0.33, 0.60);
+      addHowStep(2, 0.65, 1.0);
 
       // ──────────────────────────────────────────
       // CTA
