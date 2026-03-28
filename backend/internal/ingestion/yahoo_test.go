@@ -113,6 +113,7 @@ func TestFetchProfile(t *testing.T) {
 		httpClient:  srv.Client(),
 		rateLimiter: rate.NewLimiter(rate.Inf, 1), // no throttle in tests
 		baseURL:     srv.URL,
+		crumb:       "test-crumb", // skip real crumb auth in tests
 	}
 
 	profile, err := client.FetchProfile(context.Background(), "BHP.AX")
@@ -146,6 +147,7 @@ func TestFetchFinancials(t *testing.T) {
 		httpClient:  srv.Client(),
 		rateLimiter: rate.NewLimiter(rate.Inf, 1),
 		baseURL:     srv.URL,
+		crumb:       "test-crumb", // skip real crumb auth in tests
 	}
 
 	fin, err := client.FetchFinancials(context.Background(), "BHP.AX")
