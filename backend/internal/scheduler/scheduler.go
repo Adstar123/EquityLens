@@ -190,10 +190,10 @@ func (s *Scheduler) ScoreSector(ctx context.Context, sectorID uuid.UUID) error {
 
 	consecutiveFails := 0
 	for _, company := range companies {
-		// If we hit 5+ consecutive failures, pause 2 minutes (likely rate limited)
+		// If we hit 5+ consecutive failures, pause and wait for cooldown to clear
 		if consecutiveFails >= 5 {
-			log.Printf("score-sector: %d consecutive failures, pausing 2 minutes", consecutiveFails)
-			time.Sleep(2 * time.Minute)
+			log.Printf("score-sector: %d consecutive failures, pausing 5 minutes (likely rate limited or crumb cooldown)", consecutiveFails)
+			time.Sleep(5 * time.Minute)
 			consecutiveFails = 0
 		}
 
