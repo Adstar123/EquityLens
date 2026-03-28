@@ -107,51 +107,75 @@ func (c *YahooClient) ensureCrumb(ctx context.Context) error {
 }
 
 func (c *YahooClient) fetchCrumb(ctx context.Context) error {
-	// Step 1: hit consent/cookie endpoint to get cookies
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://fc.yahoo.com/", nil)
-	if err != nil {
-		return fmt.Errorf("building cookie request: %w", err)
-	}
-	req.Header.Set("User-Agent", yahooUserAgent)
+	maxAttempts := 5
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		if attempt > 0 {
+			backoff := time.Duration(15*(attempt)) * time.Second
+			fmt.Printf("yahoo: crumb fetch retry in %v (attempt %d/%d)\n", backoff, attempt+1, maxAttempts)
+			time.Sleep(backoff)
+		}
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("fetching cookies: %w", err)
-	}
-	resp.Body.Close()
-	// 404 is expected — we just need the cookies
+		// Step 1: hit consent/cookie endpoint to get cookies (fresh jar each attempt)
+		jar, _ := cookiejar.New(nil)
+		c.httpClient.Jar = jar
 
-	// Step 2: fetch the crumb using the cookies
-	req, err = http.NewRequestWithContext(ctx, http.MethodGet,
-		"https://query2.finance.yahoo.com/v1/test/getcrumb", nil)
-	if err != nil {
-		return fmt.Errorf("building crumb request: %w", err)
-	}
-	req.Header.Set("User-Agent", yahooUserAgent)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://fc.yahoo.com/", nil)
+		if err != nil {
+			return fmt.Errorf("building cookie request: %w", err)
+		}
+		req.Header.Set("User-Agent", yahooUserAgent)
 
-	resp, err = c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("fetching crumb: %w", err)
-	}
-	defer resp.Body.Close()
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			fmt.Printf("yahoo: cookie fetch failed: %v\n", err)
+			continue
+		}
+		resp.Body.Close()
+		// 404 is expected — we just need the cookies
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("crumb endpoint returned %d", resp.StatusCode)
+		// Step 2: fetch the crumb using the cookies
+		req, err = http.NewRequestWithContext(ctx, http.MethodGet,
+			"https://query2.finance.yahoo.com/v1/test/getcrumb", nil)
+		if err != nil {
+			return fmt.Errorf("building crumb request: %w", err)
+		}
+		req.Header.Set("User-Agent", yahooUserAgent)
+
+		resp, err = c.httpClient.Do(req)
+		if err != nil {
+			fmt.Printf("yahoo: crumb fetch failed: %v\n", err)
+			continue
+		}
+
+		if resp.StatusCode == 429 || resp.StatusCode == 401 {
+			resp.Body.Close()
+			fmt.Printf("yahoo: crumb endpoint returned %d\n", resp.StatusCode)
+			continue
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			return fmt.Errorf("crumb endpoint returned %d", resp.StatusCode)
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			return fmt.Errorf("reading crumb: %w", err)
+		}
+
+		crumb := strings.TrimSpace(string(body))
+		if crumb == "" {
+			fmt.Printf("yahoo: empty crumb returned, retrying\n")
+			continue
+		}
+
+		c.crumb = crumb
+		fmt.Printf("yahoo: obtained crumb for authenticated requests\n")
+		return nil
 	}
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("reading crumb: %w", err)
-	}
-
-	crumb := strings.TrimSpace(string(body))
-	if crumb == "" {
-		return fmt.Errorf("empty crumb returned")
-	}
-
-	c.crumb = crumb
-	fmt.Printf("yahoo: obtained crumb for authenticated requests\n")
-	return nil
+	return fmt.Errorf("failed to obtain crumb after %d attempts", maxAttempts)
 }
 
 func (c *YahooClient) invalidateCrumb() {
