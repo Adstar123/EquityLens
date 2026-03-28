@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: equitylens-api
+    runtime: go
+    rootDir: backend
+    buildCommand: go build -o server ./cmd/server/
+    startCommand: ./server
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: SUPERADMIN_EMAILS
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      - key: ALPHA_VANTAGE_API_KEY
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: BACKEND_URL
+        sync: false
+      - key: MIGRATIONS_PATH
+        value: migrations
+      - key: CONFIGS_PATH
+        value: configs/sectors

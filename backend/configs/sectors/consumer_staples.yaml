@@ -1,0 +1,63 @@
+# Consumer Staples sector configuration (food, retail essentials)
+sector: consumer_staples
+display_name: "Consumer Staples"
+ratios:
+  - key: pe_ratio
+    name: "P/E Ratio"
+    weight: 0.20
+    lower_is_better: true
+    ranges:
+      strong: { max: 16 }
+      good: { min: 16, max: 22 }
+      neutral: { min: 22, max: 28 }
+      weak: { min: 28, max: 36 }
+      poor: { min: 36 }
+  - key: debt_to_equity
+    name: "Debt to Equity"
+    weight: 0.20
+    lower_is_better: true
+    ranges:
+      strong: { max: 0.4 }
+      good: { min: 0.4, max: 0.7 }
+      neutral: { min: 0.7, max: 1.0 }
+      weak: { min: 1.0, max: 1.5 }
+      poor: { min: 1.5 }
+  - key: fcf_yield
+    name: "Free Cash Flow Yield"
+    weight: 0.20
+    lower_is_better: false
+    ranges:
+      strong: { min: 6 }
+      good: { min: 4, max: 6 }
+      neutral: { min: 2.5, max: 4 }
+      weak: { min: 1, max: 2.5 }
+      poor: { max: 1 }
+  - key: roe
+    name: "Return on Equity"
+    weight: 0.25
+    lower_is_better: false
+    ranges:
+      strong: { min: 20 }
+      good: { min: 15, max: 20 }
+      neutral: { min: 10, max: 15 }
+      weak: { min: 5, max: 10 }
+      poor: { max: 5 }
+  - key: ev_ebitda
+    name: "EV/EBITDA"
+    weight: 0.15
+    lower_is_better: true
+    ranges:
+      strong: { max: 10 }
+      good: { min: 10, max: 14 }
+      neutral: { min: 14, max: 18 }
+      weak: { min: 18, max: 24 }
+      poor: { min: 24 }
+edge_cases:
+  negative_earnings: "exclude_pe_redistribute"
+  missing_data_threshold: 0.4
+rating_scale:
+  strong_buy: { min: 80 }
+  buy: { min: 65, max: 80 }
+  hold: { min: 45, max: 65 }
+  sell: { min: 30, max: 45 }
+  strong_sell: { max: 30 }

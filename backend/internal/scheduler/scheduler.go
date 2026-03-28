@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -15,13 +16,26 @@ import (
 
 // Scheduler orchestrates data ingestion, scoring, and config seeding.
 type Scheduler struct {
-	db    *storage.DB
-	yahoo *ingestion.YahooClient
+	db             *storage.DB
+	yahoo          *ingestion.YahooClient
+	asx            *ingestion.ASXClient
+	alphaVantage   *ingestion.AlphaVantageClient // optional fallback
 }
 
 // NewScheduler creates a new Scheduler with the given database and Yahoo client.
 func NewScheduler(db *storage.DB, yahoo *ingestion.YahooClient) *Scheduler {
-	return &Scheduler{db: db, yahoo: yahoo}
+	return &Scheduler{
+		db:    db,
+		yahoo: yahoo,
+		asx:   ingestion.NewASXClient(),
+	}
+}
+
+// SetAlphaVantage adds the Alpha Vantage client as a fallback for company listings.
+func (s *Scheduler) SetAlphaVantage(apiKey string) {
+	if apiKey != "" {
+		s.alphaVantage = ingestion.NewAlphaVantageClient(apiKey)
+	}
 }
 
 // SeedFromYAML loads YAML configs from disk into the database.
@@ -204,6 +218,61 @@ func (s *Scheduler) ScoreSector(ctx context.Context, sectorID uuid.UUID) error {
 		log.Printf("score-sector: scored %s — %.1f (%s)", company.Symbol, result.CompositeScore, result.Rating)
 	}
 
+	return nil
+}
+
+// SyncASXCompanies fetches the full ASX company list from external sources,
+// maps each company to an internal sector, and upserts them into the database.
+// Uses ASX website as primary source, Alpha Vantage as fallback.
+func (s *Scheduler) SyncASXCompanies(ctx context.Context) error {
+	log.Println("sync-asx: fetching company list from ASX website")
+
+	companies, err := s.asx.FetchAllCompanies(ctx)
+	if err != nil {
+		log.Printf("sync-asx: ASX fetch failed: %v — trying Alpha Vantage fallback", err)
+
+		if s.alphaVantage == nil {
+			return fmt.Errorf("ASX fetch failed and no Alpha Vantage key configured: %w", err)
+		}
+
+		companies, err = s.alphaVantage.FetchASXCompanies(ctx)
+		if err != nil {
+			return fmt.Errorf("both ASX and Alpha Vantage fetches failed: %w", err)
+		}
+	}
+
+	log.Printf("sync-asx: fetched %d companies, syncing to database", len(companies))
+
+	synced, skipped := 0, 0
+	for _, c := range companies {
+		sectorKey := ingestion.MapGICSSector(c.GICSSector)
+
+		var sectorID *uuid.UUID
+		if sectorKey != "" {
+			sector, err := s.db.GetSectorByKey(ctx, sectorKey)
+			if err != nil {
+				log.Printf("sync-asx: failed to look up sector %s: %v", sectorKey, err)
+			}
+			if sector != nil {
+				sectorID = &sector.ID
+			}
+		}
+
+		company := models.Company{
+			ID:     uuid.New(),
+			Symbol: c.Symbol,
+			Name:   c.Name,
+			SectorID: sectorID,
+		}
+		if err := s.db.UpsertCompany(ctx, company); err != nil {
+			log.Printf("sync-asx: failed to upsert %s: %v", c.Symbol, err)
+			skipped++
+			continue
+		}
+		synced++
+	}
+
+	log.Printf("sync-asx: complete — %d synced, %d skipped", synced, skipped)
 	return nil
 }
 

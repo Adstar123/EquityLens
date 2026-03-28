@@ -1,0 +1,63 @@
+# Technology sector configuration (software, hardware, IT services)
+sector: technology
+display_name: "Technology"
+ratios:
+  - key: pe_ratio
+    name: "P/E Ratio"
+    weight: 0.20
+    lower_is_better: true
+    ranges:
+      strong: { max: 15 }
+      good: { min: 15, max: 25 }
+      neutral: { min: 25, max: 35 }
+      weak: { min: 35, max: 50 }
+      poor: { min: 50 }
+  - key: debt_to_equity
+    name: "Debt to Equity"
+    weight: 0.15
+    lower_is_better: true
+    ranges:
+      strong: { max: 0.2 }
+      good: { min: 0.2, max: 0.5 }
+      neutral: { min: 0.5, max: 0.8 }
+      weak: { min: 0.8, max: 1.2 }
+      poor: { min: 1.2 }
+  - key: fcf_yield
+    name: "Free Cash Flow Yield"
+    weight: 0.25
+    lower_is_better: false
+    ranges:
+      strong: { min: 6 }
+      good: { min: 4, max: 6 }
+      neutral: { min: 2, max: 4 }
+      weak: { min: 0.5, max: 2 }
+      poor: { max: 0.5 }
+  - key: roe
+    name: "Return on Equity"
+    weight: 0.25
+    lower_is_better: false
+    ranges:
+      strong: { min: 25 }
+      good: { min: 18, max: 25 }
+      neutral: { min: 12, max: 18 }
+      weak: { min: 5, max: 12 }
+      poor: { max: 5 }
+  - key: ev_ebitda
+    name: "EV/EBITDA"
+    weight: 0.15
+    lower_is_better: true
+    ranges:
+      strong: { max: 10 }
+      good: { min: 10, max: 18 }
+      neutral: { min: 18, max: 25 }
+      weak: { min: 25, max: 35 }
+      poor: { min: 35 }
+edge_cases:
+  negative_earnings: "exclude_pe_redistribute"
+  missing_data_threshold: 0.4
+rating_scale:
+  strong_buy: { min: 80 }
+  buy: { min: 65, max: 80 }
+  hold: { min: 45, max: 65 }
+  sell: { min: 30, max: 45 }
+  strong_sell: { max: 30 }

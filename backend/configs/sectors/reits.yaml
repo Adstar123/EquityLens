@@ -1,0 +1,63 @@
+# REITs sector configuration (real estate investment trusts)
+sector: reits
+display_name: "REITs"
+ratios:
+  - key: pe_ratio
+    name: "P/E Ratio"
+    weight: 0.15
+    lower_is_better: true
+    ranges:
+      strong: { max: 14 }
+      good: { min: 14, max: 20 }
+      neutral: { min: 20, max: 28 }
+      weak: { min: 28, max: 38 }
+      poor: { min: 38 }
+  - key: debt_to_equity
+    name: "Debt to Equity"
+    weight: 0.25
+    lower_is_better: true
+    ranges:
+      strong: { max: 0.5 }
+      good: { min: 0.5, max: 0.8 }
+      neutral: { min: 0.8, max: 1.2 }
+      weak: { min: 1.2, max: 1.8 }
+      poor: { min: 1.8 }
+  - key: fcf_yield
+    name: "Free Cash Flow Yield"
+    weight: 0.25
+    lower_is_better: false
+    ranges:
+      strong: { min: 7 }
+      good: { min: 5, max: 7 }
+      neutral: { min: 3.5, max: 5 }
+      weak: { min: 2, max: 3.5 }
+      poor: { max: 2 }
+  - key: roe
+    name: "Return on Equity"
+    weight: 0.15
+    lower_is_better: false
+    ranges:
+      strong: { min: 12 }
+      good: { min: 8, max: 12 }
+      neutral: { min: 5, max: 8 }
+      weak: { min: 2, max: 5 }
+      poor: { max: 2 }
+  - key: ev_ebitda
+    name: "EV/EBITDA"
+    weight: 0.20
+    lower_is_better: true
+    ranges:
+      strong: { max: 14 }
+      good: { min: 14, max: 20 }
+      neutral: { min: 20, max: 26 }
+      weak: { min: 26, max: 34 }
+      poor: { min: 34 }
+edge_cases:
+  negative_earnings: "exclude_pe_redistribute"
+  missing_data_threshold: 0.4
+rating_scale:
+  strong_buy: { min: 80 }
+  buy: { min: 65, max: 80 }
+  hold: { min: 45, max: 65 }
+  sell: { min: 30, max: 45 }
+  strong_sell: { max: 30 }

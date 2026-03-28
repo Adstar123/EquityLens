@@ -1,0 +1,63 @@
+# Consumer Discretionary sector configuration (luxury, media, automotive)
+sector: consumer_discretionary
+display_name: "Consumer Discretionary"
+ratios:
+  - key: pe_ratio
+    name: "P/E Ratio"
+    weight: 0.20
+    lower_is_better: true
+    ranges:
+      strong: { max: 14 }
+      good: { min: 14, max: 20 }
+      neutral: { min: 20, max: 28 }
+      weak: { min: 28, max: 38 }
+      poor: { min: 38 }
+  - key: debt_to_equity
+    name: "Debt to Equity"
+    weight: 0.20
+    lower_is_better: true
+    ranges:
+      strong: { max: 0.3 }
+      good: { min: 0.3, max: 0.6 }
+      neutral: { min: 0.6, max: 1.0 }
+      weak: { min: 1.0, max: 1.5 }
+      poor: { min: 1.5 }
+  - key: fcf_yield
+    name: "Free Cash Flow Yield"
+    weight: 0.25
+    lower_is_better: false
+    ranges:
+      strong: { min: 7 }
+      good: { min: 5, max: 7 }
+      neutral: { min: 3, max: 5 }
+      weak: { min: 1, max: 3 }
+      poor: { max: 1 }
+  - key: roe
+    name: "Return on Equity"
+    weight: 0.20
+    lower_is_better: false
+    ranges:
+      strong: { min: 20 }
+      good: { min: 14, max: 20 }
+      neutral: { min: 9, max: 14 }
+      weak: { min: 4, max: 9 }
+      poor: { max: 4 }
+  - key: ev_ebitda
+    name: "EV/EBITDA"
+    weight: 0.15
+    lower_is_better: true
+    ranges:
+      strong: { max: 8 }
+      good: { min: 8, max: 12 }
+      neutral: { min: 12, max: 17 }
+      weak: { min: 17, max: 24 }
+      poor: { min: 24 }
+edge_cases:
+  negative_earnings: "exclude_pe_redistribute"
+  missing_data_threshold: 0.4
+rating_scale:
+  strong_buy: { min: 80 }
+  buy: { min: 65, max: 80 }
+  hold: { min: 45, max: 65 }
+  sell: { min: 30, max: 45 }
+  strong_sell: { max: 30 }

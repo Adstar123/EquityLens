@@ -65,6 +65,12 @@ func main() {
 	yahoo := ingestion.NewYahooClient()
 	sched := scheduler.NewScheduler(db, yahoo)
 
+	// Set up Alpha Vantage as fallback if API key is provided.
+	if avKey := os.Getenv("ALPHA_VANTAGE_API_KEY"); avKey != "" {
+		sched.SetAlphaVantage(avKey)
+		fmt.Println("Alpha Vantage fallback configured")
+	}
+
 	// Seed configs from YAML on startup.
 	configsPath := os.Getenv("CONFIGS_PATH")
 	if configsPath == "" {
@@ -74,10 +80,26 @@ func main() {
 		log.Printf("warning: failed to seed configs: %v", err)
 	}
 
-	// Set up daily cron job to refresh all scores.
+	// Sync ASX company list on startup (background — don't block server start).
+	go func() {
+		log.Println("startup: syncing ASX company list")
+		if err := sched.SyncASXCompanies(context.Background()); err != nil {
+			log.Printf("warning: ASX sync failed: %v", err)
+		}
+		// Score all companies after sync.
+		log.Println("startup: scoring all companies")
+		if err := sched.RefreshAll(context.Background()); err != nil {
+			log.Printf("warning: initial scoring failed: %v", err)
+		}
+	}()
+
+	// Set up daily cron: sync companies + refresh scores.
 	c := cron.New()
 	_, err = c.AddFunc("@daily", func() {
-		log.Println("cron: starting daily refresh")
+		log.Println("cron: starting daily sync + refresh")
+		if err := sched.SyncASXCompanies(context.Background()); err != nil {
+			log.Printf("cron: ASX sync failed: %v", err)
+		}
 		if err := sched.RefreshAll(context.Background()); err != nil {
 			log.Printf("cron: refresh failed: %v", err)
 		}

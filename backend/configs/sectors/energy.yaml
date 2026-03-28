@@ -1,0 +1,63 @@
+# Energy sector configuration (oil, gas, renewables)
+sector: energy
+display_name: "Energy"
+ratios:
+  - key: pe_ratio
+    name: "P/E Ratio"
+    weight: 0.20
+    lower_is_better: true
+    ranges:
+      strong: { max: 8 }
+      good: { min: 8, max: 12 }
+      neutral: { min: 12, max: 18 }
+      weak: { min: 18, max: 25 }
+      poor: { min: 25 }
+  - key: debt_to_equity
+    name: "Debt to Equity"
+    weight: 0.20
+    lower_is_better: true
+    ranges:
+      strong: { max: 0.3 }
+      good: { min: 0.3, max: 0.6 }
+      neutral: { min: 0.6, max: 0.9 }
+      weak: { min: 0.9, max: 1.3 }
+      poor: { min: 1.3 }
+  - key: fcf_yield
+    name: "Free Cash Flow Yield"
+    weight: 0.25
+    lower_is_better: false
+    ranges:
+      strong: { min: 10 }
+      good: { min: 7, max: 10 }
+      neutral: { min: 4, max: 7 }
+      weak: { min: 2, max: 4 }
+      poor: { max: 2 }
+  - key: roe
+    name: "Return on Equity"
+    weight: 0.20
+    lower_is_better: false
+    ranges:
+      strong: { min: 18 }
+      good: { min: 12, max: 18 }
+      neutral: { min: 8, max: 12 }
+      weak: { min: 3, max: 8 }
+      poor: { max: 3 }
+  - key: ev_ebitda
+    name: "EV/EBITDA"
+    weight: 0.15
+    lower_is_better: true
+    ranges:
+      strong: { max: 4 }
+      good: { min: 4, max: 7 }
+      neutral: { min: 7, max: 10 }
+      weak: { min: 10, max: 14 }
+      poor: { min: 14 }
+edge_cases:
+  negative_earnings: "exclude_pe_redistribute"
+  missing_data_threshold: 0.4
+rating_scale:
+  strong_buy: { min: 80 }
+  buy: { min: 65, max: 80 }
+  hold: { min: 45, max: 65 }
+  sell: { min: 30, max: 45 }
+  strong_sell: { max: 30 }
