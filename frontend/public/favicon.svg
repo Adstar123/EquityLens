@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Lens circle -->
+  <circle cx="26" cy="26" r="18" fill="none" stroke="#d4930d" stroke-width="4"/>
+  <!-- Lens handle -->
+  <line x1="39" y1="39" x2="56" y2="56" stroke="#d4930d" stroke-width="5" stroke-linecap="round"/>
+  <!-- Equity chart line inside lens -->
+  <polyline points="14,34 20,28 26,31 32,18" fill="none" stroke="#f0b429" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
