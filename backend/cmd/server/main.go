@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/Adstar123/equitylens/backend/internal/api"
 	"github.com/Adstar123/equitylens/backend/internal/auth"
@@ -15,7 +16,6 @@ import (
 	"github.com/Adstar123/equitylens/backend/internal/scheduler"
 	"github.com/Adstar123/equitylens/backend/internal/storage"
 	"github.com/joho/godotenv"
-	"github.com/robfig/cron/v3"
 )
 
 func main() {
@@ -81,34 +81,29 @@ func main() {
 	}
 
 	// Sync ASX company list on startup (background — don't block server start).
+	// Scoring is handled by the GitHub Actions scorer workflow, not here.
 	go func() {
 		log.Println("startup: syncing ASX company list")
 		if err := sched.SyncASXCompanies(context.Background()); err != nil {
 			log.Printf("warning: ASX sync failed: %v", err)
 		}
-		// Score all companies after sync.
-		log.Println("startup: scoring all companies")
-		if err := sched.RefreshAll(context.Background()); err != nil {
-			log.Printf("warning: initial scoring failed: %v", err)
-		}
+		log.Println("startup: ASX sync complete (scoring runs via GitHub Actions)")
 	}()
 
-	// Set up daily cron: sync companies + refresh scores.
-	c := cron.New()
-	_, err = c.AddFunc("@daily", func() {
-		log.Println("cron: starting daily sync + refresh")
-		if err := sched.SyncASXCompanies(context.Background()); err != nil {
-			log.Printf("cron: ASX sync failed: %v", err)
+	// Self-ping keep-alive: hit our own health endpoint every 10 minutes
+	// to prevent Render free tier spin-down (15 min inactivity timeout).
+	go func() {
+		ticker := time.NewTicker(10 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			resp, err := http.Get("http://localhost:8080/api/v1/health")
+			if err != nil {
+				log.Printf("keep-alive ping failed: %v", err)
+				continue
+			}
+			resp.Body.Close()
 		}
-		if err := sched.RefreshAll(context.Background()); err != nil {
-			log.Printf("cron: refresh failed: %v", err)
-		}
-	})
-	if err != nil {
-		log.Fatalf("failed to schedule cron job: %v", err)
-	}
-	c.Start()
-	defer c.Stop()
+	}()
 
 	redisURL := os.Getenv("REDIS_URL")
 	var appCache *cache.Cache

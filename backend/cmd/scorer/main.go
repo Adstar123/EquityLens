@@ -1,0 +1,71 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"os"
+
+	"github.com/Adstar123/equitylens/backend/internal/ingestion"
+	"github.com/Adstar123/equitylens/backend/internal/scheduler"
+	"github.com/Adstar123/equitylens/backend/internal/storage"
+	"github.com/joho/godotenv"
+)
+
+// Standalone scorer CLI — runs ASX sync + Yahoo scoring outside of the API server.
+// Designed to run as a GitHub Action where Yahoo Finance isn't IP-blocked.
+func main() {
+	_ = godotenv.Load()
+
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		log.Fatal("DATABASE_URL is required")
+	}
+
+	ctx := context.Background()
+	db, err := storage.NewDB(ctx, databaseURL)
+	if err != nil {
+		log.Fatalf("failed to connect to database: %v", err)
+	}
+	defer db.Close()
+
+	migrationsPath := os.Getenv("MIGRATIONS_PATH")
+	if migrationsPath == "" {
+		migrationsPath = "migrations"
+	}
+	if err := db.RunMigrations(databaseURL, migrationsPath); err != nil {
+		log.Fatalf("failed to run migrations: %v", err)
+	}
+	fmt.Println("migrations applied")
+
+	yahoo := ingestion.NewYahooClient()
+	sched := scheduler.NewScheduler(db, yahoo)
+
+	if avKey := os.Getenv("ALPHA_VANTAGE_API_KEY"); avKey != "" {
+		sched.SetAlphaVantage(avKey)
+		fmt.Println("Alpha Vantage fallback configured")
+	}
+
+	// Seed configs (no-op if already seeded).
+	configsPath := os.Getenv("CONFIGS_PATH")
+	if configsPath == "" {
+		configsPath = "configs/sectors"
+	}
+	if err := sched.SeedFromYAML(ctx, configsPath); err != nil {
+		log.Printf("warning: failed to seed configs: %v", err)
+	}
+
+	// Sync ASX company list.
+	log.Println("scorer: syncing ASX company list")
+	if err := sched.SyncASXCompanies(ctx); err != nil {
+		log.Fatalf("ASX sync failed: %v", err)
+	}
+
+	// Score all companies.
+	log.Println("scorer: scoring all companies")
+	if err := sched.RefreshAll(ctx); err != nil {
+		log.Printf("scoring completed with errors: %v", err)
+	}
+
+	log.Println("scorer: done")
+}
