@@ -22,7 +22,7 @@ type YahooClient struct {
 func NewYahooClient() *YahooClient {
 	return &YahooClient{
 		httpClient:  &http.Client{Timeout: 15 * time.Second},
-		rateLimiter: rate.NewLimiter(rate.Every(2*time.Second), 5),
+		rateLimiter: rate.NewLimiter(rate.Every(4*time.Second), 2),
 		baseURL:     "https://query1.finance.yahoo.com",
 	}
 }
@@ -83,40 +83,57 @@ type Price struct {
 // ---------- internal fetch ----------
 
 func (c *YahooClient) fetchQuoteSummary(ctx context.Context, symbol string) (*QuoteSummaryResult, error) {
-	if err := c.rateLimiter.Wait(ctx); err != nil {
-		return nil, fmt.Errorf("rate limiter: %w", err)
-	}
-
 	url := fmt.Sprintf(
 		"%s/v10/finance/quoteSummary/%s?modules=defaultKeyStatistics,financialData,summaryDetail,price",
 		c.baseURL, symbol,
 	)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("building request: %w", err)
+	maxRetries := 3
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if err := c.rateLimiter.Wait(ctx); err != nil {
+			return nil, fmt.Errorf("rate limiter: %w", err)
+		}
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return nil, fmt.Errorf("building request: %w", err)
+		}
+
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("executing request: %w", err)
+		}
+
+		if resp.StatusCode == 429 {
+			resp.Body.Close()
+			if attempt < maxRetries {
+				backoff := time.Duration(10*(attempt+1)) * time.Second
+				time.Sleep(backoff)
+				continue
+			}
+			return nil, fmt.Errorf("yahoo rate limited after %d retries for %s", maxRetries, symbol)
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			return nil, fmt.Errorf("yahoo returned status %d for %s", resp.StatusCode, symbol)
+		}
+
+		var envelope QuoteSummaryResponse
+		if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+			resp.Body.Close()
+			return nil, fmt.Errorf("decoding response: %w", err)
+		}
+		resp.Body.Close()
+
+		if len(envelope.QuoteSummary.Result) == 0 {
+			return nil, fmt.Errorf("no results returned for %s", symbol)
+		}
+
+		return &envelope.QuoteSummary.Result[0], nil
 	}
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("executing request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("yahoo returned status %d for %s", resp.StatusCode, symbol)
-	}
-
-	var envelope QuoteSummaryResponse
-	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
-		return nil, fmt.Errorf("decoding response: %w", err)
-	}
-
-	if len(envelope.QuoteSummary.Result) == 0 {
-		return nil, fmt.Errorf("no results returned for %s", symbol)
-	}
-
-	return &envelope.QuoteSummary.Result[0], nil
+	return nil, fmt.Errorf("exhausted retries for %s", symbol)
 }
 
 // ---------- public methods ----------
