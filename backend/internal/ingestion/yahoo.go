@@ -57,8 +57,31 @@ type CompanyProfile struct {
 // ---------- Yahoo response model ----------
 
 // YahooValue captures the {"raw": value} pattern Yahoo uses everywhere.
+// Yahoo sometimes returns strings like "Infinity" or "NaN" instead of numbers,
+// so we use a custom unmarshaler to handle both.
 type YahooValue struct {
-	Raw float64 `json:"raw"`
+	Raw float64
+}
+
+func (v *YahooValue) UnmarshalJSON(data []byte) error {
+	// Try {"raw": 123.45} first
+	var obj struct {
+		Raw json.Number `json:"raw"`
+	}
+	if err := json.Unmarshal(data, &obj); err != nil {
+		// Not an object — treat as zero
+		return nil
+	}
+	if obj.Raw == "" {
+		return nil
+	}
+	f, err := obj.Raw.Float64()
+	if err != nil {
+		// String like "Infinity", "NaN", etc. — treat as zero (missing)
+		return nil
+	}
+	v.Raw = f
+	return nil
 }
 
 // QuoteSummaryResponse is the top-level JSON envelope.
