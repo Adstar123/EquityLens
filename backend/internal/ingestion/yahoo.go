@@ -22,7 +22,7 @@ type YahooClient struct {
 func NewYahooClient() *YahooClient {
 	return &YahooClient{
 		httpClient:  &http.Client{Timeout: 15 * time.Second},
-		rateLimiter: rate.NewLimiter(rate.Every(4*time.Second), 2),
+		rateLimiter: rate.NewLimiter(rate.Every(6*time.Second), 1),
 		baseURL:     "https://query1.finance.yahoo.com",
 	}
 }
@@ -107,7 +107,8 @@ func (c *YahooClient) fetchQuoteSummary(ctx context.Context, symbol string) (*Qu
 		if resp.StatusCode == 429 {
 			resp.Body.Close()
 			if attempt < maxRetries {
-				backoff := time.Duration(10*(attempt+1)) * time.Second
+				backoff := time.Duration(30*(attempt+1)) * time.Second
+				fmt.Printf("yahoo: 429 for %s, backing off %v (attempt %d/%d)\n", symbol, backoff, attempt+1, maxRetries)
 				time.Sleep(backoff)
 				continue
 			}

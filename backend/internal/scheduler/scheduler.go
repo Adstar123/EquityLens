@@ -188,12 +188,22 @@ func (s *Scheduler) ScoreSector(ctx context.Context, sectorID uuid.UUID) error {
 		return nil
 	}
 
+	consecutiveFails := 0
 	for _, company := range companies {
+		// If we hit 5+ consecutive failures, pause 2 minutes (likely rate limited)
+		if consecutiveFails >= 5 {
+			log.Printf("score-sector: %d consecutive failures, pausing 2 minutes", consecutiveFails)
+			time.Sleep(2 * time.Minute)
+			consecutiveFails = 0
+		}
+
 		financials, err := s.yahoo.FetchFinancials(ctx, company.Symbol)
 		if err != nil {
 			log.Printf("score-sector: failed to fetch financials for %s: %v", company.Symbol, err)
+			consecutiveFails++
 			continue
 		}
+		consecutiveFails = 0
 
 		result, err := scoring.ScoreCompany(activeConfig.ConfigJSON, financials)
 		if err != nil {
