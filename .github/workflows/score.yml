@@ -2,8 +2,8 @@ name: Score ASX Companies
 
 on:
   schedule:
-    # Run twice daily: 6 AM and 6 PM UTC (4 PM and 4 AM AEST)
-    - cron: '0 6,18 * * *'
+    # Run every 2 days at 6 AM UTC (4 PM AEST)
+    - cron: '0 6 */2 * *'
   workflow_dispatch: # Allow manual trigger
 
 jobs:
