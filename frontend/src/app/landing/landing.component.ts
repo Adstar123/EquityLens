@@ -12,6 +12,7 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideScanEye, lucideBrainCircuit, lucideRadar } from '@ng-icons/lucide';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { environment } from '../../environments/environment';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -115,8 +116,8 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   dataColumns = buildColumns(12, 18);
 
   // Auth URLs
-  googleAuthUrl = 'http://localhost:8080/api/v1/auth/google/login';
-  githubAuthUrl = 'http://localhost:8080/api/v1/auth/github/login';
+  googleAuthUrl = `${environment.apiUrl}/auth/google/login`;
+  githubAuthUrl = `${environment.apiUrl}/auth/github/login`;
 
   // GSAP context
   private gsapCtx: gsap.Context | null = null;
