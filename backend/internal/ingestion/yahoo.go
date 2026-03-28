@@ -4,7 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"net/http/cookiejar"
+	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/time/rate"
@@ -15,15 +19,24 @@ type YahooClient struct {
 	httpClient  *http.Client
 	rateLimiter *rate.Limiter
 	baseURL     string // overridable for tests
+
+	// crumb/cookie auth
+	mu    sync.Mutex
+	crumb string
 }
 
-// NewYahooClient returns a client with sensible defaults:
-// 15s timeout, 5-burst / 1-per-2s rate limiter.
+const yahooUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+
+// NewYahooClient returns a client with crumb/cookie auth and rate limiting.
 func NewYahooClient() *YahooClient {
+	jar, _ := cookiejar.New(nil)
 	return &YahooClient{
-		httpClient:  &http.Client{Timeout: 15 * time.Second},
-		rateLimiter: rate.NewLimiter(rate.Every(6*time.Second), 1),
-		baseURL:     "https://query1.finance.yahoo.com",
+		httpClient: &http.Client{
+			Timeout: 15 * time.Second,
+			Jar:     jar,
+		},
+		rateLimiter: rate.NewLimiter(rate.Every(2*time.Second), 1),
+		baseURL:     "https://query2.finance.yahoo.com",
 	}
 }
 
@@ -80,12 +93,83 @@ type Price struct {
 	MarketCap YahooValue `json:"marketCap"`
 }
 
+// ---------- crumb/cookie auth ----------
+
+func (c *YahooClient) ensureCrumb(ctx context.Context) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.crumb != "" {
+		return nil
+	}
+
+	return c.fetchCrumb(ctx)
+}
+
+func (c *YahooClient) fetchCrumb(ctx context.Context) error {
+	// Step 1: hit consent/cookie endpoint to get cookies
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://fc.yahoo.com/", nil)
+	if err != nil {
+		return fmt.Errorf("building cookie request: %w", err)
+	}
+	req.Header.Set("User-Agent", yahooUserAgent)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("fetching cookies: %w", err)
+	}
+	resp.Body.Close()
+	// 404 is expected — we just need the cookies
+
+	// Step 2: fetch the crumb using the cookies
+	req, err = http.NewRequestWithContext(ctx, http.MethodGet,
+		"https://query2.finance.yahoo.com/v1/test/getcrumb", nil)
+	if err != nil {
+		return fmt.Errorf("building crumb request: %w", err)
+	}
+	req.Header.Set("User-Agent", yahooUserAgent)
+
+	resp, err = c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("fetching crumb: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("crumb endpoint returned %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("reading crumb: %w", err)
+	}
+
+	crumb := strings.TrimSpace(string(body))
+	if crumb == "" {
+		return fmt.Errorf("empty crumb returned")
+	}
+
+	c.crumb = crumb
+	fmt.Printf("yahoo: obtained crumb for authenticated requests\n")
+	return nil
+}
+
+func (c *YahooClient) invalidateCrumb() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.crumb = ""
+}
+
 // ---------- internal fetch ----------
 
 func (c *YahooClient) fetchQuoteSummary(ctx context.Context, symbol string) (*QuoteSummaryResult, error) {
+	if err := c.ensureCrumb(ctx); err != nil {
+		return nil, fmt.Errorf("crumb auth failed: %w", err)
+	}
+
 	url := fmt.Sprintf(
-		"%s/v10/finance/quoteSummary/%s?modules=defaultKeyStatistics,financialData,summaryDetail,price",
-		c.baseURL, symbol,
+		"%s/v10/finance/quoteSummary/%s?modules=defaultKeyStatistics,financialData,summaryDetail,price&crumb=%s",
+		c.baseURL, symbol, c.crumb,
 	)
 
 	maxRetries := 3
@@ -98,6 +182,7 @@ func (c *YahooClient) fetchQuoteSummary(ctx context.Context, symbol string) (*Qu
 		if err != nil {
 			return nil, fmt.Errorf("building request: %w", err)
 		}
+		req.Header.Set("User-Agent", yahooUserAgent)
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
@@ -113,6 +198,24 @@ func (c *YahooClient) fetchQuoteSummary(ctx context.Context, symbol string) (*Qu
 				continue
 			}
 			return nil, fmt.Errorf("yahoo rate limited after %d retries for %s", maxRetries, symbol)
+		}
+
+		if resp.StatusCode == 401 {
+			resp.Body.Close()
+			// Crumb expired, refresh and retry
+			c.invalidateCrumb()
+			if attempt < maxRetries {
+				fmt.Printf("yahoo: 401 for %s, refreshing crumb (attempt %d/%d)\n", symbol, attempt+1, maxRetries)
+				if err := c.ensureCrumb(ctx); err != nil {
+					return nil, fmt.Errorf("crumb refresh failed: %w", err)
+				}
+				url = fmt.Sprintf(
+					"%s/v10/finance/quoteSummary/%s?modules=defaultKeyStatistics,financialData,summaryDetail,price&crumb=%s",
+					c.baseURL, symbol, c.crumb,
+				)
+				continue
+			}
+			return nil, fmt.Errorf("yahoo auth failed after %d retries for %s", maxRetries, symbol)
 		}
 
 		if resp.StatusCode != http.StatusOK {
