@@ -123,15 +123,23 @@ type SortDir = 'asc' | 'desc';
             </div>
           </section>
 
-          <!-- Heatmap -->
-          @if (heatmapOptions()) {
-            <section class="heatmap-section" @fadeIn>
-              <h2 class="section-title">RATIO HEATMAP</h2>
-              <div
-                echarts
-                [options]="heatmapOptions()!"
-                class="heatmap-chart"
-              ></div>
+          <!-- Analytics -->
+          @if (distributionOptions() || radarOptions()) {
+            <section class="analytics-section" @fadeIn>
+              <div class="analytics-grid">
+                @if (distributionOptions()) {
+                  <div class="analytics-card">
+                    <h2 class="section-title">STRENGTH DISTRIBUTION</h2>
+                    <div echarts [options]="distributionOptions()!" class="analytics-chart"></div>
+                  </div>
+                }
+                @if (radarOptions()) {
+                  <div class="analytics-card">
+                    <h2 class="section-title">SECTOR RATIO PROFILE</h2>
+                    <div echarts [options]="radarOptions()!" class="analytics-chart"></div>
+                  </div>
+                }
+              </div>
             </section>
           }
         } @else {
@@ -316,8 +324,8 @@ type SortDir = 'asc' | 'desc';
       font-size: 0.875rem;
     }
 
-    /* Heatmap */
-    .heatmap-section {
+    /* Analytics */
+    .analytics-section {
       margin-top: 1rem;
     }
 
@@ -330,10 +338,27 @@ type SortDir = 'asc' | 'desc';
       margin: 0 0 0.75rem;
     }
 
-    .heatmap-chart {
+    .analytics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+
+    .analytics-card {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      padding: 1.25rem;
+    }
+
+    .analytics-chart {
       width: 100%;
-      height: 500px;
-      min-height: 300px;
+      height: 300px;
+    }
+
+    @media (max-width: 768px) {
+      .analytics-grid {
+        grid-template-columns: 1fr;
+      }
     }
   `],
 })
@@ -395,87 +420,127 @@ export class SectorComponent implements OnInit {
     return list;
   });
 
-  /** ECharts heatmap options */
-  heatmapOptions = computed<EChartsCoreOption | null>(() => {
+  /** Strength distribution bar chart */
+  distributionOptions = computed<EChartsCoreOption | null>(() => {
+    const list = this.items();
+    if (!list.length) return null;
+
+    const buckets: Record<string, number> = {
+      strong_buy: 0, buy: 0, hold: 0, sell: 0, strong_sell: 0,
+    };
+    for (const item of list) {
+      if (buckets[item.rating] !== undefined) {
+        buckets[item.rating]++;
+      }
+    }
+
+    const isDark = this.theme.theme() === 'dark';
+    const labelColor = isDark ? '#8888a0' : '#4a4a65';
+
+    return {
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' },
+        formatter: (params: any) => {
+          const p = params[0];
+          return `<b>${p.name}</b><br/>${p.value} companies`;
+        },
+      },
+      grid: { top: 16, bottom: 32, left: 40, right: 16 },
+      xAxis: {
+        type: 'category',
+        data: ['Very Strong', 'Strong', 'Neutral', 'Weak', 'Very Weak'],
+        axisLabel: { color: labelColor, fontSize: 10, fontFamily: 'Inter' },
+        axisTick: { show: false },
+        axisLine: { lineStyle: { color: isDark ? '#252540' : '#d8d8e4' } },
+      },
+      yAxis: {
+        type: 'value',
+        axisLabel: { color: labelColor, fontSize: 10 },
+        splitLine: { lineStyle: { color: isDark ? '#1a1a2e' : '#eaeaf0' } },
+        axisLine: { show: false },
+        axisTick: { show: false },
+      },
+      series: [{
+        type: 'bar',
+        data: [
+          { value: buckets['strong_buy'], itemStyle: { color: '#22c55e' } },
+          { value: buckets['buy'], itemStyle: { color: '#84cc16' } },
+          { value: buckets['hold'], itemStyle: { color: '#d4930d' } },
+          { value: buckets['sell'], itemStyle: { color: '#ef4444' } },
+          { value: buckets['strong_sell'], itemStyle: { color: '#dc2626' } },
+        ],
+        barWidth: '55%',
+        itemStyle: { borderRadius: [3, 3, 0, 0] },
+      }],
+    };
+  });
+
+  /** Sector average ratio radar chart */
+  radarOptions = computed<EChartsCoreOption | null>(() => {
     const list = this.items();
     const names = this.ratioNames();
     if (!list.length || !names.length) return null;
 
-    // Sort by score descending for the heatmap
-    const sorted = [...list].sort((a, b) => a.composite_score - b.composite_score);
-    const symbols = sorted.map(i => i.symbol);
+    const sums = new Array(names.length).fill(0);
+    const counts = new Array(names.length).fill(0);
 
-    const data: number[][] = [];
-    for (let yi = 0; yi < sorted.length; yi++) {
-      const item = sorted[yi];
+    for (const item of list) {
       const ratios = item.breakdown?.ratios ?? [];
-      for (let xi = 0; xi < names.length; xi++) {
-        const ratio = ratios.find(r => r.name === names[xi]);
-        data.push([xi, yi, ratio?.points ?? 0]);
+      for (let i = 0; i < names.length; i++) {
+        const ratio = ratios.find(r => r.name === names[i]);
+        if (ratio) {
+          sums[i] += ratio.points;
+          counts[i]++;
+        }
       }
     }
 
-    const dynamicHeight = Math.max(300, sorted.length * 24 + 120);
+    const avgs = sums.map((s: number, i: number) =>
+      counts[i] > 0 ? +(s / counts[i]).toFixed(2) : 0
+    );
+
     const isDark = this.theme.theme() === 'dark';
     const labelColor = isDark ? '#8888a0' : '#4a4a65';
-    const borderCol = isDark ? '#0f0f1a' : '#f5f5f9';
-    const heatColors = isDark
-      ? ['#1e1e35', '#2e2e50', '#6b5b1e', '#b8860b', '#d4930d']
-      : ['#e0e0ec', '#c8c8d8', '#c9a84c', '#b8960b', '#d4930d'];
+    const splitColor = isDark ? '#252540' : '#d8d8e4';
 
     return {
       tooltip: {
-        position: 'top',
+        trigger: 'item',
         formatter: (params: any) => {
           const d = params.data;
-          return `<b>${symbols[d[1]]}</b><br/>${names[d[0]]}: ${d[2]}/5`;
+          return d.value.map((v: number, i: number) =>
+            `${names[i]}: <b>${v}</b> / 5`
+          ).join('<br/>');
         },
       },
-      grid: { top: 40, bottom: 100, left: 100, right: 20 },
-      xAxis: {
-        type: 'category',
-        data: names,
-        position: 'top',
-        axisLabel: { color: labelColor, rotate: 0, fontSize: 11, fontFamily: 'Inter' },
-        axisTick: { show: false },
-        axisLine: { show: false },
-      },
-      yAxis: {
-        type: 'category',
-        data: symbols,
-        axisLabel: { color: labelColor, fontFamily: 'JetBrains Mono', fontSize: 11 },
-        axisTick: { show: false },
-        axisLine: { show: false },
-      },
-      visualMap: {
-        min: 1,
-        max: 5,
-        calculable: false,
-        orient: 'horizontal',
-        left: 'center',
-        bottom: 15,
-        itemWidth: 16,
-        itemHeight: 140,
-        text: ['Strong', 'Weak'],
-        inRange: { color: heatColors },
-        textStyle: { color: labelColor, fontSize: 11 },
+      radar: {
+        indicator: names.map(name => ({ name, max: 5 })),
+        shape: 'polygon',
+        splitNumber: 5,
+        center: ['50%', '55%'],
+        radius: '65%',
+        axisName: {
+          color: labelColor,
+          fontSize: 11,
+          fontFamily: 'Inter',
+        },
+        splitLine: { lineStyle: { color: splitColor } },
+        splitArea: { show: false },
+        axisLine: { lineStyle: { color: splitColor } },
       },
       series: [{
-        type: 'heatmap',
-        data,
-        itemStyle: {
-          borderColor: borderCol,
-          borderWidth: 2,
-          borderRadius: 3,
-        },
-        emphasis: {
-          itemStyle: {
-            borderColor: '#d4930d',
-            borderWidth: 2,
-          },
-        },
+        type: 'radar',
+        data: [{
+          value: avgs,
+          name: 'Sector Average',
+          areaStyle: { color: 'rgba(212, 147, 13, 0.15)' },
+          lineStyle: { color: '#d4930d', width: 2 },
+          itemStyle: { color: '#d4930d', borderColor: '#d4930d' },
+          symbol: 'circle',
+          symbolSize: 6,
+        }],
       }],
-      _height: dynamicHeight,
     };
   });
 
