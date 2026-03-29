@@ -50,8 +50,8 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
           <div class="company-identity">
             <h1 class="company-name">{{ detail()!.company.name }}</h1>
             <span class="company-symbol">{{ detail()!.company.symbol }}</span>
-            @if (detail()!.company.sector_id) {
-              <span class="sector-pill">{{ detail()!.company.sector_id }}</span>
+            @if (sectorName()) {
+              <span class="sector-pill">{{ sectorName() }}</span>
             }
             @if (auth.isLoggedIn()) {
               <button
@@ -92,6 +92,16 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
               ></div>
             </div>
           </section>
+
+          <!-- Sector rank context -->
+          @if (sectorRank() && sectorTotal()) {
+            <div class="sector-rank-bar">
+              <span class="rank-text">
+                Ranked <strong>#{{ sectorRank() }}</strong> of {{ sectorTotal() }} in {{ sectorName() }}
+              </span>
+              <span class="rank-percentile">Top {{ sectorPercentile() }}%</span>
+            </div>
+          }
 
           <!-- Breakdown table -->
           <section class="breakdown-section" @rowStagger>
@@ -302,8 +312,34 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
     }
 
     .radar-chart {
-      width: 200px;
-      height: 200px;
+      width: 280px;
+      height: 280px;
+    }
+
+    .sector-rank-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.75rem 1rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      margin-bottom: 2rem;
+      font-size: 0.8125rem;
+      color: var(--text-secondary);
+    }
+
+    .rank-text strong {
+      color: var(--text-primary);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .rank-percentile {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+      color: var(--accent);
+      font-size: 0.8125rem;
+      white-space: nowrap;
     }
 
     /* Breakdown section */
@@ -457,6 +493,17 @@ export class TickerComponent implements OnInit, AfterViewInit {
   expandedRatio = signal<string | null>(null);
   inWatchlist = signal(false);
   private watchlistSymbols = signal<Set<string>>(new Set());
+
+  // Sector context
+  sectorName = signal<string | null>(null);
+  sectorRank = signal<number | null>(null);
+  sectorTotal = signal<number | null>(null);
+  sectorPercentile = computed(() => {
+    const rank = this.sectorRank();
+    const total = this.sectorTotal();
+    if (!rank || !total) return 0;
+    return Math.round(((total - rank + 1) / total) * 100);
+  });
 
   ratios = computed(() => {
     const d = this.detail();
@@ -616,10 +663,34 @@ export class TickerComponent implements OnInit, AfterViewInit {
         if (data.score) {
           this.animateScore(data.score.composite_score);
         }
+        // Load sector context (name + rank)
+        if (data.company.sector_id) {
+          this.loadSectorContext(data.company.sector_id, symbol);
+        }
       },
       error: () => {
         this.detail.set(null);
         this.loading.set(false);
+      },
+    });
+  }
+
+  private loadSectorContext(sectorId: string, symbol: string): void {
+    this.api.listSectors().subscribe({
+      next: (sectors) => {
+        const sector = sectors.find(s => s.id === sectorId);
+        if (!sector) return;
+        this.sectorName.set(sector.display_name);
+
+        // Load sector screener to find rank
+        this.api.screener({ sector: sector.key }).subscribe({
+          next: (items) => {
+            const sorted = [...items].sort((a, b) => b.composite_score - a.composite_score);
+            const rank = sorted.findIndex(i => i.symbol.toUpperCase() === symbol.toUpperCase()) + 1;
+            this.sectorTotal.set(sorted.length);
+            this.sectorRank.set(rank > 0 ? rank : null);
+          },
+        });
       },
     });
   }
