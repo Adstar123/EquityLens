@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -56,8 +57,13 @@ func (s *Server) Router() chi.Router {
 	if frontendURL == "" {
 		frontendURL = "http://localhost:4200"
 	}
+	origins := []string{frontendURL, "http://localhost:4200"}
+	// Also allow www variant
+	if strings.HasPrefix(frontendURL, "https://") && !strings.HasPrefix(frontendURL, "https://www.") {
+		origins = append(origins, strings.Replace(frontendURL, "https://", "https://www.", 1))
+	}
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{frontendURL, "http://localhost:4200"},
+		AllowedOrigins:   origins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
 		AllowCredentials: true,
