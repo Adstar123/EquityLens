@@ -90,20 +90,25 @@ func main() {
 		log.Println("startup: ASX sync complete (scoring runs via GitHub Actions)")
 	}()
 
-	// Self-ping keep-alive: hit our own health endpoint every 10 minutes
+	// Self-ping keep-alive: hit our own external URL every 10 minutes
 	// to prevent Render free tier spin-down (15 min inactivity timeout).
-	go func() {
-		ticker := time.NewTicker(10 * time.Minute)
-		defer ticker.Stop()
-		for range ticker.C {
-			resp, err := http.Get("http://localhost:8080/api/v1/health")
-			if err != nil {
-				log.Printf("keep-alive ping failed: %v", err)
-				continue
+	// Must go through external URL so Render counts it as inbound traffic.
+	if backendURL := os.Getenv("BACKEND_URL"); backendURL != "" {
+		go func() {
+			pingURL := backendURL + "/api/v1/health"
+			ticker := time.NewTicker(10 * time.Minute)
+			defer ticker.Stop()
+			for range ticker.C {
+				resp, err := http.Get(pingURL)
+				if err != nil {
+					log.Printf("keep-alive ping failed: %v", err)
+					continue
+				}
+				resp.Body.Close()
 			}
-			resp.Body.Close()
-		}
-	}()
+		}()
+		log.Printf("keep-alive: pinging %s every 10 minutes", backendURL)
+	}
 
 	redisURL := os.Getenv("REDIS_URL")
 	var appCache *cache.Cache

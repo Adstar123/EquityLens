@@ -43,31 +43,7 @@ func (s *Server) getTickerDetail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if company == nil {
-		// On-demand fetch from Yahoo via scheduler
-		score, err := s.scheduler.ScoreCompany(r.Context(), symbol)
-		if err != nil {
-			writeError(w, http.StatusBadGateway, "failed to fetch company data")
-			return
-		}
-
-		// Cache the freshly computed score
-		if s.cache != nil && score != nil {
-			if err := s.cache.SetScore(r.Context(), symbol, *score, time.Hour); err != nil {
-				log.Printf("cache set error: %v", err)
-			}
-		}
-
-		// Re-fetch the company after scoring
-		company, err = s.db.GetCompanyBySymbol(r.Context(), symbol)
-		if err != nil || company == nil {
-			writeError(w, http.StatusNotFound, "company not found")
-			return
-		}
-
-		writeJSON(w, http.StatusOK, map[string]any{
-			"company": company,
-			"score":   score,
-		})
+		writeError(w, http.StatusNotFound, "company not found")
 		return
 	}
 
