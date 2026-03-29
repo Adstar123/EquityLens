@@ -365,6 +365,59 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
       font-size: 0.75rem;
       color: var(--text-secondary);
     }
+
+    @media (max-width: 768px) {
+      .screener-header {
+        padding: 0.75rem 0.75rem 0.5rem;
+      }
+
+      .filter-bar {
+        gap: 0.5rem;
+      }
+
+      .filter-group {
+        flex: 1 1 calc(50% - 0.5rem);
+        min-width: 0;
+      }
+
+      .filter-select,
+      .filter-input {
+        min-width: 0;
+        width: 100%;
+        font-size: 0.75rem;
+        padding: 0.5rem;
+      }
+
+      .result-count {
+        width: 100%;
+        text-align: right;
+      }
+
+      td, th {
+        padding: 0.4rem 0.5rem;
+        font-size: 0.75rem;
+      }
+
+      .cell-name {
+        max-width: 120px;
+      }
+
+      .pagination {
+        padding: 0.75rem 1rem;
+        padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+        gap: 0.75rem;
+      }
+
+      .page-btn {
+        padding: 0.625rem 1.25rem;
+        font-size: 0.8125rem;
+        min-height: 44px;
+      }
+
+      .page-info {
+        font-size: 0.8125rem;
+      }
+    }
   `],
 })
 export class ScreenerComponent implements OnInit {

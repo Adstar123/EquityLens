@@ -652,17 +652,15 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
       ScrollTrigger.defaults({ scroller });
       ScrollTrigger.refresh();
 
-      // ── Hero entrance (plays on load) ──
+      // ─�� Hero entrance (plays on load) ──
       gsap.set(this.heroEquity.nativeElement, { y: 30, opacity: 0 });
       gsap.set(this.heroLens.nativeElement, { y: 30, opacity: 0 });
       gsap.set(this.heroSubtitle.nativeElement, { y: 15, opacity: 0 });
-      gsap.set(this.scrollCue.nativeElement, { opacity: 0 });
 
       const heroEls = [
         this.heroEquity.nativeElement,
         this.heroLens.nativeElement,
         this.heroSubtitle.nativeElement,
-        this.scrollCue.nativeElement,
       ];
 
       const heroTl = gsap.timeline({
@@ -678,28 +676,16 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
         }, '-=0.5')
         .to(this.heroSubtitle.nativeElement, {
           y: 0, opacity: 1, duration: 0.6, ease: 'power2.out',
-        }, '-=0.3')
-        .to(this.scrollCue.nativeElement, {
-          opacity: 1, duration: 0.8,
-        }, '-=0.2');
+        }, '-=0.3');
 
-      // ── Hero fade on scroll (NO pin — just natural scroll) ──
+      // ── Hero fade on scroll (NO pin) ──
+      // hero-type is 100svh; fade as user scrolls toward problem statement
       gsap.to(this.heroType.nativeElement, {
         opacity: 0,
         scrollTrigger: {
-          trigger: this.heroSection.nativeElement,
+          trigger: this.heroType.nativeElement,
           start: 'top top',
-          end: '40% top',
-          scrub: true,
-        },
-      });
-
-      gsap.to(this.scrollCue.nativeElement, {
-        opacity: 0,
-        scrollTrigger: {
-          trigger: this.heroSection.nativeElement,
-          start: 'top top',
-          end: '10% top',
+          end: '60% top',
           scrub: true,
         },
       });
@@ -707,34 +693,32 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
       gsap.to(this.dataStream.nativeElement, {
         opacity: 0,
         scrollTrigger: {
-          trigger: this.heroSection.nativeElement,
+          trigger: this.heroType.nativeElement,
           start: 'top top',
-          end: '60% top',
+          end: '80% top',
           scrub: true,
         },
       });
 
-      // ── Problem statement crossfade with hero ──
+      // ── Problem statement — own section, word-by-word reveal ──
       const psWords = this.problemStatement.nativeElement.querySelectorAll('.ps-word');
       gsap.set(psWords, { opacity: 0, y: 15 });
 
-      const psTl = gsap.timeline({
+      const psRevealTl = gsap.timeline({
         scrollTrigger: {
-          trigger: this.heroSection.nativeElement,
-          start: '20% top',
-          end: '85% top',
-          scrub: true,
+          trigger: this.problemStatement.nativeElement,
+          start: 'top 85%',
+          toggleActions: 'play none none reverse',
         },
       });
 
-      psTl
-        .to(this.problemStatement.nativeElement, { opacity: 1, duration: 0.05 })
-        .to(psWords, {
-          opacity: 1, y: 0, stagger: 0.015, duration: 0.15, ease: 'power2.out',
-        }, 0.05)
+      psRevealTl
         .to(this.problemStatement.nativeElement, {
-          opacity: 0, duration: 0.35,
-        }, 0.65);
+          opacity: 1, duration: 0.4, ease: 'power2.out',
+        })
+        .to(psWords, {
+          opacity: 1, y: 0, stagger: 0.04, duration: 0.3, ease: 'power2.out',
+        }, '-=0.2');
 
       // ── Solution card ──
       const scoreObj = { val: 0 };

@@ -1,0 +1,7 @@
+// Fix mobile viewport height — 100vh includes browser chrome on mobile,
+// pushing bottom content (pagination) off-screen.
+@supports (height: 100dvh) {
+  :host > div {
+    height: 100dvh;
+  }
+}

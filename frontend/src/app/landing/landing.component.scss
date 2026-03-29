@@ -849,11 +849,20 @@ $data-visible: #555570;
 // Mobile responsive
 // ────────────────────────────────────────────────────────
 @media (max-width: 768px) {
-  // Hero
+  // Hero — problem statement gets its own section below the title
   .section-hero {
-    height: 100vh;
-    height: 100svh;
+    height: auto;
+    display: block;
     cursor: default;
+  }
+
+  .hero-type {
+    min-height: 100vh;
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
   }
 
   .hero-signin {
@@ -889,15 +898,15 @@ $data-visible: #555570;
   }
 
   .scroll-cue {
-    bottom: 1.5rem;
+    display: none;
   }
 
-  .scroll-cue-line {
-    height: 32px;
-  }
-
+  // Problem statement flows as its own visual section
   .problem-statement {
-    padding: 0 1.25rem;
+    position: relative;
+    inset: auto;
+    min-height: 40svh;
+    padding: 3rem 1.5rem;
 
     h2 {
       font-size: clamp(1.2rem, 5.5vw, 1.75rem);

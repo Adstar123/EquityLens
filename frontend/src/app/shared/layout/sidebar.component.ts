@@ -115,6 +115,7 @@ import { filter } from 'rxjs';
       width: 60px;
       min-width: 60px;
       height: 100vh;
+      height: 100dvh;
       background: var(--bg-deep);
       border-right: 1px solid var(--bg-surface);
       display: flex;
@@ -227,6 +228,7 @@ import { filter } from 'rxjs';
       margin-top: auto;
       border-top: 1px solid var(--border);
       padding: 0.5rem 0;
+      padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
     }
 
     .user-area {
