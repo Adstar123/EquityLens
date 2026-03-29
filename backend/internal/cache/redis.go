@@ -66,6 +66,45 @@ func (c *Cache) InvalidateSector(ctx context.Context, sectorKey string) error {
 	return nil
 }
 
+func (c *Cache) GetQuote(ctx context.Context, symbol string) (*models.Quote, error) {
+	key := fmt.Sprintf("quote:%s", symbol)
+	data, err := c.client.Get(ctx, key).Bytes()
+	if err == redis.Nil {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var q models.Quote
+	if err := json.Unmarshal(data, &q); err != nil {
+		return nil, err
+	}
+	return &q, nil
+}
+
+func (c *Cache) SetQuote(ctx context.Context, symbol string, quote models.Quote, ttl time.Duration) error {
+	key := fmt.Sprintf("quote:%s", symbol)
+	data, err := json.Marshal(quote)
+	if err != nil {
+		return err
+	}
+	return c.client.Set(ctx, key, data, ttl).Err()
+}
+
+func (c *Cache) GetQuotes(ctx context.Context, symbols []string) (map[string]*models.Quote, []string) {
+	hits := make(map[string]*models.Quote)
+	var misses []string
+	for _, sym := range symbols {
+		q, err := c.GetQuote(ctx, sym)
+		if err != nil || q == nil {
+			misses = append(misses, sym)
+		} else {
+			hits[sym] = q
+		}
+	}
+	return hits, misses
+}
+
 func (c *Cache) Close() error {
 	return c.client.Close()
 }

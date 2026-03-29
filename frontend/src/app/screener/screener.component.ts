@@ -9,7 +9,7 @@ import {
   query,
   stagger,
 } from '@angular/animations';
-import { ApiService, ScreenerItem, Sector } from '../core/api.service';
+import { ApiService, ScreenerItem, Sector, Quote } from '../core/api.service';
 import { ScoreBadgeComponent } from '../shared/components/score-badge.component';
 import { RatioBarComponent } from '../shared/components/ratio-bar.component';
 
@@ -91,6 +91,8 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
               <tr>
                 <th class="col-symbol">Symbol</th>
                 <th class="col-name">Company</th>
+                <th class="col-price">Price</th>
+                <th class="col-mcap">Mkt Cap</th>
                 <th class="col-sector">Sector</th>
                 <th class="col-score">Score</th>
                 @for (name of ratioHeaders(); track name) {
@@ -103,6 +105,23 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
                 <tr class="table-row" (click)="goToTicker(item.symbol)">
                   <td class="cell-symbol">{{ item.symbol }}</td>
                   <td class="cell-name">{{ item.company_name }}</td>
+                  <td class="cell-price">
+                    @if (quotes()[item.symbol]; as q) {
+                      <span class="price-value">{{ formatPrice(q.price) }}</span>
+                      <span class="price-change" [class.positive]="q.change >= 0" [class.negative]="q.change < 0">
+                        {{ q.change >= 0 ? '+' : '' }}{{ q.change_pct.toFixed(2) }}%
+                      </span>
+                    } @else {
+                      <span class="price-placeholder">--</span>
+                    }
+                  </td>
+                  <td class="cell-mcap">
+                    @if (quotes()[item.symbol]; as q) {
+                      {{ formatMarketCap(q.market_cap) }}
+                    } @else {
+                      <span class="price-placeholder">--</span>
+                    }
+                  </td>
                   <td class="cell-sector">{{ item.sector_name }}</td>
                   <td class="cell-score">
                     <app-score-badge [score]="item.composite_score" [rating]="item.rating" />
@@ -120,7 +139,7 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
                 </tr>
               } @empty {
                 <tr>
-                  <td [attr.colspan]="5 + maxRatioCols()" class="empty-state">
+                  <td [attr.colspan]="7 + maxRatioCols()" class="empty-state">
                     @if (selectedSector()) {
                       No scored stocks found for this sector.
                     } @else {
@@ -366,6 +385,38 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
       color: var(--text-secondary);
     }
 
+    .cell-price {
+      white-space: nowrap;
+    }
+
+    .price-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+      font-size: 0.8125rem;
+      margin-right: 0.375rem;
+    }
+
+    .price-change {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6875rem;
+      font-weight: 600;
+    }
+
+    .price-change.positive { color: #22c55e; }
+    .price-change.negative { color: #ef4444; }
+
+    .price-placeholder {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+    }
+
+    .cell-mcap {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+
     @media (max-width: 768px) {
       .screener-header {
         padding: 0.75rem 0.75rem 0.5rem;
@@ -427,6 +478,8 @@ export class ScreenerComponent implements OnInit {
   sectors = signal<Sector[]>([]);
   items = signal<ScreenerItem[]>([]);
   loading = signal(false);
+  quotes = signal<Record<string, Quote>>({});
+  quotesLoading = signal(false);
 
   selectedSector = signal('');
   minScore = signal(0);
@@ -501,12 +554,14 @@ export class ScreenerComponent implements OnInit {
   nextPage(): void {
     if (this.currentPage() < this.totalPages()) {
       this.currentPage.update(p => p + 1);
+      this.loadQuotesForPage();
     }
   }
 
   prevPage(): void {
     if (this.currentPage() > 1) {
       this.currentPage.update(p => p - 1);
+      this.loadQuotesForPage();
     }
   }
 
@@ -536,11 +591,35 @@ export class ScreenerComponent implements OnInit {
       next: (items) => {
         this.items.set(items);
         this.loading.set(false);
+        this.loadQuotesForPage();
       },
       error: () => {
         this.items.set([]);
         this.loading.set(false);
       },
+    });
+  }
+
+  formatPrice(price: number): string {
+    return '$' + price.toFixed(2);
+  }
+
+  formatMarketCap(cap: number): string {
+    if (cap >= 1_000_000_000) return '$' + (cap / 1_000_000_000).toFixed(1) + 'B';
+    if (cap >= 1_000_000) return '$' + (cap / 1_000_000).toFixed(0) + 'M';
+    return '$' + cap.toLocaleString();
+  }
+
+  private loadQuotesForPage(): void {
+    const symbols = this.pagedItems().map(i => i.symbol);
+    if (!symbols.length) return;
+    this.quotesLoading.set(true);
+    this.api.getQuotes(symbols).subscribe({
+      next: (q) => {
+        this.quotes.update(prev => ({ ...prev, ...q }));
+        this.quotesLoading.set(false);
+      },
+      error: () => this.quotesLoading.set(false),
     });
   }
 }

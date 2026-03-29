@@ -55,6 +55,18 @@ type RatioResult struct {
 	WeightedScore float64 `json:"weighted_score"`
 }
 
+// Quote holds real-time price data fetched from ASX.
+type Quote struct {
+	Symbol    string  `json:"symbol"`
+	Price     float64 `json:"price"`
+	Change    float64 `json:"change"`
+	ChangePct float64 `json:"change_pct"`
+	Volume    int64   `json:"volume"`
+	MarketCap int64   `json:"market_cap"`
+	PrevClose float64 `json:"prev_close"`
+	FetchedAt string  `json:"fetched_at"`
+}
+
 // ScreenerItem is an enriched score row with company info for the screener page.
 type ScreenerItem struct {
 	Symbol         string    `json:"symbol"`

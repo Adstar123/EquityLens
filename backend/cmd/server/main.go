@@ -135,8 +135,10 @@ func main() {
 		}
 	}
 
+	asxQuote := ingestion.NewASXQuoteClient()
+
 	authHandler := auth.NewAuthHandler(db, jwtSecret, frontendURL, superAdmins)
-	srv := api.NewServer(db, sched, authHandler, appCache, jwtSecret, superAdmins)
+	srv := api.NewServer(db, sched, authHandler, appCache, asxQuote, jwtSecret, superAdmins)
 	router := srv.Router()
 
 	fmt.Println("server starting on :8080")

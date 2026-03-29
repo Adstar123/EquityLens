@@ -58,6 +58,17 @@ export interface ScreenerItem {
   scored_at: string;
 }
 
+export interface Quote {
+  symbol: string;
+  price: number;
+  change: number;
+  change_pct: number;
+  volume: number;
+  market_cap: number;
+  prev_close: number;
+  fetched_at: string;
+}
+
 export interface RangeConfig {
   min?: number | null;
   max?: number | null;
@@ -174,6 +185,16 @@ export class ApiService {
     return this.http.get<ScreenerItem[]>(`${this.baseUrl}/screener`, { params }).pipe(
       tap(data => this.screenerCache.set(key, { data, ts: Date.now() }))
     );
+  }
+
+  // Quotes (live prices)
+  getQuote(symbol: string): Observable<Quote> {
+    return this.http.get<Quote>(`${this.baseUrl}/quotes/${symbol}`);
+  }
+
+  getQuotes(symbols: string[]): Observable<Record<string, Quote>> {
+    const joined = symbols.join(',');
+    return this.http.get<Record<string, Quote>>(`${this.baseUrl}/quotes`, { params: { symbols: joined } });
   }
 
   // Authenticated

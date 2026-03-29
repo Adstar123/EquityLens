@@ -11,6 +11,7 @@ import (
 
 	"github.com/Adstar123/equitylens/backend/internal/auth"
 	"github.com/Adstar123/equitylens/backend/internal/cache"
+	"github.com/Adstar123/equitylens/backend/internal/ingestion"
 	"github.com/Adstar123/equitylens/backend/internal/scheduler"
 	"github.com/Adstar123/equitylens/backend/internal/storage"
 )
@@ -20,16 +21,18 @@ type Server struct {
 	scheduler   *scheduler.Scheduler
 	authHandler *auth.AuthHandler
 	cache       *cache.Cache
+	asxQuote    *ingestion.ASXQuoteClient
 	jwtSecret   string
 	superAdmins []string
 }
 
-func NewServer(db *storage.DB, sched *scheduler.Scheduler, authHandler *auth.AuthHandler, appCache *cache.Cache, jwtSecret string, superAdmins []string) *Server {
+func NewServer(db *storage.DB, sched *scheduler.Scheduler, authHandler *auth.AuthHandler, appCache *cache.Cache, asxQuote *ingestion.ASXQuoteClient, jwtSecret string, superAdmins []string) *Server {
 	return &Server{
 		db:          db,
 		scheduler:   sched,
 		authHandler: authHandler,
 		cache:       appCache,
+		asxQuote:    asxQuote,
 		jwtSecret:   jwtSecret,
 		superAdmins: superAdmins,
 	}
@@ -79,6 +82,8 @@ func (s *Server) Router() chi.Router {
 		r.Get("/sectors", s.listSectors)
 		r.Get("/sectors/{id}/rankings", s.getSectorRankings)
 		r.Get("/screener", s.screener)
+		r.Get("/quotes/{symbol}", s.getQuote)
+		r.Get("/quotes", s.batchQuotes)
 
 		// Auth routes
 		r.Get("/auth/google/login", s.authHandler.GoogleLogin)

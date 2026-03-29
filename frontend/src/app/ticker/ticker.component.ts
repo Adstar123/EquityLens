@@ -10,7 +10,7 @@ import {
 } from '@angular/animations';
 import { NgxEchartsDirective } from 'ngx-echarts';
 import { EChartsCoreOption } from 'echarts/core';
-import { ApiService, TickerDetail, Company } from '../core/api.service';
+import { ApiService, TickerDetail, Company, Quote } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { ThemeService } from '../core/theme.service';
 import { RatioBarComponent } from '../shared/components/ratio-bar.component';
@@ -69,6 +69,21 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
             }
           </div>
         </header>
+
+        @if (quote()) {
+          <div class="price-block" @fadeIn>
+            <span class="price-big">{{ formatPrice(quote()!.price) }}</span>
+            <span class="price-change-lg" [class.positive]="quote()!.change >= 0" [class.negative]="quote()!.change < 0">
+              {{ quote()!.change >= 0 ? '+' : '' }}{{ formatPrice(quote()!.change) }}
+              ({{ quote()!.change >= 0 ? '+' : '' }}{{ quote()!.change_pct.toFixed(2) }}%)
+            </span>
+            <div class="price-meta">
+              <span>Vol: {{ formatVolume(quote()!.volume) }}</span>
+              <span>Mkt Cap: {{ formatMarketCap(quote()!.market_cap) }}</span>
+              <span class="price-delayed">Delayed ~20min</span>
+            </div>
+          </div>
+        }
 
         @if (detail()!.score) {
           <!-- Score area -->
@@ -473,6 +488,44 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
       color: var(--accent);
     }
 
+    .price-block {
+      margin-bottom: 2rem;
+      padding: 1rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .price-big {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 900;
+      font-size: 2rem;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+      margin-right: 0.75rem;
+    }
+
+    .price-change-lg {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .price-change-lg.positive { color: #22c55e; }
+    .price-change-lg.negative { color: #ef4444; }
+
+    .price-meta {
+      display: flex;
+      gap: 1.5rem;
+      margin-top: 0.5rem;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .price-delayed {
+      font-style: italic;
+      opacity: 0.7;
+    }
+
     .no-score-state {
       text-align: center;
       color: var(--text-muted);
@@ -492,6 +545,7 @@ export class TickerComponent implements OnInit, AfterViewInit {
   displayScore = signal(0);
   expandedRatio = signal<string | null>(null);
   inWatchlist = signal(false);
+  quote = signal<Quote | null>(null);
   private watchlistSymbols = signal<Set<string>>(new Set());
 
   // Sector context
@@ -624,6 +678,22 @@ export class TickerComponent implements OnInit, AfterViewInit {
     return value.toFixed(2);
   }
 
+  formatPrice(price: number): string {
+    return '$' + price.toFixed(2);
+  }
+
+  formatMarketCap(cap: number): string {
+    if (cap >= 1_000_000_000) return '$' + (cap / 1_000_000_000).toFixed(1) + 'B';
+    if (cap >= 1_000_000) return '$' + (cap / 1_000_000).toFixed(0) + 'M';
+    return '$' + cap.toLocaleString();
+  }
+
+  formatVolume(vol: number): string {
+    if (vol >= 1_000_000) return (vol / 1_000_000).toFixed(1) + 'M';
+    if (vol >= 1_000) return (vol / 1_000).toFixed(0) + 'K';
+    return vol.toLocaleString();
+  }
+
   toggleWatchlist(): void {
     const symbol = this.detail()?.company.symbol;
     if (!symbol) return;
@@ -660,6 +730,10 @@ export class TickerComponent implements OnInit, AfterViewInit {
       next: (data) => {
         this.detail.set(data);
         this.loading.set(false);
+        this.api.getQuote(symbol).subscribe({
+          next: (q) => this.quote.set(q),
+          error: () => this.quote.set(null),
+        });
         if (data.score) {
           this.animateScore(data.score.composite_score);
         }

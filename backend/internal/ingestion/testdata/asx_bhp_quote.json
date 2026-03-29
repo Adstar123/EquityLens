@@ -1,0 +1,20 @@
+{
+  "code": "BHP",
+  "isin_code": "AU000000BHP4",
+  "desc_full": "BHP GROUP LIMITED",
+  "last_price": 43.52,
+  "open_price": 43.10,
+  "day_high_price": 43.85,
+  "day_low_price": 43.01,
+  "change_price": 0.42,
+  "change_in_percent": "0.975%",
+  "volume": 8234561,
+  "bid_price": 43.51,
+  "offer_price": 43.53,
+  "previous_close_price": 43.10,
+  "average_daily_volume": 7500000,
+  "number_of_shares": 5074000000,
+  "market_cap": 220821280000,
+  "suspended": false,
+  "last_trade_date": "2026-03-30T00:00:00+1100"
+}
