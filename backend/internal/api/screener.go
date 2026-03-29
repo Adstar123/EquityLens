@@ -17,14 +17,14 @@ func (s *Server) screener(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	limit := 500
+	limit := 2000
 	if l := q.Get("limit"); l != "" {
 		if v, err := strconv.Atoi(l); err == nil && v > 0 {
 			limit = v
 		}
 	}
-	if limit > 500 {
-		limit = 500
+	if limit > 2000 {
+		limit = 2000
 	}
 
 	offset := 0

@@ -135,7 +135,7 @@ func main() {
 		}
 	}
 
-	authHandler := auth.NewAuthHandler(db, jwtSecret, frontendURL)
+	authHandler := auth.NewAuthHandler(db, jwtSecret, frontendURL, superAdmins)
 	srv := api.NewServer(db, sched, authHandler, appCache, jwtSecret, superAdmins)
 	router := srv.Router()
 

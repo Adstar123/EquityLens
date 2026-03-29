@@ -9,17 +9,19 @@ import (
 )
 
 type Claims struct {
-	UserID uuid.UUID `json:"user_id"`
-	Email  string    `json:"email"`
-	Name   string    `json:"name"`
+	UserID  uuid.UUID `json:"user_id"`
+	Email   string    `json:"email"`
+	Name    string    `json:"name"`
+	IsAdmin bool      `json:"is_admin"`
 	jwt.RegisteredClaims
 }
 
-func GenerateToken(userID uuid.UUID, email, name, secret string) (string, error) {
+func GenerateToken(userID uuid.UUID, email, name, secret string, isAdmin bool) (string, error) {
 	claims := Claims{
-		UserID: userID,
-		Email:  email,
-		Name:   name,
+		UserID:  userID,
+		Email:   email,
+		Name:    name,
+		IsAdmin: isAdmin,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -23,17 +24,23 @@ type AuthHandler struct {
 	frontendURL string
 	google      *oauth2.Config
 	github      *oauth2.Config
+	superAdmins map[string]bool
 }
 
-func NewAuthHandler(db *storage.DB, jwtSecret, frontendURL string) *AuthHandler {
+func NewAuthHandler(db *storage.DB, jwtSecret, frontendURL string, superAdmins []string) *AuthHandler {
 	backendURL := os.Getenv("BACKEND_URL")
 	if backendURL == "" {
 		backendURL = "http://localhost:8080"
+	}
+	adminSet := make(map[string]bool)
+	for _, e := range superAdmins {
+		adminSet[strings.TrimSpace(e)] = true
 	}
 	return &AuthHandler{
 		db:          db,
 		jwtSecret:   jwtSecret,
 		frontendURL: frontendURL,
+		superAdmins: adminSet,
 		google: &oauth2.Config{
 			ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
 			ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
@@ -148,7 +155,7 @@ func (h *AuthHandler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jwt, err := GenerateToken(user.ID, user.Email, user.Name, h.jwtSecret)
+	jwt, err := GenerateToken(user.ID, user.Email, user.Name, h.jwtSecret, h.superAdmins[user.Email])
 	if err != nil {
 		http.Error(w, `{"error":"failed to generate token"}`, http.StatusInternalServerError)
 		return
@@ -258,7 +265,7 @@ func (h *AuthHandler) GitHubCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jwt, err := GenerateToken(user.ID, user.Email, user.Name, h.jwtSecret)
+	jwt, err := GenerateToken(user.ID, user.Email, user.Name, h.jwtSecret, h.superAdmins[user.Email])
 	if err != nil {
 		http.Error(w, `{"error":"failed to generate token"}`, http.StatusInternalServerError)
 		return
