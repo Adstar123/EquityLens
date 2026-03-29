@@ -54,6 +54,7 @@ $data-visible: #555570;
   letter-spacing: 0.04em;
   padding: 6px 16px;
   cursor: pointer;
+  text-decoration: none;
   transition: border-color 0.2s ease, color 0.2s ease;
 
   &:hover {
@@ -767,10 +768,31 @@ $data-visible: #555570;
   }
 }
 
+.cta-btn-dashboard {
+  border-color: $amber;
+  color: $amber;
+  justify-content: center;
+  font-weight: 600;
+
+  &:hover {
+    background: rgba(212, 147, 13, 0.08);
+  }
+}
+
 .cta-btn-icon {
   width: 20px;
   height: 20px;
   flex-shrink: 0;
+}
+
+.last-used-tag {
+  margin-left: auto;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: $amber;
+  opacity: 0.7;
 }
 
 .cta-explore {

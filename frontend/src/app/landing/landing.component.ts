@@ -13,6 +13,7 @@ import { lucideScanEye, lucideBrainCircuit, lucideRadar } from '@ng-icons/lucide
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { environment } from '../../environments/environment';
+import { AuthService } from '../core/auth.service';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -115,9 +116,15 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   // Data columns
   dataColumns = buildColumns(12, 18);
 
-  // Auth URLs
+  // Auth
+  auth = inject(AuthService);
   googleAuthUrl = `${environment.apiUrl}/auth/google/login`;
   githubAuthUrl = `${environment.apiUrl}/auth/github/login`;
+  lastProvider = localStorage.getItem('equitylens_last_provider') as 'google' | 'github' | null;
+
+  onOAuthClick(provider: 'google' | 'github'): void {
+    localStorage.setItem('equitylens_last_provider', provider);
+  }
 
   // GSAP context
   private gsapCtx: gsap.Context | null = null;
