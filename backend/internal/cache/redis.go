@@ -52,11 +52,18 @@ func (c *Cache) SetScore(ctx context.Context, symbol string, score models.Score,
 }
 
 func (c *Cache) InvalidateSector(ctx context.Context, sectorKey string) error {
+	var keys []string
 	iter := c.client.Scan(ctx, 0, "score:*", 100).Iterator()
 	for iter.Next(ctx) {
-		c.client.Del(ctx, iter.Val())
+		keys = append(keys, iter.Val())
 	}
-	return iter.Err()
+	if err := iter.Err(); err != nil {
+		return err
+	}
+	if len(keys) > 0 {
+		return c.client.Del(ctx, keys...).Err()
+	}
+	return nil
 }
 
 func (c *Cache) Close() error {

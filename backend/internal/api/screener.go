@@ -17,7 +17,7 @@ func (s *Server) screener(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	limit := 5000
+	limit := 500
 	if l := q.Get("limit"); l != "" {
 		if v, err := strconv.Atoi(l); err == nil && v > 0 {
 			limit = v

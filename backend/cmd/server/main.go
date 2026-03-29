@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -109,6 +110,18 @@ func main() {
 		}()
 		log.Printf("keep-alive: pinging %s every 10 minutes", backendURL)
 	}
+
+	// Resource monitoring: log memory stats every minute
+	go func() {
+		ticker := time.NewTicker(1 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			var m runtime.MemStats
+			runtime.ReadMemStats(&m)
+			log.Printf("stats: alloc=%dMB sys=%dMB goroutines=%d gc=%d",
+				m.Alloc/1024/1024, m.Sys/1024/1024, runtime.NumGoroutine(), m.NumGC)
+		}
+	}()
 
 	redisURL := os.Getenv("REDIS_URL")
 	var appCache *cache.Cache

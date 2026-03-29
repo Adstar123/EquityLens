@@ -16,7 +16,15 @@ type DB struct {
 }
 
 func NewDB(ctx context.Context, databaseURL string) (*DB, error) {
-	pool, err := pgxpool.New(ctx, databaseURL)
+	config, err := pgxpool.ParseConfig(databaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("parse postgres config: %w", err)
+	}
+	// Constrain pool for 512MB Render free tier
+	config.MaxConns = 3
+	config.MinConns = 1
+
+	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("connect to postgres: %w", err)
 	}

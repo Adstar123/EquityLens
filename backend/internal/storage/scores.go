@@ -77,7 +77,7 @@ func (db *DB) ListScreenerItems(ctx context.Context, sectorID *uuid.UUID, minSco
 	}
 	defer rows.Close()
 
-	var items []models.ScreenerItem
+	items := make([]models.ScreenerItem, 0, limit)
 	for rows.Next() {
 		var item models.ScreenerItem
 		var breakdownBytes []byte
