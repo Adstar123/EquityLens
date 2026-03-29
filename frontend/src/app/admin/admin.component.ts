@@ -312,13 +312,13 @@ import {
                         <td class="cell-mono">{{ row.currentScore.toFixed(1) }}</td>
                         <td>
                           <span class="rating-pill-sm" [style.color]="ratingColor(row.currentRating)">
-                            {{ row.currentRating.replace('_', ' ') }}
+                            {{ ratingDisplayLabel(row.currentRating) }}
                           </span>
                         </td>
                         <td class="cell-mono">{{ row.previewScore.toFixed(1) }}</td>
                         <td>
                           <span class="rating-pill-sm" [style.color]="ratingColor(row.previewRating)">
-                            {{ row.previewRating.replace('_', ' ') }}
+                            {{ ratingDisplayLabel(row.previewRating) }}
                           </span>
                         </td>
                         <td
@@ -463,11 +463,11 @@ export class AdminComponent implements OnInit {
   ];
 
   readonly ratingLevels = [
-    { key: 'strong_buy', label: 'Strong Buy', color: '#22c55e' },
-    { key: 'buy', label: 'Buy', color: '#84cc16' },
-    { key: 'hold', label: 'Hold', color: '#d4930d' },
-    { key: 'sell', label: 'Sell', color: '#f97316' },
-    { key: 'strong_sell', label: 'Strong Sell', color: '#ef4444' },
+    { key: 'strong_buy', label: 'Very Strong', color: '#22c55e' },
+    { key: 'buy', label: 'Strong', color: '#84cc16' },
+    { key: 'hold', label: 'Neutral', color: '#d4930d' },
+    { key: 'sell', label: 'Weak', color: '#f97316' },
+    { key: 'strong_sell', label: 'Very Weak', color: '#ef4444' },
   ];
 
   get ratiosArray(): FormArray {
@@ -731,6 +731,14 @@ export class AdminComponent implements OnInit {
     this.saveMsg.set(`Restored v${ver.version} into editor. Save to create a new draft.`);
     this.saveMsgType.set('success');
     this.clearMsgAfterDelay();
+  }
+
+  ratingDisplayLabel(rating: string): string {
+    const labels: Record<string, string> = {
+      strong_buy: 'Very Strong', buy: 'Strong', hold: 'Neutral',
+      sell: 'Weak', strong_sell: 'Very Weak', insufficient_data: 'No Data',
+    };
+    return labels[rating] ?? rating.replace(/_/g, ' ');
   }
 
   ratingColor(rating: string): string {

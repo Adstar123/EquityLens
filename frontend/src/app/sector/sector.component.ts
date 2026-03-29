@@ -103,7 +103,7 @@ type SortDir = 'asc' | 'desc';
                         <span class="rating-pill"
                               [style.background]="ratingBg(item.rating)"
                               [style.color]="ratingColor(item.rating)">
-                          {{ item.rating.replace('_', ' ') }}
+                          {{ ratingDisplayLabel(item.rating) }}
                         </span>
                       </td>
                       @if (item.breakdown && item.breakdown.ratios) {
@@ -511,6 +511,14 @@ export class SectorComponent implements OnInit {
     if (Math.abs(value) >= 1000) return value.toFixed(0);
     if (Math.abs(value) >= 100) return value.toFixed(1);
     return value.toFixed(2);
+  }
+
+  ratingDisplayLabel(rating: string): string {
+    const labels: Record<string, string> = {
+      strong_buy: 'Very Strong', buy: 'Strong', hold: 'Neutral',
+      sell: 'Weak', strong_sell: 'Very Weak', insufficient_data: 'No Data',
+    };
+    return labels[rating] ?? rating.replace(/_/g, ' ');
   }
 
   ratingColor(rating: string): string {

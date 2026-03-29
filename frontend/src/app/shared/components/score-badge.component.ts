@@ -44,7 +44,13 @@ export class ScoreBadgeComponent {
 
   formattedScore = computed(() => this.score().toFixed(1));
 
-  ratingLabel = computed(() => this.rating().replace(/_/g, ' '));
+  ratingLabel = computed(() => {
+    const labels: Record<string, string> = {
+      strong_buy: 'Very Strong', buy: 'Strong', hold: 'Neutral',
+      sell: 'Weak', strong_sell: 'Very Weak', insufficient_data: 'No Data',
+    };
+    return labels[this.rating()] ?? this.rating().replace(/_/g, ' ');
+  });
 
   ratingColor = computed(() => {
     const map: Record<string, string> = {

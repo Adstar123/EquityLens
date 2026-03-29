@@ -465,8 +465,12 @@ export class TickerComponent implements OnInit, AfterViewInit {
   });
 
   ratingLabel = computed(() => {
-    const d = this.detail();
-    return d?.score?.rating?.replace(/_/g, ' ') ?? '';
+    const r = this.detail()?.score?.rating ?? '';
+    const labels: Record<string, string> = {
+      strong_buy: 'Very Strong', buy: 'Strong', hold: 'Neutral',
+      sell: 'Weak', strong_sell: 'Very Weak', insufficient_data: 'No Data',
+    };
+    return labels[r] ?? r.replace(/_/g, ' ');
   });
 
   ratingColor = computed(() => {
