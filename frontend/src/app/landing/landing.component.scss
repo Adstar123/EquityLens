@@ -820,6 +820,29 @@ $data-visible: #555570;
     color: $text-muted;
     letter-spacing: 0.02em;
   }
+
+  text-align: center;
+}
+
+.footer-links {
+  margin-top: 4px;
+
+  a {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 0.65rem;
+    color: $text-muted;
+    text-decoration: none;
+    letter-spacing: 0.02em;
+    transition: color 0.2s ease;
+
+    &:hover { color: $amber; }
+  }
+}
+
+.footer-sep {
+  margin: 0 4px;
+  font-size: 0.65rem;
+  color: $text-muted;
 }
 
 // ────────────────────────────────────────────────────────

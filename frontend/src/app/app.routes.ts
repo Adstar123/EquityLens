@@ -10,5 +10,7 @@ export const routes: Routes = [
   { path: 'dashboard', loadComponent: () => import('./dashboard/dashboard.component').then(m => m.DashboardComponent), canActivate: [authGuard] },
   { path: 'admin', loadComponent: () => import('./admin/admin.component').then(m => m.AdminComponent), canActivate: [superAdminGuard] },
   { path: 'auth/callback', loadComponent: () => import('./core/auth-callback.component').then(m => m.AuthCallbackComponent) },
+  { path: 'privacy', loadComponent: () => import('./legal/privacy.component').then(m => m.PrivacyComponent) },
+  { path: 'terms', loadComponent: () => import('./legal/terms.component').then(m => m.TermsComponent) },
   { path: '**', redirectTo: '' },
 ];
