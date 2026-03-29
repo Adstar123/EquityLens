@@ -72,7 +72,7 @@ func setStateCookie(w http.ResponseWriter, state string) {
 		MaxAge:   300, // 5 minutes
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		Secure:   false, // set true in production behind HTTPS
+		Secure:   os.Getenv("FRONTEND_URL") != "" && os.Getenv("FRONTEND_URL") != "http://localhost:4200",
 	})
 }
 

@@ -12,7 +12,7 @@ func (s *Server) screener(w http.ResponseWriter, r *http.Request) {
 
 	minScore := 0.0
 	if ms := q.Get("min_score"); ms != "" {
-		if v, err := strconv.ParseFloat(ms, 64); err == nil {
+		if v, err := strconv.ParseFloat(ms, 64); err == nil && v >= 0 && v <= 100 {
 			minScore = v
 		}
 	}
@@ -23,10 +23,13 @@ func (s *Server) screener(w http.ResponseWriter, r *http.Request) {
 			limit = v
 		}
 	}
+	if limit > 500 {
+		limit = 500
+	}
 
 	offset := 0
 	if o := q.Get("offset"); o != "" {
-		if v, err := strconv.Atoi(o); err == nil && v >= 0 {
+		if v, err := strconv.Atoi(o); err == nil && v >= 0 && v <= 100000 {
 			offset = v
 		}
 	}

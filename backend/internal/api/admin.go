@@ -89,7 +89,7 @@ func (s *Server) updateConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var cfg models.SectorConfig
-	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&cfg); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
@@ -144,7 +144,7 @@ func (s *Server) previewConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var draftConfig models.SectorConfig
-	if err := json.NewDecoder(r.Body).Decode(&draftConfig); err != nil {
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&draftConfig); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}

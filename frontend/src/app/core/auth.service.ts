@@ -31,8 +31,14 @@ export class AuthService {
 
   readonly isSuperAdmin = computed(() => {
     if (this.mockRole) return MOCK_USERS[this.mockRole]?.admin ?? false;
-    const email = this.user()?.email;
-    return !!email;
+    const token = this.tokenSignal();
+    if (!token) return false;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.is_admin === true;
+    } catch {
+      return false;
+    }
   });
 
   login(token: string): void {
