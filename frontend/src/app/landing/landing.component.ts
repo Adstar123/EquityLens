@@ -114,7 +114,8 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   @ViewChild('ctaInner') ctaInner!: ElementRef<HTMLDivElement>;
 
   // Data columns
-  dataColumns = buildColumns(12, 18);
+  private isMobile = window.innerWidth <= 768;
+  dataColumns = buildColumns(this.isMobile ? 6 : 12, this.isMobile ? 22 : 18);
 
   // Auth
   auth = inject(AuthService);
@@ -195,7 +196,9 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           this.initAnimations();
-          this.startLensLoop();
+          if (!this.isMobile) {
+            this.startLensLoop();
+          }
         });
       });
     });
@@ -250,7 +253,14 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
 
   private initAnimations(): void {
     const scroller = this.getScroller();
+    if (this.isMobile) {
+      this.initMobileAnimations(scroller);
+    } else {
+      this.initDesktopAnimations(scroller);
+    }
+  }
 
+  private initDesktopAnimations(scroller: HTMLElement): void {
     this.gsapCtx = gsap.context(() => {
       ScrollTrigger.defaults({ scroller });
       ScrollTrigger.refresh();
@@ -634,6 +644,210 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
         },
       });
 
+    }); // end gsap.context
+  }
+
+  private initMobileAnimations(scroller: HTMLElement): void {
+    this.gsapCtx = gsap.context(() => {
+      ScrollTrigger.defaults({ scroller });
+      ScrollTrigger.refresh();
+
+      // ── Hero entrance (plays on load) ──
+      gsap.set(this.heroEquity.nativeElement, { y: 30, opacity: 0 });
+      gsap.set(this.heroLens.nativeElement, { y: 30, opacity: 0 });
+      gsap.set(this.heroSubtitle.nativeElement, { y: 15, opacity: 0 });
+      gsap.set(this.scrollCue.nativeElement, { opacity: 0 });
+
+      const heroEls = [
+        this.heroEquity.nativeElement,
+        this.heroLens.nativeElement,
+        this.heroSubtitle.nativeElement,
+        this.scrollCue.nativeElement,
+      ];
+
+      const heroTl = gsap.timeline({
+        onComplete: () => { gsap.set(heroEls, { clearProps: 'all' }); },
+      });
+
+      heroTl
+        .to(this.heroEquity.nativeElement, {
+          y: 0, opacity: 1, duration: 0.8, ease: 'power3.out',
+        })
+        .to(this.heroLens.nativeElement, {
+          y: 0, opacity: 1, duration: 0.8, ease: 'power3.out',
+        }, '-=0.5')
+        .to(this.heroSubtitle.nativeElement, {
+          y: 0, opacity: 1, duration: 0.6, ease: 'power2.out',
+        }, '-=0.3')
+        .to(this.scrollCue.nativeElement, {
+          opacity: 1, duration: 0.8,
+        }, '-=0.2');
+
+      // ── Hero fade on scroll (NO pin — just natural scroll) ──
+      gsap.to(this.heroType.nativeElement, {
+        opacity: 0,
+        scrollTrigger: {
+          trigger: this.heroSection.nativeElement,
+          start: 'top top',
+          end: '40% top',
+          scrub: true,
+        },
+      });
+
+      gsap.to(this.scrollCue.nativeElement, {
+        opacity: 0,
+        scrollTrigger: {
+          trigger: this.heroSection.nativeElement,
+          start: 'top top',
+          end: '10% top',
+          scrub: true,
+        },
+      });
+
+      gsap.to(this.dataStream.nativeElement, {
+        opacity: 0,
+        scrollTrigger: {
+          trigger: this.heroSection.nativeElement,
+          start: 'top top',
+          end: '60% top',
+          scrub: true,
+        },
+      });
+
+      // ── Problem statement crossfade with hero ──
+      const psWords = this.problemStatement.nativeElement.querySelectorAll('.ps-word');
+      gsap.set(psWords, { opacity: 0, y: 15 });
+
+      const psTl = gsap.timeline({
+        scrollTrigger: {
+          trigger: this.heroSection.nativeElement,
+          start: '20% top',
+          end: '85% top',
+          scrub: true,
+        },
+      });
+
+      psTl
+        .to(this.problemStatement.nativeElement, { opacity: 1, duration: 0.05 })
+        .to(psWords, {
+          opacity: 1, y: 0, stagger: 0.015, duration: 0.15, ease: 'power2.out',
+        }, 0.05)
+        .to(this.problemStatement.nativeElement, {
+          opacity: 0, duration: 0.35,
+        }, 0.65);
+
+      // ── Solution card ──
+      const scoreObj = { val: 0 };
+      const solutionTl = gsap.timeline({
+        scrollTrigger: {
+          trigger: this.solutionSection.nativeElement,
+          start: 'top 80%',
+          toggleActions: 'play none none reverse',
+        },
+      });
+
+      const sparklineLine = this.demoCard.nativeElement
+        .querySelector('.sparkline-line') as SVGGeometryElement | null;
+      const sparklineArea = this.demoCard.nativeElement
+        .querySelector('.sparkline-area') as SVGElement | null;
+      if (sparklineLine) {
+        const len = sparklineLine.getTotalLength?.() ?? 300;
+        gsap.set(sparklineLine, { strokeDasharray: len, strokeDashoffset: len });
+      }
+
+      solutionTl.to(this.demoCard.nativeElement, {
+        opacity: 1, y: 0, duration: 0.7, ease: 'power3.out',
+      });
+
+      if (sparklineLine) {
+        solutionTl.to(sparklineLine, {
+          strokeDashoffset: 0, duration: 1, ease: 'power2.out',
+        }, 0.2);
+      }
+      if (sparklineArea) {
+        solutionTl.to(sparklineArea, {
+          opacity: 1, duration: 0.5,
+        }, 0.6);
+      }
+
+      solutionTl.to(scoreObj, {
+        val: 78, duration: 1, ease: 'power2.out',
+        onUpdate: () => {
+          this.demoScore.nativeElement.textContent =
+            Math.round(scoreObj.val).toString();
+        },
+      }, '-=0.4');
+
+      const ratioFills = this.demoRatios.nativeElement
+        .querySelectorAll('.demo-ratio-fill');
+      ratioFills.forEach((fill: Element, i: number) => {
+        const el = fill as HTMLElement;
+        const targetWidth = el.style.getPropertyValue('--target-width');
+        const color = el.getAttribute('data-color') || '#d4930d';
+        el.style.background = color;
+        solutionTl.to(el, {
+          width: targetWidth, duration: 0.4, ease: 'power2.out',
+        }, `${0.4 + i * 0.1}`);
+      });
+
+      solutionTl.to(this.demoRating.nativeElement, {
+        opacity: 1, scale: 1, duration: 0.3, ease: 'back.out(3)',
+      }, '-=0.2');
+
+      solutionTl.to(this.solutionCaption.nativeElement, {
+        opacity: 1, duration: 0.5, ease: 'power2.out',
+      }, '-=0.1');
+
+      // ── Section divider ──
+      gsap.to(this.sectionDivider.nativeElement, {
+        scaleX: 1, duration: 0.6, ease: 'power2.out',
+        scrollTrigger: {
+          trigger: this.sectionDivider.nativeElement,
+          start: 'top 90%',
+          toggleActions: 'play none none reverse',
+        },
+      });
+
+      // ── How it works — stacked reveals (NO pin) ──
+      const howSlides = [this.howStep1, this.howStep2, this.howStep3];
+
+      howSlides.forEach((slide) => {
+        const paths = slide.nativeElement.querySelectorAll(
+          '.how-icon svg path, .how-icon svg circle, .how-icon svg line'
+        );
+        paths.forEach((p: Element) => {
+          const el = p as SVGGeometryElement;
+          const len = el.getTotalLength?.() ?? 200;
+          gsap.set(el, { strokeDasharray: len, strokeDashoffset: len });
+        });
+
+        gsap.set(slide.nativeElement, { y: 30 });
+
+        const tl = gsap.timeline({
+          scrollTrigger: {
+            trigger: slide.nativeElement,
+            start: 'top 85%',
+            toggleActions: 'play none none reverse',
+          },
+        });
+
+        tl.to(slide.nativeElement, {
+          opacity: 1, y: 0, duration: 0.5, ease: 'power2.out',
+        }).to(paths, {
+          strokeDashoffset: 0, duration: 0.5, stagger: 0.04,
+          ease: 'power2.out',
+        }, '-=0.3');
+      });
+
+      // ── CTA ──
+      gsap.to(this.ctaInner.nativeElement, {
+        opacity: 1, y: 0, duration: 0.7, ease: 'power3.out',
+        scrollTrigger: {
+          trigger: this.ctaSection.nativeElement,
+          start: 'top 80%',
+          toggleActions: 'play none none reverse',
+        },
+      });
     }); // end gsap.context
   }
 
