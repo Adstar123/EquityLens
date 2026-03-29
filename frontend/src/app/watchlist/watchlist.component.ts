@@ -108,12 +108,12 @@ interface WatchlistRow {
       height: 100%;
       display: flex;
       flex-direction: column;
-      background: #0f0f1a;
+      background: var(--bg-base);
     }
 
     .wl-page-header {
       padding: 1rem 1.5rem 0.75rem;
-      border-bottom: 1px solid #252540;
+      border-bottom: 1px solid var(--border);
       flex-shrink: 0;
       display: flex;
       align-items: center;
@@ -124,7 +124,7 @@ interface WatchlistRow {
       font-size: 0.75rem;
       font-weight: 600;
       letter-spacing: 0.12em;
-      color: #555570;
+      color: var(--text-muted);
       margin: 0;
       text-transform: uppercase;
     }
@@ -132,7 +132,7 @@ interface WatchlistRow {
     .wl-count {
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.75rem;
-      color: #555570;
+      color: var(--text-muted);
     }
 
     .wl-table-wrap {
@@ -148,7 +148,7 @@ interface WatchlistRow {
     th {
       position: sticky;
       top: 0;
-      background: #0f0f1a;
+      background: var(--bg-base);
       z-index: 10;
       padding: 0.5rem 0.75rem;
       text-align: left;
@@ -156,8 +156,8 @@ interface WatchlistRow {
       font-weight: 500;
       text-transform: uppercase;
       letter-spacing: 0.06em;
-      color: #555570;
-      border-bottom: 1px solid #252540;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
       white-space: nowrap;
     }
 
@@ -167,33 +167,33 @@ interface WatchlistRow {
     }
 
     tbody tr:hover td {
-      background: #1a1a2e;
+      background: var(--bg-surface);
     }
 
     td {
       padding: 0.5rem 0.75rem;
       font-size: 0.8125rem;
-      color: #e8e8ed;
-      border-bottom: 1px solid #1a1a2e;
+      color: var(--text-primary);
+      border-bottom: 1px solid var(--bg-surface);
       white-space: nowrap;
     }
 
     .cell-symbol {
       font-family: 'JetBrains Mono', monospace;
       font-weight: 700;
-      color: #e8e8ed;
+      color: var(--text-primary);
       letter-spacing: 0.02em;
     }
 
     .cell-name {
-      color: #8888a0;
+      color: var(--text-secondary);
       max-width: 280px;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
     .cell-sector {
-      color: #555570;
+      color: var(--text-muted);
       font-size: 0.75rem;
     }
 
@@ -208,13 +208,13 @@ interface WatchlistRow {
 
     .no-score {
       font-family: 'JetBrains Mono', monospace;
-      color: #555570;
+      color: var(--text-muted);
     }
 
     .remove-btn {
       background: none;
       border: 1px solid transparent;
-      color: #555570;
+      color: var(--text-muted);
       font-size: 1.125rem;
       line-height: 1;
       width: 28px;
@@ -233,7 +233,7 @@ interface WatchlistRow {
     }
 
     .remove-btn.removing {
-      color: #555570;
+      color: var(--text-muted);
       cursor: default;
     }
 
@@ -242,7 +242,7 @@ interface WatchlistRow {
       align-items: center;
       justify-content: center;
       flex: 1;
-      color: #555570;
+      color: var(--text-muted);
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.875rem;
     }
@@ -252,7 +252,7 @@ interface WatchlistRow {
       align-items: center;
       justify-content: center;
       flex: 1;
-      color: #555570;
+      color: var(--text-muted);
       font-size: 0.875rem;
       padding: 3rem 1rem;
     }

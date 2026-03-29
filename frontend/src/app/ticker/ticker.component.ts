@@ -577,15 +577,16 @@ export class TickerComponent implements OnInit, AfterViewInit {
     const symbol = this.detail()?.company.symbol;
     if (!symbol) return;
 
-    if (this.inWatchlist()) {
+    const wasInWatchlist = this.inWatchlist();
+    this.inWatchlist.set(!wasInWatchlist); // optimistic update
+
+    if (wasInWatchlist) {
       this.api.removeFromWatchlist(symbol).subscribe({
-        next: () => this.inWatchlist.set(false),
-        error: () => {},
+        error: () => this.inWatchlist.set(true), // revert on failure
       });
     } else {
       this.api.addToWatchlist(symbol).subscribe({
-        next: () => this.inWatchlist.set(true),
-        error: () => {},
+        error: () => this.inWatchlist.set(false), // revert on failure
       });
     }
   }

@@ -93,11 +93,13 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
                 <th class="col-name">Company</th>
                 <th class="col-sector">Sector</th>
                 <th class="col-score">Score</th>
-                <th class="col-ratios" [attr.colspan]="maxRatioCols()">Ratios</th>
+                @for (name of ratioHeaders(); track name) {
+                  <th class="col-ratio">{{ name }}</th>
+                }
               </tr>
             </thead>
             <tbody>
-              @for (item of filteredItems(); track item.symbol) {
+              @for (item of pagedItems(); track item.symbol) {
                 <tr class="table-row" (click)="goToTicker(item.symbol)">
                   <td class="cell-symbol">{{ item.symbol }}</td>
                   <td class="cell-name">{{ item.company_name }}</td>
@@ -130,6 +132,15 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
             </tbody>
           </table>
         </div>
+
+        <!-- Pagination -->
+        @if (totalPages() > 1) {
+          <div class="pagination">
+            <button class="page-btn" [disabled]="currentPage() === 1" (click)="prevPage()">← Prev</button>
+            <span class="page-info">Page {{ currentPage() }} of {{ totalPages() }}</span>
+            <button class="page-btn" [disabled]="currentPage() === totalPages()" (click)="nextPage()">Next →</button>
+          </div>
+        }
       }
     </div>
   `,
@@ -318,6 +329,42 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.875rem;
     }
+
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      padding: 0.75rem 1.5rem;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .page-btn {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      padding: 0.375rem 0.75rem;
+      cursor: pointer;
+      transition: border-color 150ms, background 150ms;
+    }
+
+    .page-btn:hover:not(:disabled) {
+      border-color: var(--accent);
+    }
+
+    .page-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    .page-info {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
   `],
 })
 export class ScreenerComponent implements OnInit {
@@ -331,6 +378,8 @@ export class ScreenerComponent implements OnInit {
   selectedSector = signal('');
   minScore = signal(0);
   sortBy = signal<'score' | 'symbol'>('score');
+  currentPage = signal(1);
+  readonly pageSize = 50;
 
   filteredItems = computed(() => {
     let list = [...this.items()];
@@ -350,6 +399,14 @@ export class ScreenerComponent implements OnInit {
     return list;
   });
 
+  totalPages = computed(() => Math.max(1, Math.ceil(this.filteredItems().length / this.pageSize)));
+
+  pagedItems = computed(() => {
+    const page = this.currentPage();
+    const start = (page - 1) * this.pageSize;
+    return this.filteredItems().slice(start, start + this.pageSize);
+  });
+
   maxRatioCols = computed(() => {
     let max = 0;
     for (const item of this.items()) {
@@ -357,6 +414,15 @@ export class ScreenerComponent implements OnInit {
       if (len > max) max = len;
     }
     return max || 1;
+  });
+
+  ratioHeaders = computed(() => {
+    for (const item of this.items()) {
+      if (item.breakdown?.ratios?.length) {
+        return item.breakdown.ratios.map(r => r.name);
+      }
+    }
+    return [];
   });
 
   ngOnInit(): void {
@@ -370,11 +436,25 @@ export class ScreenerComponent implements OnInit {
 
   onSectorChange(sector: string): void {
     this.selectedSector.set(sector);
+    this.currentPage.set(1);
     this.loadData();
   }
 
   onMinScoreChange(val: number): void {
     this.minScore.set(val ?? 0);
+    this.currentPage.set(1);
+  }
+
+  nextPage(): void {
+    if (this.currentPage() < this.totalPages()) {
+      this.currentPage.update(p => p + 1);
+    }
+  }
+
+  prevPage(): void {
+    if (this.currentPage() > 1) {
+      this.currentPage.update(p => p - 1);
+    }
   }
 
   goToTicker(symbol: string): void {
