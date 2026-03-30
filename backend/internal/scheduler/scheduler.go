@@ -6,6 +6,8 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Adstar123/equitylens/backend/internal/config"
@@ -193,7 +195,7 @@ func (s *Scheduler) ScoreCompany(ctx context.Context, symbol string) (*models.Sc
 	return &score, nil
 }
 
-// ScoreSector re-scores all companies in the given sector.
+// ScoreSector re-scores all companies in the given sector using concurrent workers.
 func (s *Scheduler) ScoreSector(ctx context.Context, sectorID uuid.UUID) error {
 	companies, err := s.db.ListCompaniesBySector(ctx, sectorID)
 	if err != nil {
@@ -209,50 +211,70 @@ func (s *Scheduler) ScoreSector(ctx context.Context, sectorID uuid.UUID) error {
 		return nil
 	}
 
-	consecutiveFails := 0
-	for _, company := range companies {
-		if s.indexFilter != nil && !s.indexFilter[company.Symbol] {
+	// Filter to index members.
+	var filtered []models.Company
+	for _, c := range companies {
+		if s.indexFilter != nil && !s.indexFilter[c.Symbol] {
 			continue
 		}
-
-		// If we hit 5+ consecutive failures, pause and wait for cooldown to clear
-		if consecutiveFails >= 5 {
-			log.Printf("score-sector: %d consecutive failures, pausing 5 minutes (likely rate limited or crumb cooldown)", consecutiveFails)
-			time.Sleep(5 * time.Minute)
-			consecutiveFails = 0
-		}
-
-		financials, err := s.yahoo.FetchFinancials(ctx, company.Symbol)
-		if err != nil {
-			log.Printf("score-sector: failed to fetch financials for %s: %v", company.Symbol, err)
-			consecutiveFails++
-			continue
-		}
-		consecutiveFails = 0
-
-		result, err := scoring.ScoreCompany(activeConfig.ConfigJSON, financials)
-		if err != nil {
-			log.Printf("score-sector: failed to score %s: %v", company.Symbol, err)
-			continue
-		}
-
-		score := models.Score{
-			ID:             uuid.New(),
-			CompanyID:      company.ID,
-			SectorConfigID: activeConfig.ID,
-			CompositeScore: result.CompositeScore,
-			Rating:         result.Rating,
-			Breakdown:      result.Breakdown,
-			ScoredAt:       time.Now(),
-		}
-		if err := s.db.UpsertScore(ctx, score); err != nil {
-			log.Printf("score-sector: failed to upsert score for %s: %v", company.Symbol, err)
-			continue
-		}
-
-		log.Printf("score-sector: scored %s — %.1f (%s)", company.Symbol, result.CompositeScore, result.Rating)
+		filtered = append(filtered, c)
 	}
 
+	if len(filtered) == 0 {
+		return nil
+	}
+
+	// Score concurrently with a worker pool.
+	const workers = 5
+	sem := make(chan struct{}, workers)
+	var wg sync.WaitGroup
+	var scored, failed int64
+
+	for _, company := range filtered {
+		wg.Add(1)
+		go func(c models.Company) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			financials, err := s.yahoo.FetchFinancials(ctx, c.Symbol)
+			if err != nil {
+				log.Printf("score-sector: failed to fetch %s: %v", c.Symbol, err)
+				atomic.AddInt64(&failed, 1)
+				return
+			}
+
+			result, err := scoring.ScoreCompany(activeConfig.ConfigJSON, financials)
+			if err != nil {
+				log.Printf("score-sector: failed to score %s: %v", c.Symbol, err)
+				atomic.AddInt64(&failed, 1)
+				return
+			}
+
+			score := models.Score{
+				ID:             uuid.New(),
+				CompanyID:      c.ID,
+				SectorConfigID: activeConfig.ID,
+				CompositeScore: result.CompositeScore,
+				Rating:         result.Rating,
+				Breakdown:      result.Breakdown,
+				ScoredAt:       time.Now(),
+			}
+			if err := s.db.UpsertScore(ctx, score); err != nil {
+				log.Printf("score-sector: failed to upsert %s: %v", c.Symbol, err)
+				atomic.AddInt64(&failed, 1)
+				return
+			}
+
+			n := atomic.AddInt64(&scored, 1)
+			if n%25 == 0 {
+				log.Printf("score-sector: progress — %d scored so far", n)
+			}
+		}(company)
+	}
+	wg.Wait()
+
+	log.Printf("score-sector: done — %d scored, %d failed out of %d", scored, failed, len(filtered))
 	return nil
 }
 

@@ -39,7 +39,7 @@ func NewYahooClient() *YahooClient {
 			Timeout: 30 * time.Second,
 			Jar:     jar,
 		},
-		rateLimiter: rate.NewLimiter(rate.Every(2*time.Second), 1),
+		rateLimiter: rate.NewLimiter(rate.Limit(3), 1), // 3 requests/sec for concurrent scoring
 		baseURL:     "https://query2.finance.yahoo.com",
 	}
 }
