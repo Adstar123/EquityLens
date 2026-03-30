@@ -308,7 +308,7 @@ func (c *YahooClient) fetchQuoteSummary(ctx context.Context, symbol string) (*Qu
 	}
 
 	url := fmt.Sprintf(
-		"%s/v10/finance/quoteSummary/%s?modules=defaultKeyStatistics,financialData,summaryDetail,price,incomeStatementHistory,balanceSheetHistory&crumb=%s",
+		"%s/v10/finance/quoteSummary/%s?modules=defaultKeyStatistics,financialData,summaryDetail,price&crumb=%s",
 		c.baseURL, symbol, c.crumb,
 	)
 
@@ -350,7 +350,7 @@ func (c *YahooClient) fetchQuoteSummary(ctx context.Context, symbol string) (*Qu
 					return nil, fmt.Errorf("crumb refresh failed: %w", err)
 				}
 				url = fmt.Sprintf(
-					"%s/v10/finance/quoteSummary/%s?modules=defaultKeyStatistics,financialData,summaryDetail,price,incomeStatementHistory,balanceSheetHistory&crumb=%s",
+					"%s/v10/finance/quoteSummary/%s?modules=defaultKeyStatistics,financialData,summaryDetail,price&crumb=%s",
 					c.baseURL, symbol, c.crumb,
 				)
 				continue
@@ -363,39 +363,12 @@ func (c *YahooClient) fetchQuoteSummary(ctx context.Context, symbol string) (*Qu
 			return nil, fmt.Errorf("yahoo returned status %d for %s", resp.StatusCode, symbol)
 		}
 
-		bodyBytes, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			return nil, fmt.Errorf("reading response body: %w", err)
-		}
-
-		// Temporary debug: dump raw income statement JSON for BHP
-		if symbol == "BHP.AX" {
-			var raw map[string]any
-			json.Unmarshal(bodyBytes, &raw)
-			if qs, ok := raw["quoteSummary"].(map[string]any); ok {
-				if results, ok := qs["result"].([]any); ok && len(results) > 0 {
-					r := results[0].(map[string]any)
-					if ish, ok := r["incomeStatementHistory"].(map[string]any); ok {
-						if stmts, ok := ish["incomeStatementHistory"].([]any); ok && len(stmts) > 0 {
-							b, _ := json.Marshal(stmts[0])
-							fmt.Printf("DEBUG-INCOME-RAW %s: %s\n", symbol, string(b)[:min(500, len(b))])
-						}
-					}
-					if bsh, ok := r["balanceSheetHistory"].(map[string]any); ok {
-						if stmts, ok := bsh["balanceSheetStatements"].([]any); ok && len(stmts) > 0 {
-							b, _ := json.Marshal(stmts[0])
-							fmt.Printf("DEBUG-BALANCE-RAW %s: %s\n", symbol, string(b)[:min(500, len(b))])
-						}
-					}
-				}
-			}
-		}
-
 		var envelope QuoteSummaryResponse
-		if err := json.Unmarshal(bodyBytes, &envelope); err != nil {
+		if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+			resp.Body.Close()
 			return nil, fmt.Errorf("decoding response: %w", err)
 		}
+		resp.Body.Close()
 
 		if len(envelope.QuoteSummary.Result) == 0 {
 			return nil, fmt.Errorf("no results returned for %s", symbol)
@@ -432,22 +405,6 @@ func (c *YahooClient) FetchFinancials(ctx context.Context, symbol string) (map[s
 		return nil, err
 	}
 
-	// Temporary debug: dump raw JSON of first income stmt and balance sheet
-	if symbol == "BHP.AX" {
-		if len(result.IncomeStatementHistory.IncomeStatementHistory) > 0 {
-			stmt := result.IncomeStatementHistory.IncomeStatementHistory[0]
-			fmt.Printf("DEBUG-INCOME %s: ebit=%.2f interestExpense=%.2f\n", symbol, stmt.EBIT.Raw, stmt.InterestExpense.Raw)
-		} else {
-			fmt.Printf("DEBUG-INCOME %s: NO INCOME STATEMENTS\n", symbol)
-		}
-		if len(result.BalanceSheetHistory.BalanceSheetStatements) > 0 {
-			bs := result.BalanceSheetHistory.BalanceSheetStatements[0]
-			fmt.Printf("DEBUG-BALANCE %s: totalAssets=%.2f\n", symbol, bs.TotalAssets.Raw)
-		} else {
-			fmt.Printf("DEBUG-BALANCE %s: NO BALANCE SHEETS\n", symbol)
-		}
-		fmt.Printf("DEBUG-REVENUE %s: totalRevenue=%.2f\n", symbol, result.FinancialData.TotalRevenue.Raw)
-	}
 
 	return NormalizeFinancials(result), nil
 }
