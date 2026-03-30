@@ -1,15 +1,16 @@
-name: Score ASX Companies
+name: Update Prices
 
 on:
   schedule:
-    # Run every 3 days at 6 AM UTC (4 PM AEST)
-    - cron: '0 6 */3 * *'
+    # Run 4x per day during ASX trading hours (10am-4pm AEST = 0am-6am UTC)
+    # At 00:00, 02:00, 04:00, 06:00 UTC on weekdays
+    - cron: '0 0,2,4,6 * * 1-5'
   workflow_dispatch: # Allow manual trigger
 
 jobs:
-  score:
+  prices:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -17,15 +18,13 @@ jobs:
         with:
           go-version-file: backend/go.mod
 
-      - name: Build scorer
+      - name: Build pricer
         working-directory: backend
-        run: go build -o scorer ./cmd/scorer/
+        run: go build -o pricer ./cmd/pricer/
 
-      - name: Run scorer
+      - name: Run pricer
         working-directory: backend
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
-          CONFIGS_PATH: configs/sectors
           MIGRATIONS_PATH: migrations
-        run: ./scorer
+        run: ./pricer

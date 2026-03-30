@@ -1,0 +1,7 @@
+ALTER TABLE companies
+    ADD COLUMN IF NOT EXISTS last_price DECIMAL(12,4),
+    ADD COLUMN IF NOT EXISTS price_change DECIMAL(12,4),
+    ADD COLUMN IF NOT EXISTS price_change_pct DECIMAL(8,4),
+    ADD COLUMN IF NOT EXISTS price_volume BIGINT,
+    ADD COLUMN IF NOT EXISTS price_prev_close DECIMAL(12,4),
+    ADD COLUMN IF NOT EXISTS price_updated_at TIMESTAMPTZ;

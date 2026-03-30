@@ -120,6 +120,25 @@ type Price struct {
 	MarketCap YahooValue `json:"marketCap"`
 }
 
+// ---------- batch quote types ----------
+
+// BatchQuoteResponse is the response from Yahoo's v7/finance/quote endpoint.
+type BatchQuoteResponse struct {
+	QuoteResponse struct {
+		Result []BatchQuoteResult `json:"result"`
+	} `json:"quoteResponse"`
+}
+
+type BatchQuoteResult struct {
+	Symbol                     string  `json:"symbol"`
+	RegularMarketPrice         float64 `json:"regularMarketPrice"`
+	RegularMarketChange        float64 `json:"regularMarketChange"`
+	RegularMarketChangePercent float64 `json:"regularMarketChangePercent"`
+	RegularMarketVolume        int64   `json:"regularMarketVolume"`
+	MarketCap                  int64   `json:"marketCap"`
+	RegularMarketPreviousClose float64 `json:"regularMarketPreviousClose"`
+}
+
 // ---------- crumb/cookie auth ----------
 
 func (c *YahooClient) ensureCrumb(ctx context.Context) error {
@@ -364,4 +383,60 @@ func (c *YahooClient) FetchFinancials(ctx context.Context, symbol string) (map[s
 	}
 
 	return NormalizeFinancials(result), nil
+}
+
+// FetchBatchQuotes fetches price data for multiple symbols in a single request
+// using Yahoo's v7/finance/quote endpoint. Symbols should include the .AX suffix.
+// Returns a map of symbol -> quote result.
+func (c *YahooClient) FetchBatchQuotes(ctx context.Context, symbols []string) (map[string]*BatchQuoteResult, error) {
+	if len(symbols) == 0 {
+		return nil, nil
+	}
+
+	if err := c.ensureCrumb(ctx); err != nil {
+		return nil, fmt.Errorf("crumb auth failed: %w", err)
+	}
+
+	if err := c.rateLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("rate limiter: %w", err)
+	}
+
+	url := fmt.Sprintf(
+		"%s/v7/finance/quote?symbols=%s&crumb=%s",
+		c.baseURL, strings.Join(symbols, ","), c.crumb,
+	)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("building request: %w", err)
+	}
+	req.Header.Set("User-Agent", yahooUserAgent)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("executing batch quote request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 401 {
+		c.invalidateCrumb()
+		return nil, fmt.Errorf("yahoo auth expired for batch quote")
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("yahoo batch quote returned status %d", resp.StatusCode)
+	}
+
+	var envelope BatchQuoteResponse
+	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+		return nil, fmt.Errorf("decoding batch quote response: %w", err)
+	}
+
+	result := make(map[string]*BatchQuoteResult, len(envelope.QuoteResponse.Result))
+	for i := range envelope.QuoteResponse.Result {
+		r := &envelope.QuoteResponse.Result[i]
+		result[r.Symbol] = r
+	}
+
+	return result, nil
 }
