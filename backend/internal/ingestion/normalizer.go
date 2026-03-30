@@ -29,8 +29,10 @@ func NormalizeFinancials(data *QuoteSummaryResult) map[string]float64 {
 		m["net_profit_margin"] = v * 100
 	}
 
-	// ROE (decimal -> %)
+	// ROE (decimal -> %) — try defaultKeyStatistics first, fall back to financialData
 	if v := data.DefaultKeyStatistics.ReturnOnEquity.Raw; v != 0 {
+		m["roe"] = v * 100
+	} else if v := data.FinancialData.ReturnOnEquity.Raw; v != 0 {
 		m["roe"] = v * 100
 	}
 

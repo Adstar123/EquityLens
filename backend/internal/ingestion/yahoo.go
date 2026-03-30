@@ -405,6 +405,16 @@ func (c *YahooClient) FetchFinancials(ctx context.Context, symbol string) (map[s
 		return nil, err
 	}
 
+	// Temporary debug: log income statement and balance sheet availability
+	if symbol == "BHP.AX" || symbol == "CBA.AX" {
+		fmt.Printf("DEBUG-RAW %s: incomeStmts=%d balanceSheets=%d roe_dks=%.4f roe_fd=%.4f\n",
+			symbol,
+			len(result.IncomeStatementHistory.IncomeStatementHistory),
+			len(result.BalanceSheetHistory.BalanceSheetStatements),
+			result.DefaultKeyStatistics.ReturnOnEquity.Raw,
+			result.FinancialData.ReturnOnEquity.Raw)
+	}
+
 	return NormalizeFinancials(result), nil
 }
 

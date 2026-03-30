@@ -252,7 +252,7 @@ func (s *Scheduler) ScoreSector(ctx context.Context, sectorID uuid.UUID) error {
 
 			// Debug: log what the normalizer returned for first few companies
 			debugN := atomic.LoadInt64(&scored) + atomic.LoadInt64(&failed)
-			if debugN < 3 {
+			if debugN < 2 {
 				log.Printf("DEBUG %s: financials map has %d keys: %v", c.Symbol, len(financials), financials)
 			}
 
