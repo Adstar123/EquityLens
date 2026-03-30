@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 
@@ -78,8 +77,9 @@ func main() {
 		log.Printf("pricer: batch %d-%d done (%d quotes)", i, end, len(quotes))
 	}
 
+	db.Close()
 	log.Printf("pricer: done — %d updated, %d failed", updated, failed)
 	if failed > 0 {
-		fmt.Printf("warning: %d symbols failed to update\n", failed)
+		os.Exit(1)
 	}
 }
