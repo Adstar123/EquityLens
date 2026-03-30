@@ -77,9 +77,9 @@ func main() {
 		log.Printf("pricer: batch %d-%d done (%d quotes)", i, end, len(quotes))
 	}
 
-	db.Close()
 	log.Printf("pricer: done — %d updated, %d failed", updated, failed)
 	if failed > 0 {
 		os.Exit(1)
 	}
+	os.Exit(0)
 }
