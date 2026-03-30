@@ -146,8 +146,8 @@ func TestLoadSeedConfigs_MiningYAMLFile(t *testing.T) {
 	if cfg.DisplayName != "Mining & Resources" {
 		t.Errorf("expected display_name 'Mining & Resources', got %q", cfg.DisplayName)
 	}
-	if len(cfg.Ratios) != 5 {
-		t.Errorf("expected 5 ratios, got %d", len(cfg.Ratios))
+	if len(cfg.Ratios) != 7 {
+		t.Errorf("expected 7 ratios, got %d", len(cfg.Ratios))
 	}
 
 	// Verify weights sum to 1.0
@@ -159,29 +159,38 @@ func TestLoadSeedConfigs_MiningYAMLFile(t *testing.T) {
 		t.Errorf("expected weights to sum to ~1.0, got %f", totalWeight)
 	}
 
+	// NegativeEarnings is now optional — should be empty string when omitted
+	if cfg.EdgeCases.NegativeEarnings != "" {
+		t.Errorf("expected empty negative_earnings, got %q", cfg.EdgeCases.NegativeEarnings)
+	}
+
 	// Verify specific ratio values
 	for _, r := range cfg.Ratios {
 		switch r.Key {
-		case "pe_ratio":
-			if r.Weight != 0.20 {
-				t.Errorf("pe_ratio weight: expected 0.20, got %f", r.Weight)
-			}
-			if r.Ranges.Strong.Max == nil || *r.Ranges.Strong.Max != 12 {
-				t.Error("pe_ratio strong max should be 12")
-			}
-		case "fcf_yield":
-			if r.Weight != 0.25 {
-				t.Errorf("fcf_yield weight: expected 0.25, got %f", r.Weight)
+		case "net_profit_margin":
+			if r.Weight != 0.143 {
+				t.Errorf("net_profit_margin weight: expected 0.143, got %f", r.Weight)
 			}
 			if r.LowerIsBetter {
-				t.Error("fcf_yield should not be lower_is_better")
+				t.Error("net_profit_margin should not be lower_is_better")
 			}
-			if r.Ranges.Strong.Min == nil || *r.Ranges.Strong.Min != 8 {
-				t.Error("fcf_yield strong min should be 8")
+			if r.Ranges.Strong.Min == nil || *r.Ranges.Strong.Min != 20 {
+				t.Error("net_profit_margin strong min should be 20")
 			}
-		case "ev_ebitda":
-			if r.Weight != 0.15 {
-				t.Errorf("ev_ebitda weight: expected 0.15, got %f", r.Weight)
+		case "debt_to_equity":
+			if r.Weight != 0.143 {
+				t.Errorf("debt_to_equity weight: expected 0.143, got %f", r.Weight)
+			}
+			if !r.LowerIsBetter {
+				t.Error("debt_to_equity should be lower_is_better")
+			}
+		case "interest_coverage":
+			if r.MaxClamp == nil || *r.MaxClamp != 50 {
+				t.Error("interest_coverage should have max_clamp of 50")
+			}
+		case "asset_turnover":
+			if r.MaxClamp == nil || *r.MaxClamp != 5 {
+				t.Error("asset_turnover should have max_clamp of 5")
 			}
 		}
 	}
@@ -296,5 +305,118 @@ rating_scale:
 	}
 	if !sectors["mining"] || !sectors["tech"] {
 		t.Error("expected both mining and tech sectors")
+	}
+}
+
+func TestLoadSeedConfigs_OptionalNegativeEarnings(t *testing.T) {
+	dir := t.TempDir()
+
+	// YAML without negative_earnings — should parse fine
+	yaml := `
+sector: test
+display_name: "Test Sector"
+ratios:
+  - key: roe
+    name: "Return on Equity"
+    weight: 1.0
+    lower_is_better: false
+    ranges:
+      strong: { min: 20 }
+      good: { min: 15, max: 20 }
+      neutral: { min: 10, max: 15 }
+      weak: { min: 5, max: 10 }
+      poor: { max: 5 }
+edge_cases:
+  missing_data_threshold: 0.4
+rating_scale:
+  strong_buy: { min: 80 }
+  buy: { min: 60, max: 80 }
+  hold: { min: 40, max: 60 }
+  sell: { min: 20, max: 40 }
+  strong_sell: { max: 20 }
+`
+	err := os.WriteFile(filepath.Join(dir, "test.yaml"), []byte(yaml), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	configs, err := LoadSeedConfigs(dir)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if configs[0].EdgeCases.NegativeEarnings != "" {
+		t.Errorf("expected empty NegativeEarnings, got %q", configs[0].EdgeCases.NegativeEarnings)
+	}
+}
+
+func TestLoadSeedConfigs_ClampFields(t *testing.T) {
+	dir := t.TempDir()
+
+	yaml := `
+sector: clamptest
+display_name: "Clamp Test"
+ratios:
+  - key: interest_coverage
+    name: "Interest Coverage"
+    weight: 0.5
+    lower_is_better: false
+    max_clamp: 50
+    ranges:
+      strong: { min: 8 }
+      good: { min: 4, max: 8 }
+      neutral: { min: 2, max: 4 }
+      weak: { min: 1, max: 2 }
+      poor: { max: 1 }
+  - key: some_ratio
+    name: "Some Ratio"
+    weight: 0.5
+    lower_is_better: true
+    min_clamp: 0
+    max_clamp: 100
+    ranges:
+      strong: { max: 10 }
+      good: { min: 10, max: 20 }
+      neutral: { min: 20, max: 30 }
+      weak: { min: 30, max: 40 }
+      poor: { min: 40 }
+edge_cases:
+  missing_data_threshold: 0.4
+rating_scale:
+  strong_buy: { min: 80 }
+  buy: { min: 60, max: 80 }
+  hold: { min: 40, max: 60 }
+  sell: { min: 20, max: 40 }
+  strong_sell: { max: 20 }
+`
+	err := os.WriteFile(filepath.Join(dir, "clamp.yaml"), []byte(yaml), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	configs, err := LoadSeedConfigs(dir)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	cfg := configs[0]
+	if len(cfg.Ratios) != 2 {
+		t.Fatalf("expected 2 ratios, got %d", len(cfg.Ratios))
+	}
+
+	ic := cfg.Ratios[0]
+	if ic.MinClamp != nil {
+		t.Errorf("expected nil min_clamp for interest_coverage, got %f", *ic.MinClamp)
+	}
+	if ic.MaxClamp == nil || *ic.MaxClamp != 50 {
+		t.Error("expected max_clamp 50 for interest_coverage")
+	}
+
+	sr := cfg.Ratios[1]
+	if sr.MinClamp == nil || *sr.MinClamp != 0 {
+		t.Error("expected min_clamp 0 for some_ratio")
+	}
+	if sr.MaxClamp == nil || *sr.MaxClamp != 100 {
+		t.Error("expected max_clamp 100 for some_ratio")
 	}
 }

@@ -19,6 +19,7 @@ export interface Score {
   rating: string;
   breakdown: {
     ratios: RatioResult[];
+    context_ratios?: ContextRatio[];
   };
   scored_at: string;
 }
@@ -31,6 +32,12 @@ export interface RatioResult {
   points: number;
   weight: number;
   weighted_score: number;
+}
+
+export interface ContextRatio {
+  key: string;
+  name: string;
+  value: number;
 }
 
 export interface Sector {

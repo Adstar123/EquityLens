@@ -169,6 +169,22 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
               }
             </div>
           </section>
+
+          <!-- Context ratios (display-only) -->
+          @if (contextRatios().length > 0) {
+            <section class="context-section">
+              <h2 class="context-title">VALUATION CONTEXT</h2>
+              <div class="context-grid">
+                @for (ctx of contextRatios(); track ctx.key) {
+                  <div class="context-card">
+                    <span class="ctx-label">{{ ctx.name }}</span>
+                    <span class="ctx-value">{{ formatRatio(ctx.value) }}</span>
+                  </div>
+                }
+              </div>
+              <p class="context-note">These valuation metrics are shown for reference only and do not affect the composite score.</p>
+            </section>
+          }
         } @else {
           <div class="no-score-state">
             No score data available for this ticker yet.
@@ -526,6 +542,57 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
       opacity: 0.7;
     }
 
+    .context-section {
+      margin-top: 2rem;
+    }
+
+    .context-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin: 0 0 0.75rem;
+    }
+
+    .context-grid {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .context-card {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 0.75rem 1rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      min-width: 120px;
+    }
+
+    .ctx-label {
+      font-size: 0.6875rem;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .ctx-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.125rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .context-note {
+      font-size: 0.6875rem;
+      color: var(--text-muted);
+      font-style: italic;
+      margin: 0.75rem 0 0;
+    }
+
     .no-score-state {
       text-align: center;
       color: var(--text-muted);
@@ -563,6 +630,12 @@ export class TickerComponent implements OnInit, AfterViewInit {
     const d = this.detail();
     if (!d?.score?.breakdown?.ratios) return [];
     return d.score.breakdown.ratios;
+  });
+
+  contextRatios = computed(() => {
+    const d = this.detail();
+    if (!d?.score?.breakdown?.context_ratios) return [];
+    return d.score.breakdown.context_ratios;
   });
 
   ratingLabel = computed(() => {

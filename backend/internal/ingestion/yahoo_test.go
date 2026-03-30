@@ -35,8 +35,12 @@ func TestNormalizeFinancials(t *testing.T) {
 			ReturnOnEquity:     YahooValue{Raw: 0.28},
 		},
 		FinancialData: FinancialData{
-			FreeCashflow: YahooValue{Raw: 8500000000},
-			DebtToEquity: YahooValue{Raw: 42.5},
+			FreeCashflow:  YahooValue{Raw: 8500000000},
+			DebtToEquity:  YahooValue{Raw: 42.5},
+			ProfitMargins: YahooValue{Raw: 0.15},
+			CurrentRatio:  YahooValue{Raw: 1.8},
+			QuickRatio:    YahooValue{Raw: 1.2},
+			TotalRevenue:  YahooValue{Raw: 50000000000},
 		},
 		SummaryDetail: SummaryDetail{
 			TrailingPE: YahooValue{Raw: 14.5},
@@ -44,6 +48,21 @@ func TestNormalizeFinancials(t *testing.T) {
 		Price: Price{
 			ShortName: "BHP Group Limited",
 			MarketCap: YahooValue{Raw: 145000000000},
+		},
+		IncomeStatementHistory: IncomeStatementHistory{
+			IncomeStatementHistory: []IncomeStatement{
+				{
+					EBIT:            YahooValue{Raw: 15000000000},
+					InterestExpense: YahooValue{Raw: -2000000000},
+				},
+			},
+		},
+		BalanceSheetHistory: BalanceSheetHistory{
+			BalanceSheetStatements: []BalanceSheet{
+				{
+					TotalAssets: YahooValue{Raw: 100000000000},
+				},
+			},
 		},
 	}
 
@@ -53,11 +72,16 @@ func TestNormalizeFinancials(t *testing.T) {
 		key  string
 		want float64
 	}{
-		{"pe_ratio", 14.5},
-		{"roe", 28.0},          // 0.28 * 100
-		{"ev_ebitda", 5.8},
-		{"debt_to_equity", 0.425}, // 42.5 / 100
-		{"fcf_yield", 8500000000.0 / 145000000000.0 * 100}, // ~5.862
+		{"net_profit_margin", 15.0},                          // 0.15 * 100
+		{"roe", 28.0},                                        // 0.28 * 100
+		{"current_ratio", 1.8},                               // direct
+		{"quick_ratio", 1.2},                                 // direct
+		{"debt_to_equity", 0.425},                            // 42.5 / 100
+		{"interest_coverage", 7.5},                           // 15B / 2B
+		{"asset_turnover", 0.5},                              // 50B / 100B
+		{"ctx_pe_ratio", 14.5},                               // direct
+		{"ctx_ev_ebitda", 5.8},                               // direct
+		{"ctx_fcf_yield", 8500000000.0 / 145000000000.0 * 100}, // ~5.862
 	}
 
 	for _, tc := range tests {
@@ -72,8 +96,8 @@ func TestNormalizeFinancials(t *testing.T) {
 		})
 	}
 
-	if len(m) != 5 {
-		t.Errorf("expected 5 keys, got %d: %v", len(m), m)
+	if len(m) != 10 {
+		t.Errorf("expected 10 keys, got %d: %v", len(m), m)
 	}
 }
 
@@ -87,11 +111,11 @@ func TestNormalizeFinancials_MissingFields(t *testing.T) {
 
 	m := NormalizeFinancials(data)
 
-	if _, ok := m["pe_ratio"]; !ok {
-		t.Fatal("pe_ratio should be present")
+	if _, ok := m["ctx_pe_ratio"]; !ok {
+		t.Fatal("ctx_pe_ratio should be present")
 	}
 
-	for _, key := range []string{"roe", "ev_ebitda", "debt_to_equity", "fcf_yield"} {
+	for _, key := range []string{"net_profit_margin", "roe", "current_ratio", "quick_ratio", "debt_to_equity", "interest_coverage", "asset_turnover", "ctx_ev_ebitda", "ctx_fcf_yield"} {
 		if _, ok := m[key]; ok {
 			t.Errorf("key %q should be absent when source fields are zero", key)
 		}
@@ -156,8 +180,8 @@ func TestFetchFinancials(t *testing.T) {
 	}
 
 	// Spot-check a couple of values to confirm the full pipeline works.
-	if pe, ok := fin["pe_ratio"]; !ok || !almostEqual(pe, 14.5, 0.001) {
-		t.Errorf("pe_ratio = %v, want 14.5", pe)
+	if pe, ok := fin["ctx_pe_ratio"]; !ok || !almostEqual(pe, 14.5, 0.001) {
+		t.Errorf("ctx_pe_ratio = %v, want 14.5", pe)
 	}
 	if roe, ok := fin["roe"]; !ok || !almostEqual(roe, 28.0, 0.001) {
 		t.Errorf("roe = %v, want 28.0", roe)

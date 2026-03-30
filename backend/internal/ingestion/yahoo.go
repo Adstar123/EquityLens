@@ -93,10 +93,12 @@ type QuoteSummaryResponse struct {
 
 // QuoteSummaryResult holds the individual module blocks.
 type QuoteSummaryResult struct {
-	DefaultKeyStatistics DefaultKeyStatistics `json:"defaultKeyStatistics"`
-	FinancialData        FinancialData        `json:"financialData"`
-	SummaryDetail        SummaryDetail        `json:"summaryDetail"`
-	Price                Price                `json:"price"`
+	DefaultKeyStatistics   DefaultKeyStatistics   `json:"defaultKeyStatistics"`
+	FinancialData          FinancialData          `json:"financialData"`
+	SummaryDetail          SummaryDetail          `json:"summaryDetail"`
+	Price                  Price                  `json:"price"`
+	IncomeStatementHistory IncomeStatementHistory `json:"incomeStatementHistory"`
+	BalanceSheetHistory    BalanceSheetHistory    `json:"balanceSheetHistory"`
 }
 
 type DefaultKeyStatistics struct {
@@ -109,6 +111,10 @@ type FinancialData struct {
 	TotalDebt      YahooValue `json:"totalDebt"`
 	ReturnOnEquity YahooValue `json:"returnOnEquity"`
 	DebtToEquity   YahooValue `json:"debtToEquity"`
+	CurrentRatio   YahooValue `json:"currentRatio"`
+	QuickRatio     YahooValue `json:"quickRatio"`
+	ProfitMargins  YahooValue `json:"profitMargins"`
+	TotalRevenue   YahooValue `json:"totalRevenue"`
 }
 
 type SummaryDetail struct {
@@ -118,6 +124,23 @@ type SummaryDetail struct {
 type Price struct {
 	ShortName string     `json:"shortName"`
 	MarketCap YahooValue `json:"marketCap"`
+}
+
+type IncomeStatementHistory struct {
+	IncomeStatementHistory []IncomeStatement `json:"incomeStatementHistory"`
+}
+
+type IncomeStatement struct {
+	EBIT            YahooValue `json:"ebit"`
+	InterestExpense YahooValue `json:"interestExpense"`
+}
+
+type BalanceSheetHistory struct {
+	BalanceSheetStatements []BalanceSheet `json:"balanceSheetStatements"`
+}
+
+type BalanceSheet struct {
+	TotalAssets YahooValue `json:"totalAssets"`
 }
 
 // ---------- batch quote types ----------
@@ -285,7 +308,7 @@ func (c *YahooClient) fetchQuoteSummary(ctx context.Context, symbol string) (*Qu
 	}
 
 	url := fmt.Sprintf(
-		"%s/v10/finance/quoteSummary/%s?modules=defaultKeyStatistics,financialData,summaryDetail,price&crumb=%s",
+		"%s/v10/finance/quoteSummary/%s?modules=defaultKeyStatistics,financialData,summaryDetail,price,incomeStatementHistory,balanceSheetHistory&crumb=%s",
 		c.baseURL, symbol, c.crumb,
 	)
 
@@ -327,7 +350,7 @@ func (c *YahooClient) fetchQuoteSummary(ctx context.Context, symbol string) (*Qu
 					return nil, fmt.Errorf("crumb refresh failed: %w", err)
 				}
 				url = fmt.Sprintf(
-					"%s/v10/finance/quoteSummary/%s?modules=defaultKeyStatistics,financialData,summaryDetail,price&crumb=%s",
+					"%s/v10/finance/quoteSummary/%s?modules=defaultKeyStatistics,financialData,summaryDetail,price,incomeStatementHistory,balanceSheetHistory&crumb=%s",
 					c.baseURL, symbol, c.crumb,
 				)
 				continue

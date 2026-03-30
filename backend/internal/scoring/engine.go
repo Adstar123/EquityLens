@@ -35,11 +35,12 @@ func ScoreCompany(config models.SectorConfig, financials map[string]float64) (*S
 			continue
 		}
 
-		// Handle negative P/E edge case.
-		if rc.Key == "pe_ratio" && value < 0 &&
-			config.EdgeCases.NegativeEarnings == "exclude_pe_redistribute" {
-			skippedCount++
-			continue
+		// Clamp outliers if bounds are configured.
+		if rc.MinClamp != nil && value < *rc.MinClamp {
+			value = *rc.MinClamp
+		}
+		if rc.MaxClamp != nil && value > *rc.MaxClamp {
+			value = *rc.MaxClamp
 		}
 
 		bucket, points := classifyValue(value, rc.Ranges)
@@ -97,6 +98,22 @@ func ScoreCompany(config models.SectorConfig, financials map[string]float64) (*S
 		compositeScore = 0
 	}
 	rating := mapRating(compositeScore, config.RatingScale)
+
+	// Extract context ratios (ctx_ prefixed) for display-only.
+	ctxNames := map[string]string{
+		"ctx_pe_ratio":  "P/E Ratio",
+		"ctx_ev_ebitda": "EV/EBITDA",
+		"ctx_fcf_yield": "FCF Yield",
+	}
+	for key, name := range ctxNames {
+		if val, ok := financials[key]; ok {
+			breakdown.ContextRatios = append(breakdown.ContextRatios, models.ContextRatio{
+				Key:   key,
+				Name:  name,
+				Value: val,
+			})
+		}
+	}
 
 	return &ScoreResult{
 		CompositeScore: compositeScore,

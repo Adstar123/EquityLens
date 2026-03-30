@@ -42,7 +42,14 @@ type Score struct {
 }
 
 type Breakdown struct {
-	Ratios []RatioResult `json:"ratios"`
+	Ratios        []RatioResult  `json:"ratios"`
+	ContextRatios []ContextRatio `json:"context_ratios,omitempty"`
+}
+
+type ContextRatio struct {
+	Key   string  `json:"key"`
+	Name  string  `json:"name"`
+	Value float64 `json:"value"`
 }
 
 type RatioResult struct {

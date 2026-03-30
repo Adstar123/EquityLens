@@ -14,6 +14,8 @@ type RatioConfig struct {
 	Weight        float64  `json:"weight" yaml:"weight"`
 	LowerIsBetter bool     `json:"lower_is_better" yaml:"lower_is_better"`
 	Ranges        RangeSet `json:"ranges" yaml:"ranges"`
+	MinClamp      *float64 `json:"min_clamp,omitempty" yaml:"min_clamp,omitempty"`
+	MaxClamp      *float64 `json:"max_clamp,omitempty" yaml:"max_clamp,omitempty"`
 }
 
 type RangeSet struct {

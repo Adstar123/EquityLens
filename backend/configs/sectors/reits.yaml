@@ -2,58 +2,85 @@
 sector: reits
 display_name: "REITs"
 ratios:
-  - key: pe_ratio
-    name: "P/E Ratio"
-    weight: 0.15
-    lower_is_better: true
-    ranges:
-      strong: { max: 14 }
-      good: { min: 14, max: 20 }
-      neutral: { min: 20, max: 28 }
-      weak: { min: 28, max: 38 }
-      poor: { min: 38 }
-  - key: debt_to_equity
-    name: "Debt to Equity"
-    weight: 0.25
-    lower_is_better: true
-    ranges:
-      strong: { max: 0.5 }
-      good: { min: 0.5, max: 0.8 }
-      neutral: { min: 0.8, max: 1.2 }
-      weak: { min: 1.2, max: 1.8 }
-      poor: { min: 1.8 }
-  - key: fcf_yield
-    name: "Free Cash Flow Yield"
-    weight: 0.25
+  - key: net_profit_margin
+    name: "Net Profit Margin"
+    weight: 0.143
     lower_is_better: false
     ranges:
-      strong: { min: 7 }
-      good: { min: 5, max: 7 }
-      neutral: { min: 3.5, max: 5 }
-      weak: { min: 2, max: 3.5 }
-      poor: { max: 2 }
+      strong:  { min: 20 }
+      good:    { min: 10, max: 20 }
+      neutral: { min: 5, max: 10 }
+      weak:    { min: 0, max: 5 }
+      poor:    { max: 0 }
+
   - key: roe
     name: "Return on Equity"
-    weight: 0.15
+    weight: 0.143
     lower_is_better: false
     ranges:
-      strong: { min: 12 }
-      good: { min: 8, max: 12 }
-      neutral: { min: 5, max: 8 }
-      weak: { min: 2, max: 5 }
-      poor: { max: 2 }
-  - key: ev_ebitda
-    name: "EV/EBITDA"
-    weight: 0.20
+      strong:  { min: 20 }
+      good:    { min: 15, max: 20 }
+      neutral: { min: 10, max: 15 }
+      weak:    { min: 5, max: 10 }
+      poor:    { max: 5 }
+
+  - key: current_ratio
+    name: "Current Ratio"
+    weight: 0.143
+    lower_is_better: false
+    ranges:
+      strong:  { min: 2.0 }
+      good:    { min: 1.5, max: 2.0 }
+      neutral: { min: 1.0, max: 1.5 }
+      weak:    { min: 0.5, max: 1.0 }
+      poor:    { max: 0.5 }
+
+  - key: quick_ratio
+    name: "Quick Ratio"
+    weight: 0.143
+    lower_is_better: false
+    ranges:
+      strong:  { min: 1.5 }
+      good:    { min: 1.0, max: 1.5 }
+      neutral: { min: 0.7, max: 1.0 }
+      weak:    { min: 0.4, max: 0.7 }
+      poor:    { max: 0.4 }
+
+  - key: debt_to_equity
+    name: "Debt to Equity"
+    weight: 0.143
     lower_is_better: true
     ranges:
-      strong: { max: 14 }
-      good: { min: 14, max: 20 }
-      neutral: { min: 20, max: 26 }
-      weak: { min: 26, max: 34 }
-      poor: { min: 34 }
+      strong:  { max: 0.5 }
+      good:    { min: 0.5, max: 1.0 }
+      neutral: { min: 1.0, max: 1.5 }
+      weak:    { min: 1.5, max: 2.5 }
+      poor:    { min: 2.5 }
+
+  - key: interest_coverage
+    name: "Interest Coverage"
+    weight: 0.143
+    lower_is_better: false
+    max_clamp: 50
+    ranges:
+      strong:  { min: 8 }
+      good:    { min: 4, max: 8 }
+      neutral: { min: 2, max: 4 }
+      weak:    { min: 1, max: 2 }
+      poor:    { max: 1 }
+
+  - key: asset_turnover
+    name: "Asset Turnover"
+    weight: 0.142
+    lower_is_better: false
+    max_clamp: 5
+    ranges:
+      strong:  { min: 1.5 }
+      good:    { min: 1.0, max: 1.5 }
+      neutral: { min: 0.5, max: 1.0 }
+      weak:    { min: 0.2, max: 0.5 }
+      poor:    { max: 0.2 }
 edge_cases:
-  negative_earnings: "exclude_pe_redistribute"
   missing_data_threshold: 0.4
 rating_scale:
   strong_buy: { min: 80 }

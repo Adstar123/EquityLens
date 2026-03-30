@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/Adstar123/equitylens/backend/internal/config"
@@ -20,6 +22,7 @@ type Scheduler struct {
 	yahoo          *ingestion.YahooClient
 	asx            *ingestion.ASXClient
 	alphaVantage   *ingestion.AlphaVantageClient // optional fallback
+	indexFilter    map[string]bool
 }
 
 // NewScheduler creates a new Scheduler with the given database and Yahoo client.
@@ -36,6 +39,24 @@ func (s *Scheduler) SetAlphaVantage(apiKey string) {
 	if apiKey != "" {
 		s.alphaVantage = ingestion.NewAlphaVantageClient(apiKey)
 	}
+}
+
+// LoadIndexFilter reads a newline-delimited file of symbols and restricts
+// sector scoring to only those symbols.
+func (s *Scheduler) LoadIndexFilter(path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("reading index filter: %w", err)
+	}
+	s.indexFilter = make(map[string]bool)
+	for _, line := range strings.Split(string(data), "\n") {
+		sym := strings.TrimSpace(line)
+		if sym != "" {
+			s.indexFilter[sym] = true
+		}
+	}
+	log.Printf("index filter loaded: %d symbols", len(s.indexFilter))
+	return nil
 }
 
 // SeedFromYAML loads YAML configs from disk into the database.
@@ -190,6 +211,10 @@ func (s *Scheduler) ScoreSector(ctx context.Context, sectorID uuid.UUID) error {
 
 	consecutiveFails := 0
 	for _, company := range companies {
+		if s.indexFilter != nil && !s.indexFilter[company.Symbol] {
+			continue
+		}
+
 		// If we hit 5+ consecutive failures, pause and wait for cooldown to clear
 		if consecutiveFails >= 5 {
 			log.Printf("score-sector: %d consecutive failures, pausing 5 minutes (likely rate limited or crumb cooldown)", consecutiveFails)

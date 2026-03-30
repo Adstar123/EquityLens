@@ -55,6 +55,15 @@ func main() {
 		log.Printf("warning: failed to seed configs: %v", err)
 	}
 
+	// Load index filter (ASX 300).
+	indexPath := os.Getenv("INDEX_FILTER_PATH")
+	if indexPath == "" {
+		indexPath = "configs/asx300.csv"
+	}
+	if err := sched.LoadIndexFilter(indexPath); err != nil {
+		log.Printf("warning: no index filter loaded: %v (scoring all companies)", err)
+	}
+
 	// Sync ASX company list.
 	log.Println("scorer: syncing ASX company list")
 	if err := sched.SyncASXCompanies(ctx); err != nil {
