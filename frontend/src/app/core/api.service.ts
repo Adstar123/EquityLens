@@ -27,6 +27,7 @@ export interface Score {
 export interface RatioResult {
   key: string;
   name: string;
+  description?: string;
   value: number;
   range_bucket: string;
   points: number;
@@ -76,6 +77,13 @@ export interface Quote {
   fetched_at: string;
 }
 
+export interface Definition {
+  key: string;
+  label: string;
+  description: string;
+  updated_at: string;
+}
+
 export interface RangeConfig {
   min?: number | null;
   max?: number | null;
@@ -92,6 +100,7 @@ export interface RangeSetConfig {
 export interface RatioConfig {
   key: string;
   name: string;
+  description?: string;
   weight: number;
   lower_is_better: boolean;
   ranges: RangeSetConfig;
@@ -204,6 +213,10 @@ export class ApiService {
     return this.http.get<Record<string, Quote>>(`${this.baseUrl}/quotes`, { params: { symbols: joined } });
   }
 
+  getDefinitions(): Observable<Definition[]> {
+    return this.http.get<Definition[]>(`${this.baseUrl}/definitions`);
+  }
+
   // Authenticated
   getWatchlist(): Observable<Company[]> {
     return this.http.get<Company[]>(`${this.baseUrl}/watchlist`);
@@ -244,5 +257,13 @@ export class ApiService {
 
   getConfigVersions(sector: string): Observable<ConfigVersionRow[]> {
     return this.http.get<ConfigVersionRow[]>(`${this.baseUrl}/admin/configs/${sector}/versions`);
+  }
+
+  getAdminDefinitions(): Observable<Definition[]> {
+    return this.http.get<Definition[]>(`${this.baseUrl}/admin/definitions`);
+  }
+
+  updateDefinition(key: string, data: { label: string; description: string }): Observable<Definition> {
+    return this.http.put<Definition>(`${this.baseUrl}/admin/definitions/${key}`, data);
   }
 }

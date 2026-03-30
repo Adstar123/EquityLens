@@ -161,6 +161,67 @@
 .btn-cancel { background: var(--border); border: none; color: var(--text-secondary); font-size: 0.8125rem; font-weight: 500; padding: 0.5rem 1rem; cursor: pointer; &:hover { color: var(--text-primary); } }
 .btn-confirm { background: rgba(34, 197, 94, 0.15); border: none; color: #22c55e; font-size: 0.8125rem; font-weight: 600; padding: 0.5rem 1rem; cursor: pointer; &:hover { background: rgba(34, 197, 94, 0.25); } }
 
+// Textarea
+.field-textarea {
+  resize: vertical;
+  min-height: 2.5rem;
+  font-family: inherit;
+  font-size: 0.75rem;
+}
+
+// Definitions tab
+.definitions-content {
+  padding: 1rem;
+}
+.definitions-hint {
+  font-size: 0.75rem;
+  color: var(--text-tertiary, #6b7280);
+  margin-bottom: 1rem;
+}
+.definition-card {
+  background: var(--surface-card, #1a1a2e);
+  border: 1px solid var(--border, #2e2e3e);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+}
+.def-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+.def-key {
+  font-size: 0.7rem;
+  color: var(--text-tertiary, #6b7280);
+}
+.def-saving {
+  font-size: 0.65rem;
+  color: var(--accent, #6366f1);
+}
+.def-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.btn-save-sm {
+  font-size: 0.7rem;
+  padding: 0.25rem 0.75rem;
+  background: var(--accent, #6366f1);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.btn-save-sm:hover {
+  opacity: 0.9;
+}
+.btn-save-sm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 // States
 .loading-state { display: flex; align-items: center; justify-content: center; flex: 1; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; font-size: 0.875rem; }
 .empty-state-full { display: flex; align-items: center; justify-content: center; flex: 1; color: var(--text-muted); font-size: 0.875rem; }

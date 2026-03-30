@@ -291,3 +291,43 @@ func (s *Server) listConfigVersions(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, versions)
 }
+
+// listDefinitions returns all definitions (public endpoint).
+func (s *Server) listDefinitions(w http.ResponseWriter, r *http.Request) {
+	defs, err := s.db.ListDefinitions(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list definitions")
+		return
+	}
+	if defs == nil {
+		writeJSON(w, http.StatusOK, []any{})
+		return
+	}
+	writeJSON(w, http.StatusOK, defs)
+}
+
+// updateDefinition upserts a single definition (admin endpoint).
+func (s *Server) updateDefinition(w http.ResponseWriter, r *http.Request) {
+	key := chi.URLParam(r, "key")
+
+	var body struct {
+		Label       string `json:"label"`
+		Description string `json:"description"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	def := models.Definition{
+		Key:         key,
+		Label:       body.Label,
+		Description: body.Description,
+	}
+	if err := s.db.UpsertDefinition(r.Context(), def); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to save definition")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, def)
+}

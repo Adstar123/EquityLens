@@ -9,14 +9,15 @@ import {
   query,
   stagger,
 } from '@angular/animations';
-import { ApiService, ScreenerItem, Sector, Quote, Company } from '../core/api.service';
+import { ApiService, ScreenerItem, Sector, Quote, Company, Definition } from '../core/api.service';
 import { ScoreBadgeComponent } from '../shared/components/score-badge.component';
 import { RatioBarComponent } from '../shared/components/ratio-bar.component';
+import { InfoTooltipComponent } from '../shared/components/info-tooltip.component';
 
 @Component({
   selector: 'app-screener',
   standalone: true,
-  imports: [FormsModule, ScoreBadgeComponent, RatioBarComponent],
+  imports: [FormsModule, ScoreBadgeComponent, RatioBarComponent, InfoTooltipComponent],
   animations: [
     trigger('tableStagger', [
       transition(':enter', [
@@ -120,11 +121,26 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
                 <th class="col-symbol">Symbol</th>
                 <th class="col-name">Company</th>
                 <th class="col-price">Price</th>
-                <th class="col-mcap">Mkt Cap</th>
+                <th class="col-mcap">
+                  Mkt Cap
+                  @if (definitions()['market_cap']; as def) {
+                    <app-info-tooltip [description]="def.description" />
+                  }
+                </th>
                 <th class="col-sector">Sector</th>
-                <th class="col-score">Score</th>
-                @for (name of ratioHeaders(); track name) {
-                  <th class="col-ratio">{{ name }}</th>
+                <th class="col-score">
+                  Score
+                  @if (definitions()['composite_score']; as def) {
+                    <app-info-tooltip [description]="def.description" />
+                  }
+                </th>
+                @for (col of ratioHeadersWithDesc(); track col.name) {
+                  <th class="col-ratio">
+                    {{ col.name }}
+                    @if (col.description) {
+                      <app-info-tooltip [description]="col.description" />
+                    }
+                  </th>
                 }
               </tr>
             </thead>
@@ -579,6 +595,7 @@ export class ScreenerComponent implements OnInit {
   items = signal<ScreenerItem[]>([]);
   loading = signal(false);
   quotes = signal<Record<string, Quote>>({});
+  definitions = signal<Record<string, Definition>>({});
   searchQuery = signal('');
   searchResults = signal<Company[]>([]);
   private searchTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -641,10 +658,27 @@ export class ScreenerComponent implements OnInit {
     return [];
   });
 
+  ratioHeadersWithDesc = computed(() => {
+    const items = this.filteredItems();
+    if (!items.length || !items[0].breakdown?.ratios?.length) return [];
+    return items[0].breakdown.ratios.map(r => ({
+      name: r.name,
+      description: r.description || '',
+    }));
+  });
+
   ngOnInit(): void {
     this.api.listSectors().subscribe({
       next: (sectors) => this.sectors.set(sectors),
       error: () => this.sectors.set([]),
+    });
+
+    this.api.getDefinitions().subscribe({
+      next: (defs) => {
+        const map: Record<string, Definition> = {};
+        for (const d of defs) map[d.key] = d;
+        this.definitions.set(map);
+      },
     });
 
     this.loadData();

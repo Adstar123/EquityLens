@@ -11,6 +11,7 @@ type SectorConfig struct {
 type RatioConfig struct {
 	Key           string   `json:"key" yaml:"key"`
 	Name          string   `json:"name" yaml:"name"`
+	Description   string   `json:"description,omitempty" yaml:"description,omitempty"`
 	Weight        float64  `json:"weight" yaml:"weight"`
 	LowerIsBetter bool     `json:"lower_is_better" yaml:"lower_is_better"`
 	Ranges        RangeSet `json:"ranges" yaml:"ranges"`

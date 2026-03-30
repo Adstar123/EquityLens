@@ -80,6 +80,7 @@ func ScoreCompany(config models.SectorConfig, financials map[string]float64) (*S
 		breakdown.Ratios = append(breakdown.Ratios, models.RatioResult{
 			Key:           r.ratioConfig.Key,
 			Name:          r.ratioConfig.Name,
+			Description:   r.ratioConfig.Description,
 			Value:         r.value,
 			RangeBucket:   r.bucket,
 			Points:        r.points,

@@ -10,15 +10,16 @@ import {
 } from '@angular/animations';
 import { NgxEchartsDirective } from 'ngx-echarts';
 import { EChartsCoreOption } from 'echarts/core';
-import { ApiService, TickerDetail, Company, Quote } from '../core/api.service';
+import { ApiService, TickerDetail, Company, Quote, Definition } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { ThemeService } from '../core/theme.service';
 import { RatioBarComponent } from '../shared/components/ratio-bar.component';
+import { InfoTooltipComponent } from '../shared/components/info-tooltip.component';
 
 @Component({
   selector: 'app-ticker',
   standalone: true,
-  imports: [RouterLink, RatioBarComponent, NgxEchartsDirective],
+  imports: [RouterLink, RatioBarComponent, NgxEchartsDirective, InfoTooltipComponent],
   animations: [
     trigger('rowStagger', [
       transition(':enter', [
@@ -79,7 +80,12 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
             </span>
             <div class="price-meta">
               <span>Vol: {{ formatVolume(quote()!.volume) }}</span>
-              <span>Mkt Cap: {{ formatMarketCap(quote()!.market_cap) }}</span>
+              <span>
+                Mkt Cap: {{ formatMarketCap(quote()!.market_cap) }}
+                @if (definitions()['market_cap']; as def) {
+                  <app-info-tooltip [description]="def.description" />
+                }
+              </span>
               <span class="price-delayed">Updated 4x daily</span>
             </div>
           </div>
@@ -97,7 +103,12 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
                   [style.color]="ratingColor()"
                 >{{ ratingLabel() }}</span>
               </div>
-              <div class="score-sub">COMPOSITE SCORE</div>
+              <div class="score-sub">
+                COMPOSITE SCORE
+                @if (definitions()['composite_score']; as def) {
+                  <app-info-tooltip [description]="def.description" />
+                }
+              </div>
             </div>
             <div class="radar-chart-container">
               <div
@@ -138,7 +149,12 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
                   (mouseleave)="expandedRatio.set(null)"
                 >
                   <div class="ratio-main">
-                    <span class="r-name">{{ ratio.name }}</span>
+                    <span class="r-name">
+                      {{ ratio.name }}
+                      @if (ratio.description) {
+                        <app-info-tooltip [description]="ratio.description" />
+                      }
+                    </span>
                     <span class="r-value">{{ formatRatio(ratio.value) }}</span>
                     <span
                       class="r-bucket"
@@ -173,7 +189,12 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
           <!-- Context ratios (display-only) -->
           @if (contextRatios().length > 0) {
             <section class="context-section">
-              <h2 class="context-title">VALUATION CONTEXT</h2>
+              <h2 class="context-title">
+                VALUATION CONTEXT
+                @if (definitions()['valuation_context']; as def) {
+                  <app-info-tooltip [description]="def.description" />
+                }
+              </h2>
               <div class="context-grid">
                 @for (ctx of contextRatios(); track ctx.key) {
                   <div class="context-card">
@@ -607,6 +628,7 @@ export class TickerComponent implements OnInit, AfterViewInit {
   readonly auth = inject(AuthService);
   private theme = inject(ThemeService);
 
+  definitions = signal<Record<string, Definition>>({});
   detail = signal<TickerDetail | null>(null);
   loading = signal(true);
   displayScore = signal(0);
@@ -727,6 +749,13 @@ export class TickerComponent implements OnInit, AfterViewInit {
         this.loadTicker(symbol);
         this.checkWatchlistStatus(symbol);
       }
+    });
+    this.api.getDefinitions().subscribe({
+      next: (defs) => {
+        const map: Record<string, Definition> = {};
+        for (const d of defs) map[d.key] = d;
+        this.definitions.set(map);
+      },
     });
   }
 

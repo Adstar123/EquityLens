@@ -10,6 +10,7 @@ import {
   PreviewResult,
   PreviewScore,
   RangeConfig,
+  Definition,
 } from '../core/api.service';
 
 @Component({
@@ -60,6 +61,11 @@ import {
             [class.active]="activeTab() === 'versions'"
             (click)="activeTab.set('versions'); loadVersions()"
           >Versions</button>
+          <button
+            class="tab-btn"
+            [class.active]="activeTab() === 'definitions'"
+            (click)="activeTab.set('definitions'); loadDefinitions()"
+          >Definitions</button>
         </div>
 
         <!-- Editor Tab -->
@@ -145,6 +151,18 @@ import {
                             <input type="checkbox" formControlName="lower_is_better" />
                             <span class="toggle-slider"></span>
                           </label>
+                        </div>
+                      </div>
+
+                      <div class="field-row">
+                        <div class="field-group flex-1">
+                          <label class="field-label">DESCRIPTION (TOOLTIP)</label>
+                          <textarea
+                            class="field-input field-textarea"
+                            formControlName="description"
+                            placeholder="Short description shown in tooltip..."
+                            rows="2"
+                          ></textarea>
                         </div>
                       </div>
 
@@ -383,6 +401,54 @@ import {
           </div>
         }
 
+        <!-- Definitions Tab -->
+        @if (activeTab() === 'definitions') {
+          <div class="definitions-content">
+            @if (definitionsLoading()) {
+              <div class="loading-state">Loading definitions...</div>
+            } @else {
+              <p class="definitions-hint">Edit the tooltip descriptions shown next to UI elements across the app.</p>
+              @for (def of definitions(); track def.key) {
+                <div class="definition-card">
+                  <div class="def-header">
+                    <span class="def-key mono">{{ def.key }}</span>
+                    @if (definitionsSaving() === def.key) {
+                      <span class="def-saving">Saving...</span>
+                    }
+                  </div>
+                  <div class="def-fields">
+                    <div class="field-group">
+                      <label class="field-label">LABEL</label>
+                      <input
+                        type="text"
+                        class="field-input"
+                        [value]="def.label"
+                        (change)="onDefinitionLabelChange(def, $event)"
+                      />
+                    </div>
+                    <div class="field-group">
+                      <label class="field-label">DESCRIPTION</label>
+                      <textarea
+                        class="field-input field-textarea"
+                        rows="2"
+                        [value]="def.description"
+                        (change)="onDefinitionDescChange(def, $event)"
+                      ></textarea>
+                    </div>
+                  </div>
+                  <button
+                    class="btn-save-sm"
+                    [disabled]="definitionsSaving() === def.key"
+                    (click)="saveDefinition(def)"
+                  >Save</button>
+                </div>
+              } @empty {
+                <div class="empty-state">No definitions found.</div>
+              }
+            }
+          </div>
+        }
+
       } @else if (!selectedSectorKey()) {
         <div class="empty-state-full">
           Select a sector to edit its scoring configuration.
@@ -418,11 +484,16 @@ export class AdminComponent implements OnInit {
   saving = signal(false);
   previewing = signal(false);
   publishing = signal(false);
-  activeTab = signal<'editor' | 'preview' | 'versions'>('editor');
+  activeTab = signal<'editor' | 'preview' | 'versions' | 'definitions'>('editor');
   saveMsg = signal('');
   saveMsgType = signal<'success' | 'error'>('success');
   showConfirmDialog = signal(false);
   hasDraft = signal(false);
+
+  // Definitions
+  definitions = signal<Definition[]>([]);
+  definitionsLoading = signal(false);
+  definitionsSaving = signal<string | null>(null);
 
   // Preview
   previewData = signal<PreviewResult | null>(null);
@@ -559,6 +630,7 @@ export class AdminComponent implements OnInit {
       name: [r.name, Validators.required],
       weight: [r.weight, [Validators.required, Validators.min(0), Validators.max(1)]],
       lower_is_better: [r.lower_is_better],
+      description: [r.description ?? ''],
       ranges: this.fb.group({
         strong: this.fb.group({ min: [r.ranges?.strong?.min ?? null], max: [r.ranges?.strong?.max ?? null] }),
         good: this.fb.group({ min: [r.ranges?.good?.min ?? null], max: [r.ranges?.good?.max ?? null] }),
@@ -579,6 +651,7 @@ export class AdminComponent implements OnInit {
     this.ratiosArray.push(this.buildRatioGroup({
       key: '',
       name: '',
+      description: '',
       weight: 0,
       lower_is_better: false,
       ranges: {
@@ -611,6 +684,7 @@ export class AdminComponent implements OnInit {
       ratios: raw.ratios.map((r: any) => ({
         key: r.key,
         name: r.name,
+        description: r.description || '',
         weight: Number(r.weight),
         lower_is_better: !!r.lower_is_better,
         ranges: {
@@ -765,6 +839,45 @@ export class AdminComponent implements OnInit {
     } catch {
       return dateStr;
     }
+  }
+
+  loadDefinitions(): void {
+    this.definitionsLoading.set(true);
+    this.api.getAdminDefinitions().subscribe({
+      next: (defs) => {
+        this.definitions.set(defs || []);
+        this.definitionsLoading.set(false);
+      },
+      error: () => {
+        this.definitions.set([]);
+        this.definitionsLoading.set(false);
+      },
+    });
+  }
+
+  onDefinitionLabelChange(def: Definition, event: Event): void {
+    def.label = (event.target as HTMLInputElement).value;
+  }
+
+  onDefinitionDescChange(def: Definition, event: Event): void {
+    def.description = (event.target as HTMLTextAreaElement).value;
+  }
+
+  saveDefinition(def: Definition): void {
+    this.definitionsSaving.set(def.key);
+    this.api.updateDefinition(def.key, { label: def.label, description: def.description }).subscribe({
+      next: () => {
+        this.definitionsSaving.set(null);
+        this.saveMsg.set('Definition "' + def.key + '" saved.');
+        this.saveMsgType.set('success');
+        this.clearMsgAfterDelay();
+      },
+      error: () => {
+        this.definitionsSaving.set(null);
+        this.saveMsg.set('Failed to save definition "' + def.key + '".');
+        this.saveMsgType.set('error');
+      },
+    });
   }
 
   private clearMsgAfterDelay(): void {

@@ -55,6 +55,7 @@ type ContextRatio struct {
 type RatioResult struct {
 	Key           string  `json:"key"`
 	Name          string  `json:"name"`
+	Description   string  `json:"description,omitempty"`
 	Value         float64 `json:"value"`
 	RangeBucket   string  `json:"range_bucket"`
 	Points        int     `json:"points"`
@@ -72,6 +73,14 @@ type Quote struct {
 	MarketCap int64   `json:"market_cap"`
 	PrevClose float64 `json:"prev_close"`
 	FetchedAt string  `json:"fetched_at"`
+}
+
+// Definition is an admin-editable text description for UI elements.
+type Definition struct {
+	Key         string    `json:"key"`
+	Label       string    `json:"label"`
+	Description string    `json:"description"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // ScreenerItem is an enriched score row with company info for the screener page.

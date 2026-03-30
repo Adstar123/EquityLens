@@ -81,6 +81,7 @@ func (s *Server) Router() chi.Router {
 		r.Get("/screener", s.screener)
 		r.Get("/quotes/{symbol}", s.getQuote)
 		r.Get("/quotes", s.batchQuotes)
+		r.Get("/definitions", s.listDefinitions)
 
 		// Auth routes
 		r.Get("/auth/google/login", s.authHandler.GoogleLogin)
@@ -108,6 +109,8 @@ func (s *Server) Router() chi.Router {
 			r.Post("/admin/configs/{sector}/preview", s.previewConfig)
 			r.Post("/admin/configs/{sector}/publish", s.publishConfig)
 			r.Get("/admin/configs/{sector}/versions", s.listConfigVersions)
+			r.Get("/admin/definitions", s.listDefinitions)
+			r.Put("/admin/definitions/{key}", s.updateDefinition)
 		})
 	})
 
