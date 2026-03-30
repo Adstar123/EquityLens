@@ -77,4 +77,5 @@ func main() {
 	}
 
 	log.Println("scorer: done")
+	os.Exit(0)
 }
