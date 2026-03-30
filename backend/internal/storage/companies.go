@@ -53,9 +53,9 @@ func (db *DB) UpsertCompany(ctx context.Context, company models.Company) error {
 		 VALUES ($1, $2, $3, $4, $5, $6)
 		 ON CONFLICT (symbol) DO UPDATE
 		 SET name = EXCLUDED.name,
-		     sector_id = EXCLUDED.sector_id,
-		     market_cap = EXCLUDED.market_cap,
-		     last_updated = EXCLUDED.last_updated`,
+		     sector_id = COALESCE(EXCLUDED.sector_id, companies.sector_id),
+		     market_cap = COALESCE(EXCLUDED.market_cap, companies.market_cap),
+		     last_updated = COALESCE(EXCLUDED.last_updated, companies.last_updated)`,
 		company.ID, company.Symbol, company.Name, company.SectorID, company.MarketCap, company.LastUpdated)
 	return err
 }
