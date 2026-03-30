@@ -61,7 +61,7 @@ func (db *DB) ListScreenerItems(ctx context.Context, sectorID *uuid.UUID, minSco
 	           AND s.scored_at = (
 	               SELECT MAX(s2.scored_at) FROM scores s2 WHERE s2.company_id = s.company_id
 	           )
-	           AND s.scored_at > NOW() - INTERVAL '7 days'`
+	           AND s.sector_config_id IN (SELECT id FROM sector_configs WHERE is_active = true)`
 	args := []any{minScore}
 
 	if sectorID != nil {
@@ -101,7 +101,7 @@ func (db *DB) ListScoresBySector(ctx context.Context, sectorID uuid.UUID, minSco
 		 JOIN companies c ON c.id = s.company_id
 		 WHERE c.sector_id = $1
 		   AND s.composite_score >= $2
-		   AND s.scored_at > NOW() - INTERVAL '7 days'
+		   AND s.sector_config_id IN (SELECT id FROM sector_configs WHERE is_active = true)
 		 ORDER BY s.composite_score DESC
 		 LIMIT $3 OFFSET $4`, sectorID, minScore, limit, offset)
 	if err != nil {
