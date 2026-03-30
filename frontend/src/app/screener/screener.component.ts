@@ -68,10 +68,13 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
             <select
               class="filter-select"
               [ngModel]="sortBy()"
-              (ngModelChange)="sortBy.set($event)"
+              (ngModelChange)="onSortChange($event)"
             >
               <option value="score">Score</option>
               <option value="symbol">Symbol</option>
+              <option value="price">Price</option>
+              <option value="mcap">Market Cap</option>
+              <option value="sector">Sector</option>
             </select>
           </div>
 
@@ -483,7 +486,7 @@ export class ScreenerComponent implements OnInit {
 
   selectedSector = signal('');
   minScore = signal(0);
-  sortBy = signal<'score' | 'symbol'>('score');
+  sortBy = signal<'score' | 'symbol' | 'price' | 'mcap' | 'sector'>('score');
   currentPage = signal(1);
   readonly pageSize = 50;
 
@@ -496,8 +499,15 @@ export class ScreenerComponent implements OnInit {
     }
 
     const sort = this.sortBy();
+    const q = this.quotes();
     if (sort === 'symbol') {
       list.sort((a, b) => a.symbol.localeCompare(b.symbol));
+    } else if (sort === 'price') {
+      list.sort((a, b) => (q[b.symbol]?.price ?? 0) - (q[a.symbol]?.price ?? 0));
+    } else if (sort === 'mcap') {
+      list.sort((a, b) => (q[b.symbol]?.market_cap ?? 0) - (q[a.symbol]?.market_cap ?? 0));
+    } else if (sort === 'sector') {
+      list.sort((a, b) => a.sector_name.localeCompare(b.sector_name));
     } else {
       list.sort((a, b) => b.composite_score - a.composite_score);
     }
@@ -548,6 +558,11 @@ export class ScreenerComponent implements OnInit {
 
   onMinScoreChange(val: number): void {
     this.minScore.set(val ?? 0);
+    this.currentPage.set(1);
+  }
+
+  onSortChange(sort: string): void {
+    this.sortBy.set(sort as any);
     this.currentPage.set(1);
   }
 

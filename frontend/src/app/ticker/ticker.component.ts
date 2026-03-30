@@ -80,7 +80,7 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
             <div class="price-meta">
               <span>Vol: {{ formatVolume(quote()!.volume) }}</span>
               <span>Mkt Cap: {{ formatMarketCap(quote()!.market_cap) }}</span>
-              <span class="price-delayed">Delayed ~20min</span>
+              <span class="price-delayed">Updated 4x daily</span>
             </div>
           </div>
         }
