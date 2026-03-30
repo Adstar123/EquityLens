@@ -64,7 +64,8 @@ func (s *Scheduler) LoadIndexFilter(path string) error {
 // SeedFromYAML loads YAML configs from disk into the database.
 // It only seeds configs that don't already have any versions — it won't
 // overwrite user edits made through the admin UI.
-func (s *Scheduler) SeedFromYAML(ctx context.Context, dir string) error {
+// If force is true, it creates a new version even if versions already exist.
+func (s *Scheduler) SeedFromYAML(ctx context.Context, dir string, force bool) error {
 	configs, err := config.LoadSeedConfigs(dir)
 	if err != nil {
 		return err
@@ -96,16 +97,21 @@ func (s *Scheduler) SeedFromYAML(ctx context.Context, dir string) error {
 			continue
 		}
 
-		if len(versions) > 0 {
+		if len(versions) > 0 && !force {
 			log.Printf("seed: skipping %s — %d version(s) already exist", cfg.Sector, len(versions))
 			continue
 		}
 
-		// Save as version 1 and publish it.
+		// Determine next version number.
+		nextVersion := 1
+		if len(versions) > 0 {
+			nextVersion = versions[0].Version + 1
+		}
+
 		configRow := storage.SectorConfigRow{
 			ID:        uuid.New(),
 			SectorID:  sectorRow.ID,
-			Version:   1,
+			Version:   nextVersion,
 			ConfigJSON: cfg,
 			IsActive:  false,
 		}
@@ -118,7 +124,7 @@ func (s *Scheduler) SeedFromYAML(ctx context.Context, dir string) error {
 			continue
 		}
 
-		log.Printf("seed: seeded and published config for %s (v1)", cfg.Sector)
+		log.Printf("seed: seeded and published config for %s (v%d)", cfg.Sector, nextVersion)
 	}
 
 	return nil

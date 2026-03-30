@@ -77,7 +77,7 @@ func main() {
 	if configsPath == "" {
 		configsPath = "configs/sectors"
 	}
-	if err := sched.SeedFromYAML(ctx, configsPath); err != nil {
+	if err := sched.SeedFromYAML(ctx, configsPath, false); err != nil {
 		log.Printf("warning: failed to seed configs: %v", err)
 	}
 

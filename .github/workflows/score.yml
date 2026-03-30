@@ -9,7 +9,7 @@ on:
 jobs:
   score:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -28,4 +28,5 @@ jobs:
           ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
           CONFIGS_PATH: configs/sectors
           MIGRATIONS_PATH: migrations
+          FORCE_SEED: "true"
         run: ./scorer
