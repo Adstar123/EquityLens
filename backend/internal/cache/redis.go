@@ -66,6 +66,21 @@ func (c *Cache) InvalidateSector(ctx context.Context, sectorKey string) error {
 	return nil
 }
 
+func (c *Cache) FlushScores(ctx context.Context) error {
+	var keys []string
+	iter := c.client.Scan(ctx, 0, "score:*", 100).Iterator()
+	for iter.Next(ctx) {
+		keys = append(keys, iter.Val())
+	}
+	if err := iter.Err(); err != nil {
+		return err
+	}
+	if len(keys) > 0 {
+		return c.client.Del(ctx, keys...).Err()
+	}
+	return nil
+}
+
 func (c *Cache) GetQuote(ctx context.Context, symbol string) (*models.Quote, error) {
 	key := fmt.Sprintf("quote:%s", symbol)
 	data, err := c.client.Get(ctx, key).Bytes()

@@ -29,4 +29,5 @@ jobs:
           CONFIGS_PATH: configs/sectors
           MIGRATIONS_PATH: migrations
           FORCE_SEED: "true"
+          REDIS_URL: ${{ secrets.REDIS_URL }}
         run: ./scorer

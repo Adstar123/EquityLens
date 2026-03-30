@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/Adstar123/equitylens/backend/internal/cache"
 	"github.com/Adstar123/equitylens/backend/internal/ingestion"
 	"github.com/Adstar123/equitylens/backend/internal/scheduler"
 	"github.com/Adstar123/equitylens/backend/internal/storage"
@@ -75,6 +76,18 @@ func main() {
 	log.Println("scorer: scoring all companies")
 	if err := sched.RefreshAll(ctx); err != nil {
 		log.Printf("scoring completed with errors: %v", err)
+	}
+
+	// Flush Redis score cache so frontend serves fresh data.
+	if redisURL := os.Getenv("REDIS_URL"); redisURL != "" {
+		if c, err := cache.NewCache(redisURL); err == nil {
+			if err := c.FlushScores(ctx); err != nil {
+				log.Printf("warning: failed to flush score cache: %v", err)
+			} else {
+				log.Println("scorer: flushed score cache")
+			}
+			c.Close()
+		}
 	}
 
 	log.Println("scorer: done")

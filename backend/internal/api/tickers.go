@@ -67,7 +67,7 @@ func (s *Server) getTickerDetail(w http.ResponseWriter, r *http.Request) {
 
 	// Cache the score
 	if s.cache != nil && score != nil {
-		if err := s.cache.SetScore(r.Context(), symbol, *score, time.Hour); err != nil {
+		if err := s.cache.SetScore(r.Context(), symbol, *score, 5 * time.Minute); err != nil {
 			log.Printf("cache set error: %v", err)
 		}
 	}
@@ -111,7 +111,7 @@ func (s *Server) getTickerScores(w http.ResponseWriter, r *http.Request) {
 
 	// Cache the score
 	if s.cache != nil {
-		if err := s.cache.SetScore(r.Context(), symbol, *score, time.Hour); err != nil {
+		if err := s.cache.SetScore(r.Context(), symbol, *score, 5 * time.Minute); err != nil {
 			log.Printf("cache set error: %v", err)
 		}
 	}
