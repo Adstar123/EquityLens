@@ -9,7 +9,7 @@ import {
   query,
   stagger,
 } from '@angular/animations';
-import { ApiService, ScreenerItem, Sector, Quote } from '../core/api.service';
+import { ApiService, ScreenerItem, Sector, Quote, Company } from '../core/api.service';
 import { ScoreBadgeComponent } from '../shared/components/score-badge.component';
 import { RatioBarComponent } from '../shared/components/ratio-bar.component';
 
@@ -31,6 +31,31 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
   ],
   template: `
     <div class="screener-container">
+      <!-- Search -->
+      <div class="search-bar">
+        <div class="search-wrap">
+          <input
+            type="text"
+            class="search-input"
+            placeholder="Search ticker or company..."
+            [ngModel]="searchQuery()"
+            (ngModelChange)="onSearch($event)"
+            (keydown.enter)="goToFirstResult()"
+            (blur)="clearSearchDelayed()"
+          />
+          @if (searchResults().length > 0) {
+            <div class="search-dropdown">
+              @for (result of searchResults(); track result.symbol) {
+                <div class="search-result" (mousedown)="goToTicker(result.symbol)">
+                  <span class="sr-symbol">{{ result.symbol }}</span>
+                  <span class="sr-name">{{ result.name }}</span>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+
       <!-- Header -->
       <header class="screener-header">
         <h1 class="screener-title">SCREENER</h1>
@@ -420,6 +445,78 @@ import { RatioBarComponent } from '../shared/components/ratio-bar.component';
       white-space: nowrap;
     }
 
+    .search-bar {
+      padding: 1rem 1.5rem 0;
+      flex-shrink: 0;
+    }
+
+    .search-wrap {
+      position: relative;
+    }
+
+    .search-input {
+      width: 100%;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.875rem;
+      padding: 0.625rem 0.75rem;
+      outline: none;
+      transition: border-color 200ms ease;
+      box-sizing: border-box;
+    }
+
+    .search-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .search-input:focus {
+      border-color: var(--accent);
+    }
+
+    .search-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-top: none;
+      z-index: 20;
+      max-height: 280px;
+      overflow-y: auto;
+    }
+
+    .search-result {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.5rem 0.75rem;
+      cursor: pointer;
+      transition: background 100ms ease;
+    }
+
+    .search-result:hover {
+      background: var(--border);
+    }
+
+    .sr-symbol {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 0.8125rem;
+      color: var(--text-primary);
+      min-width: 70px;
+    }
+
+    .sr-name {
+      font-size: 0.8125rem;
+      color: var(--text-secondary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
     @media (max-width: 768px) {
       .screener-header {
         padding: 0.75rem 0.75rem 0.5rem;
@@ -482,6 +579,9 @@ export class ScreenerComponent implements OnInit {
   items = signal<ScreenerItem[]>([]);
   loading = signal(false);
   quotes = signal<Record<string, Quote>>({});
+  searchQuery = signal('');
+  searchResults = signal<Company[]>([]);
+  private searchTimeout: ReturnType<typeof setTimeout> | null = null;
   quotesLoading = signal(false);
 
   selectedSector = signal('');
@@ -564,6 +664,38 @@ export class ScreenerComponent implements OnInit {
   onSortChange(sort: string): void {
     this.sortBy.set(sort as any);
     this.currentPage.set(1);
+  }
+
+  onSearch(query: string): void {
+    this.searchQuery.set(query);
+    if (this.searchTimeout) clearTimeout(this.searchTimeout);
+    if (!query || query.length < 1) {
+      this.searchResults.set([]);
+      return;
+    }
+    this.searchTimeout = setTimeout(() => {
+      this.api.searchTickers(query).subscribe({
+        next: (results) => this.searchResults.set(results.slice(0, 8)),
+        error: () => this.searchResults.set([]),
+      });
+    }, 250);
+  }
+
+  goToFirstResult(): void {
+    const results = this.searchResults();
+    if (results.length > 0) {
+      this.goToTicker(results[0].symbol);
+    } else {
+      const q = this.searchQuery().trim().toUpperCase();
+      if (q) this.goToTicker(q);
+    }
+  }
+
+  clearSearchDelayed(): void {
+    setTimeout(() => {
+      this.searchQuery.set('');
+      this.searchResults.set([]);
+    }, 200);
   }
 
   nextPage(): void {
