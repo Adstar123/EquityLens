@@ -364,8 +364,8 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
     }
 
     .radar-chart {
-      width: 280px;
-      height: 280px;
+      width: 360px;
+      height: 360px;
     }
 
     .sector-rank-bar {
@@ -700,10 +700,11 @@ export class TickerComponent implements OnInit, AfterViewInit {
           name: ratio.name,
           max: 5,
         })),
+        radius: '55%',
         shape: 'polygon' as const,
         axisName: {
           color: this.theme.theme() === 'dark' ? '#8888a0' : '#4a4a65',
-          fontSize: 10,
+          fontSize: 11,
         },
         splitArea: {
           areaStyle: {

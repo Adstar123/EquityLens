@@ -223,12 +223,12 @@ type SortDir = 'asc' | 'desc';
       top: 0;
       background: var(--bg-base);
       z-index: 10;
-      padding: 0.5rem 0.75rem;
+      padding: 0.4rem 0.5rem;
       text-align: left;
-      font-size: 0.6875rem;
+      font-size: 0.625rem;
       font-weight: 500;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.04em;
       color: var(--text-muted);
       border-bottom: 1px solid var(--border);
       white-space: nowrap;
@@ -263,8 +263,8 @@ type SortDir = 'asc' | 'desc';
     }
 
     td {
-      padding: 0.4rem 0.75rem;
-      font-size: 0.8125rem;
+      padding: 0.35rem 0.5rem;
+      font-size: 0.75rem;
       color: var(--text-primary);
       border-bottom: 1px solid var(--bg-surface);
       white-space: nowrap;
@@ -273,8 +273,8 @@ type SortDir = 'asc' | 'desc';
     .cell-rank {
       font-family: 'JetBrains Mono', monospace;
       color: var(--text-muted);
-      font-size: 0.75rem;
-      width: 40px;
+      font-size: 0.6875rem;
+      width: 30px;
     }
 
     .cell-symbol {
@@ -286,7 +286,7 @@ type SortDir = 'asc' | 'desc';
 
     .cell-name {
       color: var(--text-secondary);
-      max-width: 200px;
+      max-width: 150px;
       overflow: hidden;
       text-overflow: ellipsis;
     }
@@ -310,19 +310,19 @@ type SortDir = 'asc' | 'desc';
     }
 
     .cell-ratio {
-      padding: 0.4rem 0.5rem;
+      padding: 0.35rem 0.4rem;
     }
 
     .ratio-cell {
       display: flex;
       flex-direction: column;
       align-items: flex-start;
-      gap: 2px;
+      gap: 1px;
     }
 
     .ratio-value {
       font-family: 'JetBrains Mono', monospace;
-      font-size: 0.75rem;
+      font-size: 0.6875rem;
       color: var(--text-secondary);
     }
 
