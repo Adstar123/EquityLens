@@ -1,0 +1,26 @@
+name: Yahoo Debug
+
+on:
+  workflow_dispatch:
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Check Yahoo modules for CBA.AX
+        run: |
+          # Get session cookies
+          curl -s -b /tmp/yc -c /tmp/yc "https://fc.yahoo.com" > /dev/null
+          # Get crumb
+          CRUMB=$(curl -s -b /tmp/yc -c /tmp/yc "https://query2.finance.yahoo.com/v1/test/getcrumb")
+          echo "Crumb: $CRUMB"
+
+          MODULES="financialData,defaultKeyStatistics,incomeStatementHistoryQuarterly,balanceSheetHistoryQuarterly"
+          echo ""
+          echo "=== CBA.AX with modules: $MODULES ==="
+          curl -s -b /tmp/yc "https://query2.finance.yahoo.com/v10/finance/quoteSummary/CBA.AX?modules=$MODULES&crumb=$CRUMB" | python3 -m json.tool
+
+          echo ""
+          echo "=== NAB.AX with modules: $MODULES ==="
+          curl -s -b /tmp/yc "https://query2.finance.yahoo.com/v10/finance/quoteSummary/NAB.AX?modules=$MODULES&crumb=$CRUMB" | python3 -m json.tool
