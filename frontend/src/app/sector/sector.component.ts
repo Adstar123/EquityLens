@@ -11,10 +11,11 @@ import {
 import { NgxEchartsDirective } from 'ngx-echarts';
 import { EChartsCoreOption } from 'echarts/core';
 import { forkJoin } from 'rxjs';
-import { ApiService, Sector, ScreenerItem } from '../core/api.service';
+import { ApiService, Sector, ScreenerItem, Definition } from '../core/api.service';
 import { ThemeService } from '../core/theme.service';
 import { ScoreBadgeComponent } from '../shared/components/score-badge.component';
 import { RatioBarComponent } from '../shared/components/ratio-bar.component';
+import { InfoTooltipComponent } from '../shared/components/info-tooltip.component';
 
 type SortColumn = 'rank' | 'symbol' | 'company' | 'score' | 'rating' | string;
 type SortDir = 'asc' | 'desc';
@@ -22,7 +23,7 @@ type SortDir = 'asc' | 'desc';
 @Component({
   selector: 'app-sector',
   standalone: true,
-  imports: [ScoreBadgeComponent, RatioBarComponent, NgxEchartsDirective],
+  imports: [ScoreBadgeComponent, RatioBarComponent, NgxEchartsDirective, InfoTooltipComponent],
   animations: [
     trigger('tableStagger', [
       transition(':enter', [
@@ -76,16 +77,24 @@ type SortDir = 'asc' | 'desc';
                     </th>
                     <th class="col-score sortable" (click)="toggleSort('score')"
                         [class.active-sort]="sortColumn() === 'score'">
-                      Score <span class="sort-arrow">{{ sortArrow('score') }}</span>
+                      Score
+                      @if (definitions()['composite_score']; as def) {
+                        <app-info-tooltip [description]="def.description" />
+                      }
+                      <span class="sort-arrow">{{ sortArrow('score') }}</span>
                     </th>
                     <th class="col-rating sortable" (click)="toggleSort('rating')"
                         [class.active-sort]="sortColumn() === 'rating'">
                       Rating <span class="sort-arrow">{{ sortArrow('rating') }}</span>
                     </th>
-                    @for (name of ratioNames(); track name) {
-                      <th class="col-ratio sortable" (click)="toggleSort('ratio:' + name)"
-                          [class.active-sort]="sortColumn() === 'ratio:' + name">
-                        {{ name }} <span class="sort-arrow">{{ sortArrow('ratio:' + name) }}</span>
+                    @for (col of ratioHeadersWithDesc(); track col.name) {
+                      <th class="col-ratio sortable" (click)="toggleSort('ratio:' + col.name)"
+                          [class.active-sort]="sortColumn() === 'ratio:' + col.name">
+                        {{ col.name }}
+                        @if (col.description) {
+                          <app-info-tooltip [description]="col.description" />
+                        }
+                        <span class="sort-arrow">{{ sortArrow('ratio:' + col.name) }}</span>
                       </th>
                     }
                   </tr>
@@ -371,6 +380,7 @@ export class SectorComponent implements OnInit {
   loading = signal(true);
   sector = signal<Sector | null>(null);
   items = signal<ScreenerItem[]>([]);
+  definitions = signal<Record<string, Definition>>({});
 
   sortColumn = signal<SortColumn>('score');
   sortDir = signal<SortDir>('desc');
@@ -381,6 +391,17 @@ export class SectorComponent implements OnInit {
     if (!list.length) return [];
     const first = list.find(i => i.breakdown?.ratios?.length);
     return first?.breakdown.ratios.map(r => r.name) ?? [];
+  });
+
+  /** Ratio headers with descriptions for tooltips */
+  ratioHeadersWithDesc = computed(() => {
+    const list = this.items();
+    if (!list.length) return [];
+    const first = list.find(i => i.breakdown?.ratios?.length);
+    return first?.breakdown.ratios.map(r => ({
+      name: r.name,
+      description: r.description || '',
+    })) ?? [];
   });
 
   /** Average composite score */
@@ -550,6 +571,13 @@ export class SectorComponent implements OnInit {
       if (key) {
         this.loadSector(key);
       }
+    });
+    this.api.getDefinitions().subscribe({
+      next: (defs) => {
+        const map: Record<string, Definition> = {};
+        for (const d of defs) map[d.key] = d;
+        this.definitions.set(map);
+      },
     });
   }
 

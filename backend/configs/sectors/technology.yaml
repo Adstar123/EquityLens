@@ -81,7 +81,7 @@ ratios:
       weak:    { min: 0.2, max: 0.5 }
       poor:    { max: 0.2 }
 edge_cases:
-  missing_data_threshold: 0.4
+  missing_data_threshold: 0.6
 rating_scale:
   strong_buy: { min: 80 }
   buy: { min: 65, max: 80 }
