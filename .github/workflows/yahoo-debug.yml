@@ -6,21 +6,16 @@ on:
 jobs:
   debug:
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 5
     steps:
-      - name: Check Yahoo modules for CBA.AX
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+
+      - name: Build and run Yahoo debug
+        working-directory: backend
         run: |
-          # Get session cookies
-          curl -s -b /tmp/yc -c /tmp/yc "https://fc.yahoo.com" > /dev/null
-          # Get crumb
-          CRUMB=$(curl -s -b /tmp/yc -c /tmp/yc "https://query2.finance.yahoo.com/v1/test/getcrumb")
-          echo "Crumb: $CRUMB"
-
-          MODULES="financialData,defaultKeyStatistics,incomeStatementHistoryQuarterly,balanceSheetHistoryQuarterly"
-          echo ""
-          echo "=== CBA.AX with modules: $MODULES ==="
-          curl -s -b /tmp/yc "https://query2.finance.yahoo.com/v10/finance/quoteSummary/CBA.AX?modules=$MODULES&crumb=$CRUMB" | python3 -m json.tool
-
-          echo ""
-          echo "=== NAB.AX with modules: $MODULES ==="
-          curl -s -b /tmp/yc "https://query2.finance.yahoo.com/v10/finance/quoteSummary/NAB.AX?modules=$MODULES&crumb=$CRUMB" | python3 -m json.tool
+          go build -o yahoodebug ./cmd/yahoodebug/
+          ./yahoodebug
