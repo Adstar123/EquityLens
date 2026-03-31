@@ -5,10 +5,10 @@ package ingestion
 //
 // Scored ratios (7):
 //   - net_profit_margin = financialData.profitMargins * 100 (decimal -> %)
-//   - roe               = defaultKeyStatistics.returnOnEquity * 100 (decimal -> %)
+//   - roe               = defaultKeyStatistics.returnOnEquity * 100, fallback financialData, fallback netIncome/(bookValue*shares)
 //   - current_ratio     = financialData.currentRatio (direct)
 //   - quick_ratio       = financialData.quickRatio (direct)
-//   - debt_to_equity    = financialData.debtToEquity / 100 (Yahoo %-style -> ratio)
+//   - debt_to_equity    = financialData.debtToEquity / 100, fallback totalDebt/(bookValue*shares)
 //   - interest_coverage = incomeStatementHistory[0].ebit / abs(interestExpense)
 //   - asset_turnover    = financialData.totalRevenue / balanceSheetHistory[0].totalAssets
 //
@@ -29,11 +29,20 @@ func NormalizeFinancials(data *QuoteSummaryResult) map[string]float64 {
 		m["net_profit_margin"] = v * 100
 	}
 
-	// ROE (decimal -> %) — try defaultKeyStatistics first, fall back to financialData
+	// ROE (decimal -> %) — try defaultKeyStatistics first, fall back to financialData,
+	// then derive from netIncomeToCommon / (bookValue * sharesOutstanding)
 	if v := data.DefaultKeyStatistics.ReturnOnEquity.Raw; v != 0 {
 		m["roe"] = v * 100
 	} else if v := data.FinancialData.ReturnOnEquity.Raw; v != 0 {
 		m["roe"] = v * 100
+	} else {
+		netIncome := data.DefaultKeyStatistics.NetIncomeToCommon.Raw
+		bookValue := data.DefaultKeyStatistics.BookValue.Raw
+		shares := data.DefaultKeyStatistics.SharesOutstanding.Raw
+		if netIncome != 0 && bookValue != 0 && shares != 0 {
+			totalEquity := bookValue * shares
+			m["roe"] = (netIncome / totalEquity) * 100
+		}
 	}
 
 	// Current Ratio (direct)
@@ -47,8 +56,18 @@ func NormalizeFinancials(data *QuoteSummaryResult) map[string]float64 {
 	}
 
 	// Debt-to-Equity (Yahoo %-style -> ratio)
+	// Primary: financialData.debtToEquity (Yahoo reports as %, so / 100)
+	// Fallback: totalDebt / (bookValue * sharesOutstanding)
 	if v := data.FinancialData.DebtToEquity.Raw; v != 0 {
 		m["debt_to_equity"] = v / 100
+	} else {
+		totalDebt := data.FinancialData.TotalDebt.Raw
+		bookValue := data.DefaultKeyStatistics.BookValue.Raw
+		shares := data.DefaultKeyStatistics.SharesOutstanding.Raw
+		if totalDebt != 0 && bookValue != 0 && shares != 0 {
+			totalEquity := bookValue * shares
+			m["debt_to_equity"] = totalDebt / totalEquity
+		}
 	}
 
 	// Interest Coverage (EBIT / Interest Expense)

@@ -104,6 +104,9 @@ type QuoteSummaryResult struct {
 type DefaultKeyStatistics struct {
 	EnterpriseToEbitda YahooValue `json:"enterpriseToEbitda"`
 	ReturnOnEquity     YahooValue `json:"returnOnEquity"`
+	BookValue          YahooValue `json:"bookValue"`
+	SharesOutstanding  YahooValue `json:"sharesOutstanding"`
+	NetIncomeToCommon  YahooValue `json:"netIncomeToCommon"`
 }
 
 type FinancialData struct {
