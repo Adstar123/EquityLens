@@ -48,16 +48,18 @@ import { Component, Input, ElementRef, HostListener, signal } from '@angular/cor
       border: 1px solid var(--border, #2e2e3e);
       border-radius: 8px;
       padding: 8px 12px;
-      min-width: 200px;
-      max-width: 300px;
+      width: 260px;
       z-index: 1000;
       box-shadow: 0 4px 12px rgba(0,0,0,0.3);
       pointer-events: none;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
     }
     .tooltip-content {
       font-size: 0.75rem;
       line-height: 1.5;
       color: var(--text-secondary, #a0a0b8);
+      white-space: normal;
     }
   `],
 })
@@ -77,15 +79,17 @@ export class InfoTooltipComponent {
 
   private positionPopover(): void {
     const rect = this.el.nativeElement.getBoundingClientRect();
-    const spaceAbove = rect.top;
-    if (spaceAbove > 120) {
-      // Show above
-      this.popoverTop = rect.top - 8;
-    } else {
-      // Show below
-      this.popoverTop = rect.bottom + 8;
-    }
+    // Always show below the icon
+    this.popoverTop = rect.bottom + 8;
     this.popoverLeft = rect.left + rect.width / 2;
+
+    // Clamp left so popover doesn't go off-screen
+    const halfWidth = 130; // half of 260px
+    if (this.popoverLeft - halfWidth < 8) {
+      this.popoverLeft = halfWidth + 8;
+    } else if (this.popoverLeft + halfWidth > window.innerWidth - 8) {
+      this.popoverLeft = window.innerWidth - halfWidth - 8;
+    }
   }
 
   toggle(event: Event): void {
