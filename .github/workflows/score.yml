@@ -2,8 +2,8 @@ name: Score ASX Companies
 
 on:
   schedule:
-    # Run every 2 days at 6 AM UTC (4 PM AEST)
-    - cron: '0 6 */2 * *'
+    # Run daily at 6 AM UTC (4 PM AEST)
+    - cron: '0 6 * * *'
   workflow_dispatch: # Allow manual trigger
 
 jobs:
@@ -29,5 +29,4 @@ jobs:
           CONFIGS_PATH: configs/sectors
           MIGRATIONS_PATH: migrations
           REDIS_URL: ${{ secrets.REDIS_URL }}
-          FORCE_SEED: "true"
         run: ./scorer

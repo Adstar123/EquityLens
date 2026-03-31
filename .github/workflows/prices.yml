@@ -2,9 +2,9 @@ name: Update Prices
 
 on:
   schedule:
-    # Run 4x per day during ASX trading hours (10am-4pm AEST = 0am-6am UTC)
-    # At 00:00, 02:00, 04:00, 06:00 UTC on weekdays
-    - cron: '0 0,2,4,6 * * 1-5'
+    # Run every hour during ASX trading hours (10am-4pm AEST = 0am-6am UTC)
+    # Every hour from 00:00-06:00 UTC on weekdays
+    - cron: '0 0-6 * * 1-5'
   workflow_dispatch: # Allow manual trigger
 
 jobs:

@@ -86,7 +86,7 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
                   <app-info-tooltip [description]="def.description" />
                 }
               </span>
-              <span class="price-delayed">Updated 4x daily</span>
+              <span class="price-delayed">Updated hourly</span>
             </div>
           </div>
         }
