@@ -4,7 +4,13 @@ import { Component, Input, ElementRef, HostListener, signal } from '@angular/cor
   selector: 'app-info-tooltip',
   standalone: true,
   template: `
-    <span class="info-icon" (click)="toggle($event)" [class.active]="open()">
+    <span
+      class="info-icon"
+      [class.active]="open()"
+      (click)="toggle($event)"
+      (mouseenter)="onMouseEnter()"
+      (mouseleave)="onMouseLeave()"
+    >
       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="10"/>
@@ -13,7 +19,7 @@ import { Component, Input, ElementRef, HostListener, signal } from '@angular/cor
       </svg>
     </span>
     @if (open()) {
-      <div class="tooltip-popover" [class.flip]="flipBelow">
+      <div class="tooltip-popover" [style.top.px]="popoverTop" [style.left.px]="popoverLeft">
         <div class="tooltip-content">{{ description }}</div>
       </div>
     }
@@ -36,9 +42,7 @@ import { Component, Input, ElementRef, HostListener, signal } from '@angular/cor
       color: var(--accent, #6366f1);
     }
     .tooltip-popover {
-      position: absolute;
-      bottom: calc(100% + 8px);
-      left: 50%;
+      position: fixed;
       transform: translateX(-50%);
       background: var(--surface-elevated, #1e1e2e);
       border: 1px solid var(--border, #2e2e3e);
@@ -46,27 +50,9 @@ import { Component, Input, ElementRef, HostListener, signal } from '@angular/cor
       padding: 8px 12px;
       min-width: 200px;
       max-width: 300px;
-      z-index: 50;
+      z-index: 1000;
       box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    }
-    .tooltip-popover::after {
-      content: '';
-      position: absolute;
-      top: 100%;
-      left: 50%;
-      transform: translateX(-50%);
-      border: 6px solid transparent;
-      border-top-color: var(--border, #2e2e3e);
-    }
-    .tooltip-popover.flip {
-      bottom: auto;
-      top: calc(100% + 8px);
-    }
-    .tooltip-popover.flip::after {
-      top: auto;
-      bottom: 100%;
-      border-top-color: transparent;
-      border-bottom-color: var(--border, #2e2e3e);
+      pointer-events: none;
     }
     .tooltip-content {
       font-size: 0.75rem;
@@ -79,9 +65,28 @@ export class InfoTooltipComponent {
   @Input() description = '';
 
   open = signal(false);
-  flipBelow = false;
+  popoverTop = 0;
+  popoverLeft = 0;
 
-  constructor(private el: ElementRef) {}
+  private hoverTimeout: any = null;
+  private isTouchDevice = false;
+
+  constructor(private el: ElementRef) {
+    this.isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  }
+
+  private positionPopover(): void {
+    const rect = this.el.nativeElement.getBoundingClientRect();
+    const spaceAbove = rect.top;
+    if (spaceAbove > 120) {
+      // Show above
+      this.popoverTop = rect.top - 8;
+    } else {
+      // Show below
+      this.popoverTop = rect.bottom + 8;
+    }
+    this.popoverLeft = rect.left + rect.width / 2;
+  }
 
   toggle(event: Event): void {
     event.stopPropagation();
@@ -89,9 +94,25 @@ export class InfoTooltipComponent {
       this.open.set(false);
       return;
     }
-    const rect = this.el.nativeElement.getBoundingClientRect();
-    this.flipBelow = rect.top < 120;
+    this.positionPopover();
     this.open.set(true);
+  }
+
+  onMouseEnter(): void {
+    if (this.isTouchDevice) return;
+    this.hoverTimeout = setTimeout(() => {
+      this.positionPopover();
+      this.open.set(true);
+    }, 150);
+  }
+
+  onMouseLeave(): void {
+    if (this.isTouchDevice) return;
+    if (this.hoverTimeout) {
+      clearTimeout(this.hoverTimeout);
+      this.hoverTimeout = null;
+    }
+    this.open.set(false);
   }
 
   @HostListener('document:click', ['$event'])
