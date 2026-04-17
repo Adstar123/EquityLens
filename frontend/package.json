@@ -22,6 +22,7 @@
     "@ng-icons/heroicons": "^33.1.0",
     "@ng-icons/lucide": "^33.2.0",
     "@ng-icons/phosphor-icons": "^33.2.0",
+    "@vercel/analytics": "^2.0.1",
     "echarts": "^6.0.0",
     "gsap": "^3.14.2",
     "ngx-echarts": "^21.0.0",

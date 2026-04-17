@@ -6,9 +6,29 @@ const MOCK_USERS: Record<string, { id: string; email: string; name: string; admi
   user: { id: 'mock-user', email: 'user@equitylens.dev', name: 'Test User', admin: false },
 };
 
+function isTokenExpired(token: string): boolean {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    if (typeof payload.exp !== 'number') return false;
+    return Date.now() >= payload.exp * 1000;
+  } catch {
+    return true;
+  }
+}
+
+function loadValidToken(): string | null {
+  const token = localStorage.getItem('token');
+  if (!token) return null;
+  if (isTokenExpired(token)) {
+    localStorage.removeItem('token');
+    return null;
+  }
+  return token;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private tokenSignal = signal<string | null>(localStorage.getItem('token'));
+  private tokenSignal = signal<string | null>(loadValidToken());
   private mockRole = environment.mockAuth as string;
 
   readonly isLoggedIn = computed(() => !!this.mockRole || !!this.tokenSignal());
@@ -53,6 +73,11 @@ export class AuthService {
 
   getAuthHeader(): string | null {
     const token = this.tokenSignal();
-    return token ? `Bearer ${token}` : null;
+    if (!token) return null;
+    if (isTokenExpired(token)) {
+      this.logout();
+      return null;
+    }
+    return `Bearer ${token}`;
   }
 }

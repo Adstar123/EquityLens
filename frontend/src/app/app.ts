@@ -1,6 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
+import { inject as injectAnalytics } from '@vercel/analytics';
 import { SidebarComponent } from './shared/layout/sidebar.component';
 import { ThemeService } from './core/theme.service';
 import { environment } from '../environments/environment';
@@ -20,6 +21,9 @@ export class App {
 
   constructor() {
     this.themeService.init();
+    if (environment.production) {
+      injectAnalytics();
+    }
     // Wake up backend on app load (handles Render cold starts)
     this.http.get(`${environment.apiUrl}/health`).subscribe({ error: () => {} });
     this.router.events
