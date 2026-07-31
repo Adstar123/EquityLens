@@ -184,6 +184,28 @@ var GICSSectorMapping = map[string]string{
 	"Media":                      "communication",
 }
 
+// yahooSectorMapping maps Yahoo Finance assetProfile sector names (Yahoo's
+// own taxonomy, not GICS) to our internal sector keys.
+var yahooSectorMapping = map[string]string{
+	"Basic Materials":        "mining",
+	"Communication Services": "communication",
+	"Consumer Cyclical":      "consumer_discretionary",
+	"Consumer Defensive":     "consumer_staples",
+	"Energy":                 "energy",
+	"Financial Services":     "financials",
+	"Healthcare":             "healthcare",
+	"Industrials":            "industrials",
+	"Real Estate":            "reits",
+	"Technology":             "technology",
+	"Utilities":              "utilities",
+}
+
+// MapYahooSector resolves a Yahoo assetProfile sector name to an internal
+// sector key. Returns empty string if no mapping found.
+func MapYahooSector(sector string) string {
+	return yahooSectorMapping[strings.TrimSpace(sector)]
+}
+
 // MapGICSSector resolves an ASX GICS industry group name to an internal sector key.
 // Returns empty string if no mapping found.
 func MapGICSSector(gics string) string {

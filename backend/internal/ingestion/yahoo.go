@@ -98,8 +98,15 @@ type QuoteSummaryResult struct {
 	FinancialData          FinancialData          `json:"financialData"`
 	SummaryDetail          SummaryDetail          `json:"summaryDetail"`
 	Price                  Price                  `json:"price"`
+	AssetProfile           AssetProfile           `json:"assetProfile"`
 	IncomeStatementHistory IncomeStatementHistory `json:"incomeStatementHistory"`
 	BalanceSheetHistory    BalanceSheetHistory    `json:"balanceSheetHistory"`
+}
+
+// AssetProfile carries company classification data (Yahoo's own sector
+// taxonomy, not GICS).
+type AssetProfile struct {
+	Sector string `json:"sector"`
 }
 
 type DefaultKeyStatistics struct {
@@ -306,14 +313,19 @@ func (c *YahooClient) invalidateCrumb() {
 
 // ---------- internal fetch ----------
 
-func (c *YahooClient) fetchQuoteSummary(ctx context.Context, symbol string) (*QuoteSummaryResult, error) {
+// financialsModules is the default module set for scoring. incomeStatementHistory
+// and balanceSheetHistory are deliberately absent — Yahoo returns them empty
+// for ASX companies.
+const financialsModules = "defaultKeyStatistics,financialData,summaryDetail,price"
+
+func (c *YahooClient) fetchQuoteSummary(ctx context.Context, symbol, modules string) (*QuoteSummaryResult, error) {
 	if err := c.ensureCrumb(ctx); err != nil {
 		return nil, fmt.Errorf("crumb auth failed: %w", err)
 	}
 
 	url := fmt.Sprintf(
-		"%s/v10/finance/quoteSummary/%s?modules=defaultKeyStatistics,financialData,summaryDetail,price&crumb=%s",
-		c.baseURL, symbol, c.crumb,
+		"%s/v10/finance/quoteSummary/%s?modules=%s&crumb=%s",
+		c.baseURL, symbol, modules, c.crumb,
 	)
 
 	maxRetries := 3
@@ -354,8 +366,8 @@ func (c *YahooClient) fetchQuoteSummary(ctx context.Context, symbol string) (*Qu
 					return nil, fmt.Errorf("crumb refresh failed: %w", err)
 				}
 				url = fmt.Sprintf(
-					"%s/v10/finance/quoteSummary/%s?modules=defaultKeyStatistics,financialData,summaryDetail,price&crumb=%s",
-					c.baseURL, symbol, c.crumb,
+					"%s/v10/finance/quoteSummary/%s?modules=%s&crumb=%s",
+					c.baseURL, symbol, modules, c.crumb,
 				)
 				continue
 			}
@@ -386,9 +398,10 @@ func (c *YahooClient) fetchQuoteSummary(ctx context.Context, symbol string) (*Qu
 
 // ---------- public methods ----------
 
-// FetchProfile returns high-level company identification data.
+// FetchProfile returns high-level company identification data, including
+// Yahoo's sector classification (map it with MapYahooSector).
 func (c *YahooClient) FetchProfile(ctx context.Context, symbol string) (*CompanyProfile, error) {
-	result, err := c.fetchQuoteSummary(ctx, symbol)
+	result, err := c.fetchQuoteSummary(ctx, symbol, "price,assetProfile")
 	if err != nil {
 		return nil, err
 	}
@@ -396,7 +409,7 @@ func (c *YahooClient) FetchProfile(ctx context.Context, symbol string) (*Company
 	return &CompanyProfile{
 		Symbol:    symbol,
 		Name:      result.Price.ShortName,
-		Sector:    "", // sector not available in this module set
+		Sector:    result.AssetProfile.Sector,
 		MarketCap: int64(result.Price.MarketCap.Raw),
 	}, nil
 }
@@ -404,7 +417,7 @@ func (c *YahooClient) FetchProfile(ctx context.Context, symbol string) (*Company
 // FetchFinancials returns a normalised map of financial ratios ready for the
 // scoring engine.
 func (c *YahooClient) FetchFinancials(ctx context.Context, symbol string) (map[string]float64, error) {
-	result, err := c.fetchQuoteSummary(ctx, symbol)
+	result, err := c.fetchQuoteSummary(ctx, symbol, financialsModules)
 	if err != nil {
 		return nil, err
 	}

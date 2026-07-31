@@ -61,6 +61,73 @@ func (s *Scheduler) LoadIndexFilter(path string) error {
 	return nil
 }
 
+// BackfillIndexCompanies adds any index filter symbol that has no companies
+// row yet, fetching name/sector/market cap from Yahoo. Needed because the ASX
+// company-list sources are unreliable — index members must exist in the
+// database to be scored and priced.
+func (s *Scheduler) BackfillIndexCompanies(ctx context.Context) error {
+	if len(s.indexFilter) == 0 {
+		return fmt.Errorf("no index filter loaded")
+	}
+
+	added, failed := 0, 0
+	for sym := range s.indexFilter {
+		existing, err := s.db.GetCompanyBySymbol(ctx, sym)
+		if err != nil {
+			return err
+		}
+		if existing != nil {
+			continue
+		}
+
+		profile, err := s.yahoo.FetchProfile(ctx, sym)
+		if err != nil {
+			log.Printf("backfill: failed to fetch %s: %v", sym, err)
+			failed++
+			continue
+		}
+
+		var sectorID *uuid.UUID
+		if key := ingestion.MapYahooSector(profile.Sector); key != "" {
+			sector, err := s.db.GetSectorByKey(ctx, key)
+			if err != nil {
+				log.Printf("backfill: failed to look up sector %s: %v", key, err)
+			}
+			if sector != nil {
+				sectorID = &sector.ID
+			}
+		}
+		if sectorID == nil {
+			log.Printf("backfill: no sector mapping for %s (yahoo sector %q) — adding without sector", sym, profile.Sector)
+		}
+
+		name := profile.Name
+		if name == "" {
+			name = sym
+		}
+		now := time.Now()
+		company := models.Company{
+			ID:          uuid.New(),
+			Symbol:      sym,
+			Name:        name,
+			SectorID:    sectorID,
+			MarketCap:   &profile.MarketCap,
+			LastUpdated: &now,
+		}
+		if err := s.db.UpsertCompany(ctx, company); err != nil {
+			log.Printf("backfill: failed to upsert %s: %v", sym, err)
+			failed++
+			continue
+		}
+		added++
+	}
+
+	if added > 0 || failed > 0 {
+		log.Printf("backfill: %d index companies added, %d failed", added, failed)
+	}
+	return nil
+}
+
 // SyncIndexMembership persists the loaded index filter to the companies table
 // so queries (screener, pricer) can restrict themselves to index members.
 func (s *Scheduler) SyncIndexMembership(ctx context.Context) error {

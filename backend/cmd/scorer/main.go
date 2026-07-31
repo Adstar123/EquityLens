@@ -73,6 +73,12 @@ func main() {
 		log.Printf("warning: ASX sync failed: %v (continuing with existing companies)", err)
 	}
 
+	// Add index members missing from the database (fetched from Yahoo), since
+	// the ASX listing sources above are unreliable.
+	if err := sched.BackfillIndexCompanies(ctx); err != nil {
+		log.Printf("warning: index backfill failed: %v", err)
+	}
+
 	// Persist index membership and drop scores for companies outside the index
 	// so the screener only ever shows index members.
 	if err := sched.SyncIndexMembership(ctx); err != nil {
