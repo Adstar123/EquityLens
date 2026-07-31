@@ -312,7 +312,7 @@ func (c *YahooClient) fetchQuoteSummary(ctx context.Context, symbol string) (*Qu
 	}
 
 	url := fmt.Sprintf(
-		"%s/v10/finance/quoteSummary/%s?modules=defaultKeyStatistics,financialData,summaryDetail,price&crumb=%s",
+		"%s/v10/finance/quoteSummary/%s?modules=defaultKeyStatistics,financialData,summaryDetail,price,incomeStatementHistory,balanceSheetHistory&crumb=%s",
 		c.baseURL, symbol, c.crumb,
 	)
 
@@ -354,7 +354,7 @@ func (c *YahooClient) fetchQuoteSummary(ctx context.Context, symbol string) (*Qu
 					return nil, fmt.Errorf("crumb refresh failed: %w", err)
 				}
 				url = fmt.Sprintf(
-					"%s/v10/finance/quoteSummary/%s?modules=defaultKeyStatistics,financialData,summaryDetail,price&crumb=%s",
+					"%s/v10/finance/quoteSummary/%s?modules=defaultKeyStatistics,financialData,summaryDetail,price,incomeStatementHistory,balanceSheetHistory&crumb=%s",
 					c.baseURL, symbol, c.crumb,
 				)
 				continue
