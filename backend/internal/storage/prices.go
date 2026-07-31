@@ -57,9 +57,13 @@ func (db *DB) GetPrices(ctx context.Context, symbols []string) (map[string]*mode
 	return result, rows.Err()
 }
 
-// ListAllSymbols returns all company symbols in the database.
-func (db *DB) ListAllSymbols(ctx context.Context) ([]string, error) {
-	rows, err := db.Pool.Query(ctx, `SELECT symbol FROM companies ORDER BY symbol`)
+// ListPriceableSymbols returns symbols worth fetching prices for: index
+// members plus anything on a user's watchlist.
+func (db *DB) ListPriceableSymbols(ctx context.Context) ([]string, error) {
+	rows, err := db.Pool.Query(ctx,
+		`SELECT symbol FROM companies
+		 WHERE in_index OR id IN (SELECT company_id FROM watchlist_items)
+		 ORDER BY symbol`)
 	if err != nil {
 		return nil, err
 	}

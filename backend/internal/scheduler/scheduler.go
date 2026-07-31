@@ -61,6 +61,24 @@ func (s *Scheduler) LoadIndexFilter(path string) error {
 	return nil
 }
 
+// SyncIndexMembership persists the loaded index filter to the companies table
+// so queries (screener, pricer) can restrict themselves to index members.
+func (s *Scheduler) SyncIndexMembership(ctx context.Context) error {
+	if len(s.indexFilter) == 0 {
+		return fmt.Errorf("no index filter loaded")
+	}
+	symbols := make([]string, 0, len(s.indexFilter))
+	for sym := range s.indexFilter {
+		symbols = append(symbols, sym)
+	}
+	marked, err := s.db.SetIndexMembers(ctx, symbols)
+	if err != nil {
+		return err
+	}
+	log.Printf("index membership synced: %d of %d symbols marked", marked, len(symbols))
+	return nil
+}
+
 // SeedFromYAML loads YAML configs from disk into the database.
 // It only seeds configs that don't already have any versions — it won't
 // overwrite user edits made through the admin UI.

@@ -66,10 +66,21 @@ func main() {
 		log.Printf("warning: no index filter loaded: %v (scoring all companies)", err)
 	}
 
-	// Sync ASX company list.
+	// Sync ASX company list. Best-effort: companies already in the database
+	// are still scoreable if both listing sources are unavailable.
 	log.Println("scorer: syncing ASX company list")
 	if err := sched.SyncASXCompanies(ctx); err != nil {
-		log.Fatalf("ASX sync failed: %v", err)
+		log.Printf("warning: ASX sync failed: %v (continuing with existing companies)", err)
+	}
+
+	// Persist index membership and drop scores for companies outside the index
+	// so the screener only ever shows index members.
+	if err := sched.SyncIndexMembership(ctx); err != nil {
+		log.Printf("warning: failed to sync index membership: %v", err)
+	} else if deleted, err := db.DeleteScoresForNonIndexCompanies(ctx); err != nil {
+		log.Printf("warning: failed to prune non-index scores: %v", err)
+	} else if deleted > 0 {
+		log.Printf("scorer: pruned %d scores for non-index companies", deleted)
 	}
 
 	// Score all companies.

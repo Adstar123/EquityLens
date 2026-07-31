@@ -60,6 +60,22 @@ func (db *DB) UpsertCompany(ctx context.Context, company models.Company) error {
 	return err
 }
 
+// SetIndexMembers marks the given symbols as index members and clears the
+// flag on every other company. Returns the number of members marked.
+func (db *DB) SetIndexMembers(ctx context.Context, symbols []string) (int64, error) {
+	_, err := db.Pool.Exec(ctx,
+		`UPDATE companies SET in_index = false WHERE in_index AND NOT (symbol = ANY($1))`, symbols)
+	if err != nil {
+		return 0, err
+	}
+	tag, err := db.Pool.Exec(ctx,
+		`UPDATE companies SET in_index = true WHERE symbol = ANY($1)`, symbols)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
 func (db *DB) ListCompaniesBySector(ctx context.Context, sectorID uuid.UUID) ([]models.Company, error) {
 	rows, err := db.Pool.Query(ctx,
 		`SELECT id, symbol, name, sector_id, market_cap, last_updated

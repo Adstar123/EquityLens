@@ -81,12 +81,25 @@ func main() {
 		log.Printf("warning: failed to seed configs: %v", err)
 	}
 
+	// Load the index filter so any server-triggered scoring (e.g. the
+	// re-score after an admin publishes a config) stays limited to the index.
+	indexPath := os.Getenv("INDEX_FILTER_PATH")
+	if indexPath == "" {
+		indexPath = "configs/asx300.csv"
+	}
+	if err := sched.LoadIndexFilter(indexPath); err != nil {
+		log.Printf("warning: no index filter loaded: %v (scoring all companies)", err)
+	}
+
 	// Sync ASX company list on startup (background — don't block server start).
 	// Scoring is handled by the GitHub Actions scorer workflow, not here.
 	go func() {
 		log.Println("startup: syncing ASX company list")
 		if err := sched.SyncASXCompanies(context.Background()); err != nil {
 			log.Printf("warning: ASX sync failed: %v", err)
+		}
+		if err := sched.SyncIndexMembership(context.Background()); err != nil {
+			log.Printf("warning: failed to sync index membership: %v", err)
 		}
 		log.Println("startup: ASX sync complete (scoring runs via GitHub Actions)")
 	}()

@@ -35,8 +35,8 @@ func main() {
 		log.Fatalf("failed to run migrations: %v", err)
 	}
 
-	// Get all company symbols from the database.
-	symbols, err := db.ListAllSymbols(ctx)
+	// Get index member + watchlisted symbols from the database.
+	symbols, err := db.ListPriceableSymbols(ctx)
 	if err != nil {
 		log.Fatalf("failed to list symbols: %v", err)
 	}
@@ -78,7 +78,9 @@ func main() {
 	}
 
 	log.Printf("pricer: done — %d updated, %d failed", updated, failed)
-	if failed > 0 {
+	// Individual symbols failing (delisted, suspended, Yahoo hiccups) is
+	// routine — only fail the run when nothing updated at all.
+	if updated == 0 {
 		os.Exit(1)
 	}
 	os.Exit(0)

@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/cookiejar"
+	neturl "net/url"
 	"strings"
 	"sync"
 	"time"
@@ -428,10 +429,10 @@ func (c *YahooClient) FetchBatchQuotes(ctx context.Context, symbols []string) (m
 		return nil, fmt.Errorf("rate limiter: %w", err)
 	}
 
-	url := fmt.Sprintf(
-		"%s/v7/finance/quote?symbols=%s&crumb=%s",
-		c.baseURL, strings.Join(symbols, ","), c.crumb,
-	)
+	params := neturl.Values{}
+	params.Set("symbols", strings.Join(symbols, ","))
+	params.Set("crumb", c.crumb)
+	url := fmt.Sprintf("%s/v7/finance/quote?%s", c.baseURL, params.Encode())
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {

@@ -57,7 +57,8 @@ func (db *DB) ListScreenerItems(ctx context.Context, sectorID *uuid.UUID, minSco
 	           FROM scores s
 	           JOIN companies c ON c.id = s.company_id
 	           JOIN sectors sec ON sec.id = c.sector_id
-	           WHERE s.composite_score >= $1
+	           WHERE c.in_index
+	           AND s.composite_score >= $1
 	           AND s.scored_at = (
 	               SELECT MAX(s2.scored_at) FROM scores s2 WHERE s2.company_id = s.company_id
 	           )
@@ -94,12 +95,24 @@ func (db *DB) ListScreenerItems(ctx context.Context, sectorID *uuid.UUID, minSco
 	return items, rows.Err()
 }
 
+// DeleteScoresForNonIndexCompanies removes scores belonging to companies
+// outside the index so they can never resurface in the screener.
+func (db *DB) DeleteScoresForNonIndexCompanies(ctx context.Context) (int64, error) {
+	tag, err := db.Pool.Exec(ctx,
+		`DELETE FROM scores WHERE company_id IN (SELECT id FROM companies WHERE NOT in_index)`)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
 func (db *DB) ListScoresBySector(ctx context.Context, sectorID uuid.UUID, minScore float64, limit, offset int) ([]models.Score, error) {
 	rows, err := db.Pool.Query(ctx,
 		`SELECT s.id, s.company_id, s.sector_config_id, s.composite_score, s.rating, s.breakdown_json, s.scored_at
 		 FROM scores s
 		 JOIN companies c ON c.id = s.company_id
-		 WHERE c.sector_id = $1
+		 WHERE c.in_index
+		   AND c.sector_id = $1
 		   AND s.composite_score >= $2
 		   AND s.sector_config_id IN (SELECT id FROM sector_configs WHERE is_active = true)
 		 ORDER BY s.composite_score DESC

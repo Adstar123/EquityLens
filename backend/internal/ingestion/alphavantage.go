@@ -77,6 +77,14 @@ func parseAlphaVantageCSV(r io.Reader) ([]ASXCompany, error) {
 
 	statusIdx, statusOK := colMap["status"]
 
+	// Alpha Vantage ignores the exchange query param and returns US listings
+	// too, so the exchange column is the only thing keeping foreign tickers
+	// from getting a fake .AX suffix. Refuse to parse without it.
+	exchangeIdx, exchangeOK := colMap["exchange"]
+	if !exchangeOK {
+		return nil, fmt.Errorf("missing exchange column in header: %v", header)
+	}
+
 	var companies []ASXCompany
 	for {
 		record, err := reader.Read()
@@ -92,6 +100,10 @@ func parseAlphaVantageCSV(r io.Reader) ([]ASXCompany, error) {
 			if strings.ToLower(strings.TrimSpace(record[statusIdx])) != "active" {
 				continue
 			}
+		}
+
+		if exchangeIdx >= len(record) || !strings.EqualFold(strings.TrimSpace(record[exchangeIdx]), "ASX") {
+			continue
 		}
 
 		symbol := strings.TrimSpace(record[symIdx])
