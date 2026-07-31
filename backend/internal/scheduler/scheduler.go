@@ -24,15 +24,17 @@ type Scheduler struct {
 	yahoo          *ingestion.YahooClient
 	asx            *ingestion.ASXClient
 	alphaVantage   *ingestion.AlphaVantageClient // optional fallback
+	marketIndex    *ingestion.MarketIndexClient
 	indexFilter    map[string]bool
 }
 
 // NewScheduler creates a new Scheduler with the given database and Yahoo client.
 func NewScheduler(db *storage.DB, yahoo *ingestion.YahooClient) *Scheduler {
 	return &Scheduler{
-		db:    db,
-		yahoo: yahoo,
-		asx:   ingestion.NewASXClient(),
+		db:          db,
+		yahoo:       yahoo,
+		asx:         ingestion.NewASXClient(),
+		marketIndex: ingestion.NewMarketIndexClient(),
 	}
 }
 
@@ -59,6 +61,26 @@ func (s *Scheduler) LoadIndexFilter(path string) error {
 	}
 	log.Printf("index filter loaded: %d symbols", len(s.indexFilter))
 	return nil
+}
+
+// LoadIndexFilterAuto loads the ASX300 index filter, preferring the live
+// constituent list (which tracks quarterly rebalances automatically) and
+// falling back to the static CSV snapshot if the API is unavailable. If both
+// fail, the filter stays empty and callers keep the last membership synced to
+// the database.
+func (s *Scheduler) LoadIndexFilterAuto(ctx context.Context, csvPath string) error {
+	symbols, err := s.marketIndex.FetchASX300(ctx)
+	if err == nil {
+		s.indexFilter = make(map[string]bool, len(symbols))
+		for _, sym := range symbols {
+			s.indexFilter[sym] = true
+		}
+		log.Printf("index filter loaded from Market Index: %d symbols", len(s.indexFilter))
+		return nil
+	}
+
+	log.Printf("warning: live ASX300 fetch failed: %v — falling back to %s", err, csvPath)
+	return s.LoadIndexFilter(csvPath)
 }
 
 // BackfillIndexCompanies adds any index filter symbol that has no companies

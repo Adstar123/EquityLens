@@ -62,8 +62,8 @@ func main() {
 	if indexPath == "" {
 		indexPath = "configs/asx300.csv"
 	}
-	if err := sched.LoadIndexFilter(indexPath); err != nil {
-		log.Printf("warning: no index filter loaded: %v (scoring all companies)", err)
+	if err := sched.LoadIndexFilterAuto(ctx, indexPath); err != nil {
+		log.Printf("warning: no index filter loaded: %v (keeping existing index membership)", err)
 	}
 
 	// Sync ASX company list. Best-effort: companies already in the database
