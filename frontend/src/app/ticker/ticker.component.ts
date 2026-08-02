@@ -166,7 +166,7 @@ interface SectorPeer {
                         <app-info-tooltip [description]="ratio.description" />
                       }
                     </span>
-                    <span class="r-value">{{ formatRatio(ratio.value) }}</span>
+                    <span class="r-value">{{ formatScoredRatio(ratio.value) }}</span>
                     <span
                       class="r-bucket"
                       [style.color]="bucketColor(ratio.range_bucket)"
@@ -999,6 +999,13 @@ export class TickerComponent implements OnInit, AfterViewInit {
     if (Math.abs(value) >= 1000) return value.toFixed(0);
     if (Math.abs(value) >= 100) return value.toFixed(1);
     return value.toFixed(2);
+  }
+
+  // Scored ratios only: the backend marks debt-free interest coverage with a
+  // 999 sentinel that should read as a state, not a number
+  formatScoredRatio(value: number): string {
+    if (value >= 998) return 'No debt';
+    return this.formatRatio(value);
   }
 
   formatPrice(price: number): string {

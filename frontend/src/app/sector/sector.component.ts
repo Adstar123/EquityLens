@@ -482,23 +482,29 @@ export class SectorComponent implements OnInit {
   sortColumn = signal<SortColumn>('score');
   sortDir = signal<SortDir>('desc');
 
-  /** All unique ratio names derived from data */
+  /** All unique ratio names across companies, ordered by first appearance,
+   * so a ratio the top company lacks (e.g. interest coverage) still shows */
   ratioNames = computed(() => {
-    const list = this.items();
-    if (!list.length) return [];
-    const first = list.find(i => i.breakdown?.ratios?.length);
-    return first?.breakdown.ratios.map(r => r.name) ?? [];
+    const seen = new Set<string>();
+    for (const item of this.items()) {
+      for (const r of item.breakdown?.ratios ?? []) {
+        seen.add(r.name);
+      }
+    }
+    return [...seen];
   });
 
   /** Ratio headers with descriptions for tooltips */
   ratioHeadersWithDesc = computed(() => {
-    const list = this.items();
-    if (!list.length) return [];
-    const first = list.find(i => i.breakdown?.ratios?.length);
-    return first?.breakdown.ratios.map(r => ({
-      name: r.name,
-      description: r.description || '',
-    })) ?? [];
+    const seen = new Map<string, { name: string; description: string }>();
+    for (const item of this.items()) {
+      for (const r of item.breakdown?.ratios ?? []) {
+        if (!seen.has(r.name)) {
+          seen.set(r.name, { name: r.name, description: r.description || '' });
+        }
+      }
+    }
+    return [...seen.values()];
   });
 
   /** Average composite score */
@@ -702,6 +708,8 @@ export class SectorComponent implements OnInit {
   }
 
   formatRatio(value: number): string {
+    // Backend sentinel for debt-free interest coverage
+    if (value >= 998) return 'No debt';
     if (Math.abs(value) >= 1000) return value.toFixed(0);
     if (Math.abs(value) >= 100) return value.toFixed(1);
     return value.toFixed(2);

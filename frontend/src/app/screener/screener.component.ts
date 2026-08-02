@@ -689,17 +689,19 @@ export class ScreenerComponent implements OnInit {
     return max || 1;
   });
 
-  // Headers come from the first row that has ratios; each row's cells are
-  // then matched by ratio key so partial-data companies stay column-aligned
+  // Headers are the union of ratios across all rows (ordered by first
+  // appearance) so a ratio the top-ranked company happens to be missing,
+  // like interest coverage, still gets its column. Cells are matched by key.
   ratioHeadersWithDesc = computed(() => {
-    const items = this.filteredItems();
-    const first = items.find(i => i.breakdown?.ratios?.length);
-    if (!first) return [];
-    return first.breakdown.ratios.map(r => ({
-      key: r.key,
-      name: r.name,
-      description: r.description || '',
-    }));
+    const seen = new Map<string, { key: string; name: string; description: string }>();
+    for (const item of this.filteredItems()) {
+      for (const r of item.breakdown?.ratios ?? []) {
+        if (!seen.has(r.key)) {
+          seen.set(r.key, { key: r.key, name: r.name, description: r.description || '' });
+        }
+      }
+    }
+    return [...seen.values()];
   });
 
   ratioFor(item: ScreenerItem, key: string) {
@@ -770,6 +772,10 @@ export class ScreenerComponent implements OnInit {
   }
 
   formatRatio(value: number): string {
+    // Backend sentinel for debt-free interest coverage
+    if (value >= 998) {
+      return 'No debt';
+    }
     if (Math.abs(value) >= 1000) {
       return value.toFixed(0);
     }
