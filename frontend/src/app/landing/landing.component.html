@@ -11,7 +11,7 @@
 
     <nav class="topnav-links">
       <button class="nav-link" (click)="scrollToSection('method')">Methodology</button>
-      <button class="nav-link" (click)="scrollToSection('live')">Movers</button>
+      <button class="nav-link" (click)="scrollToSection('live')">Live board</button>
       <button class="nav-link" (click)="scrollToSection('sectors')">Sectors</button>
     </nav>
 
@@ -50,9 +50,11 @@
       <div class="pv-card pv-board" #pvBoard>
         <div class="pv-head">
           <span class="pv-title">Today's gainers</span>
-          <span class="live-dot-wrap"><span class="live-dot"></span>live</span>
+          @if (liveData()) {
+            <span class="live-dot-wrap"><span class="live-dot"></span>live</span>
+          }
         </div>
-        @for (row of heroBoard(); track row.symbol) {
+        @for (row of heroGainers(); track row.symbol) {
           <div class="pv-row">
             <span class="pv-sym">{{ row.symbol }}</span>
             <span class="pv-name">{{ row.name }}</span>
@@ -213,18 +215,19 @@
   <section class="board" id="live">
     <div class="section-head reveal">
       <p class="eyebrow">Live board</p>
-      <h2 class="section-title">Today's movers</h2>
+      <h2 class="section-title">Where price and the books disagree</h2>
       <p class="section-sub">
-        The day's biggest price swings across the scored ASX&nbsp;300, with each
-        company's fundamentals score alongside. Price is noise; the score is the signal.
+        Scores don't chase the tape. When the market dumps a company with strong
+        fundamentals, or bids up one with weak ones, it shows up here. That gap
+        is where the lens earns its keep.
       </p>
     </div>
 
     <div class="movers-grid reveal">
       <div class="movers-col">
-        <h3 class="movers-title movers-title-up">Gainers</h3>
+        <h3 class="movers-title movers-title-up">Strong books, falling price</h3>
         <div class="board-table">
-          @if (moversLoading()) {
+          @if (boardLoading()) {
             @for (i of skeletonRows; track i) {
               <div class="board-row is-skeleton">
                 <span class="brd-sym sk"></span>
@@ -234,29 +237,27 @@
               </div>
             }
           } @else {
-            @for (row of movers().gainers; track row.symbol) {
+            @for (row of board().strongFallers; track row.symbol) {
               <a class="board-row" [routerLink]="['/ticker', row.symbol]">
                 <span class="brd-sym">{{ row.symbol }}</span>
                 <span class="brd-name">{{ row.name }}</span>
                 <span class="brd-price">{{ row.price }}</span>
-                <span class="brd-chg is-up">{{ row.change }}</span>
-                <span class="brd-score">
-                  @if (row.score !== null) {
-                    <i>{{ row.score }}</i><em>score</em>
-                  } @else {
-                    <i class="no-score">&ndash;</i>
-                  }
+                <span class="brd-chg is-down">{{ row.change }}</span>
+                <span class="brd-score is-strong">
+                  <i>{{ row.score }}</i><em>score</em>
                 </span>
               </a>
+            } @empty {
+              <div class="board-empty">No strong-rated stocks fell today. Fair enough.</div>
             }
           }
         </div>
       </div>
 
       <div class="movers-col">
-        <h3 class="movers-title movers-title-down">Fallers</h3>
+        <h3 class="movers-title movers-title-down">Weak books, rising price</h3>
         <div class="board-table">
-          @if (moversLoading()) {
+          @if (boardLoading()) {
             @for (i of skeletonRows; track i) {
               <div class="board-row is-skeleton">
                 <span class="brd-sym sk"></span>
@@ -266,20 +267,18 @@
               </div>
             }
           } @else {
-            @for (row of movers().fallers; track row.symbol) {
+            @for (row of board().weakRallies; track row.symbol) {
               <a class="board-row" [routerLink]="['/ticker', row.symbol]">
                 <span class="brd-sym">{{ row.symbol }}</span>
                 <span class="brd-name">{{ row.name }}</span>
                 <span class="brd-price">{{ row.price }}</span>
-                <span class="brd-chg is-down">{{ row.change }}</span>
-                <span class="brd-score">
-                  @if (row.score !== null) {
-                    <i>{{ row.score }}</i><em>score</em>
-                  } @else {
-                    <i class="no-score">&ndash;</i>
-                  }
+                <span class="brd-chg is-up">{{ row.change }}</span>
+                <span class="brd-score is-weak">
+                  <i>{{ row.score }}</i><em>score</em>
                 </span>
               </a>
+            } @empty {
+              <div class="board-empty">No weak-rated stocks rallied today. The market agrees with the model, for once.</div>
             }
           }
         </div>

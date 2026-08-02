@@ -6,7 +6,7 @@ import { NgIcon } from '@ng-icons/core';
 import { lucideSearch } from '@ng-icons/lucide';
 import { AuthService } from '../core/auth.service';
 import { ApiService, Company } from '../core/api.service';
-import { loadMovers, MoverRow } from '../core/movers';
+import { loadMoverRows, computeDivergence, MoverRow } from '../core/movers';
 import { ScoreBadgeComponent } from '../shared/components/score-badge.component';
 import { forkJoin } from 'rxjs';
 
@@ -97,10 +97,10 @@ interface WatchlistRow {
           }
         </section>
 
-        <!-- Today's movers -->
+        <!-- Price vs the books -->
         <section class="dash-card">
           <div class="card-head">
-            <h2 class="card-title">Today's movers</h2>
+            <h2 class="card-title">Price vs the books</h2>
             <a routerLink="/screener" class="card-link">Open screener</a>
           </div>
 
@@ -110,17 +110,33 @@ interface WatchlistRow {
                 <div class="sk-line"></div>
               }
             </div>
+          } @else if (strongFallers().length === 0 && weakRallies().length === 0) {
+            <div class="empty-state">
+              Price and the model agree today. Nothing worth flagging.
+            </div>
           } @else {
             <div class="row-list">
-              @for (row of moverRows(); track row.symbol) {
-                <div class="data-row" (click)="goToTicker(row.symbol)">
-                  <span class="dr-symbol">{{ row.symbol }}</span>
-                  <span class="dr-name">{{ row.name }}</span>
-                  <span class="dr-chg" [class.up]="row.changePct >= 0" [class.down]="row.changePct < 0">{{ row.change }}</span>
-                  <span class="dr-num">{{ row.score ?? '&ndash;' }}</span>
-                </div>
-              } @empty {
-                <div class="empty-state">Quotes are taking a moment. Check the screener instead.</div>
+              @if (strongFallers().length) {
+                <div class="group-label label-strong">Strong books, falling price</div>
+                @for (row of strongFallers(); track row.symbol) {
+                  <div class="data-row" (click)="goToTicker(row.symbol)">
+                    <span class="dr-symbol">{{ row.symbol }}</span>
+                    <span class="dr-name">{{ row.name }}</span>
+                    <span class="dr-chg down">{{ row.change }}</span>
+                    <span class="dr-num num-strong">{{ row.score }}</span>
+                  </div>
+                }
+              }
+              @if (weakRallies().length) {
+                <div class="group-label label-weak">Weak books, rising price</div>
+                @for (row of weakRallies(); track row.symbol) {
+                  <div class="data-row" (click)="goToTicker(row.symbol)">
+                    <span class="dr-symbol">{{ row.symbol }}</span>
+                    <span class="dr-name">{{ row.name }}</span>
+                    <span class="dr-chg up">{{ row.change }}</span>
+                    <span class="dr-num num-weak">{{ row.score }}</span>
+                  </div>
+                }
               }
             </div>
           }
@@ -320,6 +336,20 @@ interface WatchlistRow {
     .dr-chg.up { color: var(--up); }
     .dr-chg.down { color: var(--down); }
 
+    .dr-num.num-strong { color: var(--up); }
+    .dr-num.num-weak { color: var(--down); }
+
+    .group-label {
+      font-size: 0.62rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      padding: 0.7rem 0.25rem 0.3rem;
+    }
+
+    .group-label.label-strong { color: var(--up); }
+    .group-label.label-weak { color: var(--down); }
+
     .dr-symbol {
       font-family: 'JetBrains Mono', monospace;
       font-weight: 700;
@@ -396,12 +426,9 @@ export class DashboardComponent implements OnInit {
   searchResults = signal<Company[]>([]);
   watchlistRows = signal<WatchlistRow[]>([]);
   watchlistLoading = signal(true);
-  gainers = signal<MoverRow[]>([]);
-  fallers = signal<MoverRow[]>([]);
+  strongFallers = signal<MoverRow[]>([]);
+  weakRallies = signal<MoverRow[]>([]);
   moversLoading = signal(true);
-
-  // Interleave so the panel reads gainers first, then fallers
-  moverRows = (): MoverRow[] => [...this.gainers(), ...this.fallers()];
 
   private searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -463,10 +490,11 @@ export class DashboardComponent implements OnInit {
   private loadMoversPanel(): void {
     this.api.screener({}).subscribe({
       next: (items) => {
-        loadMovers(this.api, items, 4).subscribe({
-          next: (movers) => {
-            this.gainers.set(movers.gainers);
-            this.fallers.set(movers.fallers);
+        loadMoverRows(this.api, items).subscribe({
+          next: (rows) => {
+            const board = computeDivergence(rows, 4);
+            this.strongFallers.set(board.strongFallers);
+            this.weakRallies.set(board.weakRallies);
             this.moversLoading.set(false);
           },
           error: () => this.moversLoading.set(false),

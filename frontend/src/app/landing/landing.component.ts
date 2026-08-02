@@ -15,7 +15,13 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { environment } from '../../environments/environment';
 import { AuthService } from '../core/auth.service';
 import { ApiService } from '../core/api.service';
-import { loadMovers, Movers, MoverRow } from '../core/movers';
+import {
+  loadMoverRows,
+  computeDivergence,
+  topGainers,
+  DivergenceBoard,
+  MoverRow,
+} from '../core/movers';
 import { LogoMarkComponent } from '../shared/components/logo-mark.component';
 
 gsap.registerPlugin(ScrollTrigger);
@@ -33,20 +39,26 @@ interface SectorChip {
 }
 
 // Shown until (or in place of) live data
-const FALLBACK_MOVERS: Movers = {
-  gainers: [
-    { symbol: 'NEM.AX', name: 'Newmont Corporation', price: '$134.97', change: '+3.46%', changePct: 3.46, score: 100 },
-    { symbol: 'ELS.AX', name: 'Elsight Limited', price: '$5.59', change: '+3.71%', changePct: 3.71, score: 100 },
-    { symbol: 'NIC.AX', name: 'Nickel Industries', price: '$0.81', change: '+3.16%', changePct: 3.16, score: 100 },
-    { symbol: 'RIO.AX', name: 'Rio Tinto Limited', price: '$118.64', change: '+2.31%', changePct: 2.31, score: 87 },
-    { symbol: 'VEA.AX', name: 'Viva Energy Group', price: '$2.85', change: '+2.15%', changePct: 2.15, score: 26 },
+const FALLBACK_HERO_GAINERS: MoverRow[] = [
+  { symbol: '4DX.AX', name: '4DMedical', price: '$3.63', change: '+13.08%', changePct: 13.08, score: 60, rating: 'hold' },
+  { symbol: 'CU6.AX', name: 'Clarity Pharma', price: '$2.37', change: '+12.86%', changePct: 12.86, score: 50, rating: 'hold' },
+  { symbol: 'MP1.AX', name: 'Megaport', price: '$18.10', change: '+11.52%', changePct: 11.52, score: 45, rating: 'hold' },
+  { symbol: 'SLX.AX', name: 'Silex Systems', price: '$4.61', change: '+10.29%', changePct: 10.29, score: 56, rating: 'hold' },
+  { symbol: 'EOS.AX', name: 'Electro Optic', price: '$6.69', change: '+9.67%', changePct: 9.67, score: 69, rating: 'buy' },
+];
+
+const FALLBACK_BOARD: DivergenceBoard = {
+  strongFallers: [
+    { symbol: 'REA.AX', name: 'REA Group', price: '$160.71', change: '-2.68%', changePct: -2.68, score: 100, rating: 'strong_buy' },
+    { symbol: 'HLI.AX', name: 'Helia Group', price: '$5.02', change: '-2.33%', changePct: -2.33, score: 100, rating: 'strong_buy' },
+    { symbol: 'CYL.AX', name: 'Catalyst Metals', price: '$5.40', change: '-1.82%', changePct: -1.82, score: 100, rating: 'strong_buy' },
+    { symbol: 'RMD.AX', name: 'ResMed', price: '$29.79', change: '-1.52%', changePct: -1.52, score: 100, rating: 'strong_buy' },
+    { symbol: 'FPH.AX', name: 'Fisher & Paykel', price: '$34.02', change: '-0.64%', changePct: -0.64, score: 100, rating: 'strong_buy' },
   ],
-  fallers: [
-    { symbol: 'CSL.AX', name: 'CSL Limited', price: '$123.06', change: '-3.81%', changePct: -3.81, score: 62 },
-    { symbol: 'REA.AX', name: 'REA Group Ltd', price: '$160.71', change: '-2.68%', changePct: -2.68, score: 100 },
-    { symbol: 'HLI.AX', name: 'Helia Group Limited', price: '$5.02', change: '-2.33%', changePct: -2.33, score: 100 },
-    { symbol: 'CYL.AX', name: 'Catalyst Metals', price: '$5.40', change: '-1.82%', changePct: -1.82, score: 100 },
-    { symbol: 'RMD.AX', name: 'ResMed Inc.', price: '$29.79', change: '-1.52%', changePct: -1.52, score: 100 },
+  weakRallies: [
+    { symbol: 'SGR.AX', name: 'Star Entertainment', price: '$0.14', change: '+3.70%', changePct: 3.7, score: 27, rating: 'strong_sell' },
+    { symbol: 'VEA.AX', name: 'Viva Energy', price: '$2.85', change: '+2.15%', changePct: 2.15, score: 26, rating: 'strong_sell' },
+    { symbol: 'BEN.AX', name: 'Bendigo Bank', price: '$11.46', change: '+1.15%', changePct: 1.15, score: 25, rating: 'strong_sell' },
   ],
 };
 
@@ -109,14 +121,14 @@ export class LandingComponent implements OnInit, AfterViewInit, OnDestroy {
   githubAuthUrl = `${environment.apiUrl}/auth/github/login`;
   lastProvider = localStorage.getItem('equitylens_last_provider') as 'google' | 'github' | null;
 
-  movers = signal<Movers>(FALLBACK_MOVERS);
-  moversLoading = signal(true);
+  heroGainers = signal<MoverRow[]>(FALLBACK_HERO_GAINERS);
+  board = signal<DivergenceBoard>(FALLBACK_BOARD);
+  boardLoading = signal(true);
+  liveData = signal(false);
   tapeItems = signal<TapeItem[]>(FALLBACK_TAPE);
   sectorChips = signal<SectorChip[]>(FALLBACK_SECTORS);
   companiesCount = signal(298);
   readonly skeletonRows = [0, 1, 2, 3, 4];
-
-  heroBoard = (): MoverRow[] => this.movers().gainers.slice(0, 5);
 
   private gsapCtx: gsap.Context | null = null;
   private scrollListener: (() => void) | null = null;
@@ -135,24 +147,24 @@ export class LandingComponent implements OnInit, AfterViewInit, OnDestroy {
     this.api.screener({}).subscribe({
       next: (items) => {
         if (!items.length) {
-          this.moversLoading.set(false);
+          this.boardLoading.set(false);
           return;
         }
         this.companiesCount.set(items.length);
-        loadMovers(this.api, items, 5).subscribe({
-          next: (movers) => {
-            if (movers.gainers.length || movers.fallers.length) {
-              this.movers.set({
-                gainers: movers.gainers.map(m => ({ ...m, name: this.shortName(m.name) })),
-                fallers: movers.fallers.map(m => ({ ...m, name: this.shortName(m.name) })),
-              });
+        loadMoverRows(this.api, items).subscribe({
+          next: (rows) => {
+            if (rows.length) {
+              const short = rows.map(r => ({ ...r, name: this.shortName(r.name) }));
+              this.heroGainers.set(topGainers(short, 5));
+              this.board.set(computeDivergence(short, 5));
+              this.liveData.set(true);
             }
-            this.moversLoading.set(false);
+            this.boardLoading.set(false);
           },
-          error: () => this.moversLoading.set(false),
+          error: () => this.boardLoading.set(false),
         });
       },
-      error: () => this.moversLoading.set(false),
+      error: () => this.boardLoading.set(false),
     });
 
     this.api.getQuotes(TAPE_SYMBOLS).subscribe({

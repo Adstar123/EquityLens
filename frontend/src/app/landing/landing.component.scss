@@ -974,9 +974,24 @@ $down: #e5484d;
     color: $ash;
   }
 
+  &.is-strong i {
+    color: $up;
+  }
+
+  &.is-weak i {
+    color: $down;
+  }
+
   .no-score {
     color: $ash;
   }
+}
+
+.board-empty {
+  padding: 1.4rem 1.2rem;
+  font-size: 0.82rem;
+  color: $ash;
+  line-height: 1.5;
 }
 
 // Skeleton state

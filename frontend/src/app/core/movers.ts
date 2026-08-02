@@ -9,23 +9,28 @@ export interface MoverRow {
   change: string;
   changePct: number;
   score: number | null;
+  rating: string;
 }
 
-export interface Movers {
-  gainers: MoverRow[];
-  fallers: MoverRow[];
+// The two halves of the "price vs the books" board: strong-rated companies
+// being sold off, and weak-rated companies rallying anyway
+export interface DivergenceBoard {
+  strongFallers: MoverRow[];
+  weakRallies: MoverRow[];
 }
+
+const STRONG_RATINGS = new Set(['strong_buy', 'buy']);
+const WEAK_RATINGS = new Set(['strong_sell', 'sell']);
 
 // The quotes endpoint takes a comma-joined symbol list; keep each request modest
 const CHUNK_SIZE = 60;
 
-export function loadMovers(
+export function loadMoverRows(
   api: ApiService,
   items: ScreenerItem[],
-  count = 5,
-): Observable<Movers> {
+): Observable<MoverRow[]> {
   const symbols = items.map(i => i.symbol);
-  if (!symbols.length) return of({ gainers: [], fallers: [] });
+  if (!symbols.length) return of([]);
 
   const chunks: string[][] = [];
   for (let i = 0; i < symbols.length; i += CHUNK_SIZE) {
@@ -54,18 +59,30 @@ export function loadMovers(
           change: (q.change_pct >= 0 ? '+' : '') + q.change_pct.toFixed(2) + '%',
           changePct: q.change_pct,
           score: scored ? Math.round(item!.composite_score) : null,
+          rating: item?.rating ?? 'insufficient_data',
         });
       }
-      return {
-        gainers: [...rows]
-          .sort((a, b) => b.changePct - a.changePct)
-          .filter(r => r.changePct > 0)
-          .slice(0, count),
-        fallers: [...rows]
-          .sort((a, b) => a.changePct - b.changePct)
-          .filter(r => r.changePct < 0)
-          .slice(0, count),
-      };
+      return rows;
     }),
   );
+}
+
+export function computeDivergence(rows: MoverRow[], count = 5): DivergenceBoard {
+  return {
+    strongFallers: rows
+      .filter(r => STRONG_RATINGS.has(r.rating) && r.changePct < 0)
+      .sort((a, b) => a.changePct - b.changePct)
+      .slice(0, count),
+    weakRallies: rows
+      .filter(r => WEAK_RATINGS.has(r.rating) && r.changePct > 0)
+      .sort((a, b) => b.changePct - a.changePct)
+      .slice(0, count),
+  };
+}
+
+export function topGainers(rows: MoverRow[], count = 5): MoverRow[] {
+  return [...rows]
+    .sort((a, b) => b.changePct - a.changePct)
+    .filter(r => r.changePct > 0)
+    .slice(0, count);
 }
