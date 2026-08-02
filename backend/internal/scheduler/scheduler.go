@@ -26,6 +26,7 @@ type Scheduler struct {
 	alphaVantage   *ingestion.AlphaVantageClient // optional fallback
 	marketIndex    *ingestion.MarketIndexClient
 	indexFilter    map[string]bool
+	indexNames     map[string]string // symbol -> official ASX listing name (when known)
 }
 
 // NewScheduler creates a new Scheduler with the given database and Yahoo client.
@@ -69,11 +70,15 @@ func (s *Scheduler) LoadIndexFilter(path string) error {
 // fail, the filter stays empty and callers keep the last membership synced to
 // the database.
 func (s *Scheduler) LoadIndexFilterAuto(ctx context.Context, csvPath string) error {
-	symbols, err := s.marketIndex.FetchASX300(ctx)
+	constituents, err := s.marketIndex.FetchASX300(ctx)
 	if err == nil {
-		s.indexFilter = make(map[string]bool, len(symbols))
-		for _, sym := range symbols {
-			s.indexFilter[sym] = true
+		s.indexFilter = make(map[string]bool, len(constituents))
+		s.indexNames = make(map[string]string, len(constituents))
+		for _, c := range constituents {
+			s.indexFilter[c.Symbol] = true
+			if c.Name != "" {
+				s.indexNames[c.Symbol] = c.Name
+			}
 		}
 		log.Printf("index filter loaded from Market Index: %d symbols", len(s.indexFilter))
 		return nil
@@ -123,7 +128,12 @@ func (s *Scheduler) BackfillIndexCompanies(ctx context.Context) error {
 			log.Printf("backfill: no sector mapping for %s (yahoo sector %q) — adding without sector", sym, profile.Sector)
 		}
 
-		name := profile.Name
+		// Prefer the official ASX listing name over Yahoo's (Yahoo can serve
+		// the US listing's name for shared tickers).
+		name := s.indexNames[sym]
+		if name == "" {
+			name = profile.Name
+		}
 		if name == "" {
 			name = sym
 		}
@@ -165,6 +175,18 @@ func (s *Scheduler) SyncIndexMembership(ctx context.Context) error {
 		return err
 	}
 	log.Printf("index membership synced: %d of %d symbols marked", marked, len(symbols))
+
+	// Re-assert official ASX listing names for index members. This repairs and
+	// prevents name clobbering from listing sources that reuse tickers across
+	// exchanges (e.g. ALL is Aristocrat on ASX but Allstate on NYSE).
+	if len(s.indexNames) > 0 {
+		renamed, err := s.db.UpdateCompanyNames(ctx, s.indexNames)
+		if err != nil {
+			log.Printf("warning: failed to update company names: %v", err)
+		} else if renamed > 0 {
+			log.Printf("index names synced: %d companies renamed", renamed)
+		}
+	}
 	return nil
 }
 

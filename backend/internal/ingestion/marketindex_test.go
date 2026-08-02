@@ -34,15 +34,18 @@ func TestFetchASX300(t *testing.T) {
 	client := NewMarketIndexClient()
 	client.baseURL = server.URL
 
-	symbols, err := client.FetchASX300(context.Background())
+	constituents, err := client.FetchASX300(context.Background())
 	if err != nil {
 		t.Fatalf("FetchASX300 returned error: %v", err)
 	}
-	if len(symbols) != 300 {
-		t.Fatalf("expected 300 symbols, got %d", len(symbols))
+	if len(constituents) != 300 {
+		t.Fatalf("expected 300 constituents, got %d", len(constituents))
 	}
-	if symbols[0] != "S0.AX" {
-		t.Errorf("expected uppercased symbol with .AX suffix, got %s", symbols[0])
+	if constituents[0].Symbol != "S0.AX" {
+		t.Errorf("expected uppercased symbol with .AX suffix, got %s", constituents[0].Symbol)
+	}
+	if constituents[0].Name != "Company 0" {
+		t.Errorf("expected listing name, got %q", constituents[0].Name)
 	}
 }
 

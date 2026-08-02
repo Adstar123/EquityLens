@@ -76,6 +76,29 @@ func (db *DB) SetIndexMembers(ctx context.Context, symbols []string) (int64, err
 	return tag.RowsAffected(), nil
 }
 
+// UpdateCompanyNames sets the name for each symbol where it differs.
+// Returns the number of companies renamed.
+func (db *DB) UpdateCompanyNames(ctx context.Context, names map[string]string) (int64, error) {
+	symbols := make([]string, 0, len(names))
+	values := make([]string, 0, len(names))
+	for sym, name := range names {
+		if name == "" {
+			continue
+		}
+		symbols = append(symbols, sym)
+		values = append(values, name)
+	}
+	tag, err := db.Pool.Exec(ctx,
+		`UPDATE companies c SET name = v.name
+		 FROM (SELECT UNNEST($1::text[]) AS symbol, UNNEST($2::text[]) AS name) v
+		 WHERE c.symbol = v.symbol AND c.name IS DISTINCT FROM v.name`,
+		symbols, values)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
 func (db *DB) ListCompaniesBySector(ctx context.Context, sectorID uuid.UUID) ([]models.Company, error) {
 	rows, err := db.Pool.Query(ctx,
 		`SELECT id, symbol, name, sector_id, market_cap, last_updated

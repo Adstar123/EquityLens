@@ -28,18 +28,28 @@ func NewMarketIndexClient() *MarketIndexClient {
 	}
 }
 
+// ASX300Constituent is one index member from the Market Index feed.
+type ASX300Constituent struct {
+	Symbol string // with .AX suffix
+	Name   string // official ASX listing name
+}
+
 // marketIndexResponse mirrors the securities-list API envelope.
 type marketIndexResponse struct {
 	Data []struct {
 		Symbol struct {
 			Base string `json:"base"`
 		} `json:"symbol"`
+		SecurityDetails struct {
+			Name string `json:"name"`
+		} `json:"securityDetails"`
 	} `json:"data"`
 }
 
-// FetchASX300 returns the current ASX300 constituent symbols with the .AX
-// suffix, or an error if the list can't be fetched or looks implausible.
-func (c *MarketIndexClient) FetchASX300(ctx context.Context) ([]string, error) {
+// FetchASX300 returns the current ASX300 constituents (symbols with the .AX
+// suffix plus ASX listing names), or an error if the list can't be fetched or
+// looks implausible.
+func (c *MarketIndexClient) FetchASX300(ctx context.Context) ([]ASX300Constituent, error) {
 	url := c.baseURL + "/data-api/api/v1/securities-list/AU/XASX/asx300/quote?limit=400"
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -65,19 +75,22 @@ func (c *MarketIndexClient) FetchASX300(ctx context.Context) ([]string, error) {
 	}
 
 	seen := make(map[string]bool, len(envelope.Data))
-	symbols := make([]string, 0, len(envelope.Data))
+	constituents := make([]ASX300Constituent, 0, len(envelope.Data))
 	for _, item := range envelope.Data {
 		base := strings.ToUpper(strings.TrimSpace(item.Symbol.Base))
 		if base == "" || seen[base] {
 			continue
 		}
 		seen[base] = true
-		symbols = append(symbols, base+".AX")
+		constituents = append(constituents, ASX300Constituent{
+			Symbol: base + ".AX",
+			Name:   strings.TrimSpace(item.SecurityDetails.Name),
+		})
 	}
 
-	if len(symbols) < minASX300Constituents {
-		return nil, fmt.Errorf("marketindex returned only %d constituents — response format may have changed", len(symbols))
+	if len(constituents) < minASX300Constituents {
+		return nil, fmt.Errorf("marketindex returned only %d constituents — response format may have changed", len(constituents))
 	}
 
-	return symbols, nil
+	return constituents, nil
 }
