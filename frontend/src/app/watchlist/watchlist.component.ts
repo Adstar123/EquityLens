@@ -46,8 +46,10 @@ interface WatchlistRow {
   template: `
     <div class="watchlist-container" @fadeIn>
       <header class="wl-page-header">
-        <h1 class="wl-page-title">WATCHLIST</h1>
-        <span class="wl-count">{{ rows().length }} stocks</span>
+        <div class="wl-title-wrap">
+          <h1 class="wl-page-title">Watchlist</h1>
+          <span class="wl-count">{{ rows().length }} {{ rows().length === 1 ? 'stock' : 'stocks' }}</span>
+        </div>
       </header>
 
       @if (loading()) {
@@ -120,13 +122,20 @@ interface WatchlistRow {
       justify-content: space-between;
     }
 
+    .wl-title-wrap {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+
     .wl-page-title {
-      font-size: 0.75rem;
-      font-weight: 600;
-      letter-spacing: 0.12em;
-      color: var(--text-muted);
+      font-family: 'Archivo', sans-serif;
+      font-stretch: 104%;
+      font-weight: 720;
+      font-size: 1.25rem;
+      letter-spacing: -0.015em;
+      color: var(--text-primary);
       margin: 0;
-      text-transform: uppercase;
     }
 
     .wl-count {
@@ -227,9 +236,9 @@ interface WatchlistRow {
     }
 
     .remove-btn:hover {
-      color: #ef4444;
-      border-color: rgba(239, 68, 68, 0.3);
-      background: rgba(239, 68, 68, 0.08);
+      color: #e5484d;
+      border-color: rgba(229, 72, 77, 0.3);
+      background: rgba(229, 72, 77, 0.08);
     }
 
     .remove-btn.removing {

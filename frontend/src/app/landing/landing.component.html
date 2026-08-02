@@ -1,241 +1,374 @@
 <div class="landing" #landingContainer>
 
-  <!-- ═══════════════════════════════════════════════════════════════
-       SECTION 0 — ENTRY (viewport 1)
-       The typography IS the design.
-       ═══════════════════════════════════════════════════════════════ -->
-  <section class="section-hero" #heroSection
-    (mousemove)="onHeroMouseMove($event)"
-    (mousedown)="onHeroMouseDown($event)"
-    (mouseup)="onHeroMouseUp()"
-    (mouseleave)="onHeroMouseLeave()"
-  >
-    <!-- Quick sign-in / dashboard shortcut -->
-    @if (auth.isLoggedIn()) {
-      <a class="hero-signin" routerLink="/screener">Dashboard &rarr;</a>
-    } @else {
-      <button class="hero-signin" (click)="scrollToCta()">Sign in &darr;</button>
-    }
+  <!-- ═══════════════════════════════════════════
+       TOP NAV
+       ═══════════════════════════════════════════ -->
+  <header class="topnav" #topnav>
+    <a class="brand" (click)="scrollTop()">
+      <app-logo-mark [size]="26" />
+      <span class="brand-word">EQUITY<em>LENS</em></span>
+    </a>
 
-    <!-- Data stream behind everything (faint ambient columns) -->
-    <div class="data-stream data-stream-ambient" #dataStream>
-      @for (col of dataColumns; track col.id) {
-        <div
-          class="data-column"
-          [style.left]="col.left + '%'"
-        >
-          <div class="data-column-inner"
-            [style.animation-duration]="col.speed + 's'"
-            [style.animation-delay]="col.delay + 's'"
-          >
-            @for (item of col.items; track $index) {
-              <span class="data-item" [class.ticker]="item.isTicker">{{ item.text }}</span>
-            }
-            @for (item of col.items; track $index) {
-              <span class="data-item" [class.ticker]="item.isTicker">{{ item.text }}</span>
-            }
-          </div>
-        </div>
+    <nav class="topnav-links">
+      <button class="nav-link" (click)="scrollToSection('method')">Methodology</button>
+      <button class="nav-link" (click)="scrollToSection('live')">Movers</button>
+      <button class="nav-link" (click)="scrollToSection('sectors')">Sectors</button>
+    </nav>
+
+    <div class="topnav-actions">
+      @if (auth.isLoggedIn()) {
+        <a routerLink="/screener" class="btn btn-solid">Open dashboard</a>
+      } @else {
+        <button class="nav-link nav-signin" (click)="scrollToSection('signin')">Sign in</button>
+        <a routerLink="/screener" class="btn btn-solid">Open screener</a>
       }
     </div>
+  </header>
 
-    <!-- Bright data stream — same columns, revealed through the lens -->
-    <div class="data-stream data-stream-lens" #dataStreamLens>
-      @for (col of dataColumns; track col.id) {
-        <div
-          class="data-column"
-          [style.left]="col.left + '%'"
-        >
-          <div class="data-column-inner"
-            [style.animation-duration]="col.speed + 's'"
-            [style.animation-delay]="col.delay + 's'"
-          >
-            @for (item of col.items; track $index) {
-              <span class="data-item" [class.ticker]="item.isTicker">{{ item.text }}</span>
-            }
-            @for (item of col.items; track $index) {
-              <span class="data-item" [class.ticker]="item.isTicker">{{ item.text }}</span>
-            }
+  <!-- ═══════════════════════════════════════════
+       HERO
+       ═══════════════════════════════════════════ -->
+  <section class="hero">
+    <div class="hero-copy" #heroCopy>
+      <p class="eyebrow">ASX 300 &middot; Sector-calibrated scoring</p>
+      <h1 class="hero-headline">The ASX&nbsp;300, scored on its fundamentals.</h1>
+      <p class="hero-sub">
+        EquityLens runs every company through ratio models tuned to its sector,
+        then rolls the result into one honest score out of 100. No tips, no hot takes.
+        Just the balance sheet doing the talking.
+      </p>
+      <div class="hero-ctas">
+        <a routerLink="/screener" class="btn btn-solid btn-lg">Open the screener</a>
+        <button class="btn btn-ghost btn-lg" (click)="scrollToSection('method')">How scoring works</button>
+      </div>
+      <p class="hero-note">Free for now. Browse everything without an account.</p>
+    </div>
+
+    <div class="hero-visual" #heroVisual aria-hidden="true">
+      <div class="lens-rings"></div>
+
+      <div class="pv-card pv-board" #pvBoard>
+        <div class="pv-head">
+          <span class="pv-title">Today's gainers</span>
+          <span class="live-dot-wrap"><span class="live-dot"></span>live</span>
+        </div>
+        @for (row of heroBoard(); track row.symbol) {
+          <div class="pv-row">
+            <span class="pv-sym">{{ row.symbol }}</span>
+            <span class="pv-name">{{ row.name }}</span>
+            <span class="pv-chg">{{ row.change }}</span>
+            <span class="pv-score">{{ row.score ?? '&ndash;' }}</span>
           </div>
-        </div>
-      }
-    </div>
-
-    <!-- Hero typography -->
-    <div class="hero-type" #heroType>
-      <div class="hero-title-wrap">
-        <h1 class="hero-line hero-line-equity" #heroEquity>EQUITY</h1>
-        <div class="hero-line-lens-row">
-          <h1 class="hero-line hero-line-lens" #heroLens>LENS</h1>
-        </div>
+        }
+        <div class="pv-foot">{{ companiesCount() }} companies scored</div>
       </div>
-      <p class="hero-subtitle" #heroSubtitle>ASX Stock Intelligence</p>
-    </div>
 
-    <!-- The interactive lens -->
-    <div class="lens" #lensEl>
-      <div class="lens-bezel"></div>
-      <div class="lens-refraction"></div>
-      <div class="lens-inner-rim"></div>
-      <div class="lens-glass"></div>
-      <div class="lens-caustic"></div>
-      <div class="lens-ticks">
-        <span></span><span></span><span></span><span></span>
+      <div class="pv-card pv-detail" #pvDetail>
+        <div class="pv-head">
+          <span class="pv-sym-lg">BHP.AX</span>
+          <span class="pv-tag">Mining &amp; Resources</span>
+        </div>
+        <div class="pv-score-row">
+          <span class="pv-score-big">84</span>
+          <span class="pv-pill">Very strong</span>
+        </div>
+        <div class="pv-ratios">
+          <div class="pv-ratio"><span>Return on equity</span><i>24.71</i><b class="b-strong" style="width: 88%"></b></div>
+          <div class="pv-ratio"><span>Net profit margin</span><i>18.97</i><b class="b-good" style="width: 72%"></b></div>
+          <div class="pv-ratio"><span>Debt to equity</span><i>0.53</i><b class="b-good" style="width: 68%"></b></div>
+        </div>
+        <div class="pv-foot">Ranked #20 of 65 in its sector</div>
       </div>
-      <span class="lens-hint" #lensHint>hold to magnify</span>
-    </div>
-
-    <!-- Problem statement (revealed during pinned scroll transition) -->
-    <div class="problem-statement" #problemStatement>
-      <h2>
-        <span class="ps-word">Raw</span>
-        <span class="ps-word">data</span>
-        <span class="ps-word">doesn't</span>
-        <span class="ps-word">tell</span>
-        <span class="ps-word">you</span>
-        <span class="ps-word ps-break">what</span>
-        <span class="ps-word">to</span>
-        <span class="ps-word">buy.</span>
-      </h2>
-    </div>
-
-    <!-- Scroll cue -->
-    <div class="scroll-cue" #scrollCue>
-      <div class="scroll-cue-line"></div>
     </div>
   </section>
 
+  <!-- ═══════════════════════════════════════════
+       TICKER TAPE
+       ═══════════════════════════════════════════ -->
+  <div class="tape" aria-hidden="true">
+    <div class="tape-track">
+      @for (pass of [0, 1]; track pass) {
+        <div class="tape-group">
+          @for (q of tapeItems(); track $index) {
+            <span class="tape-item">
+              <span class="tape-sym">{{ q.symbol }}</span>
+              <span class="tape-price">{{ q.price }}</span>
+              <span class="tape-chg" [class.pos]="q.up" [class.neg]="!q.up">{{ q.change }}</span>
+            </span>
+          }
+        </div>
+      }
+    </div>
+  </div>
 
-  <!-- ═══════════════════════════════════════════════════════════════
-       SECTION 2 — THE SOLUTION (viewport 4-5)
-       Blur clears. Stock card materializes.
-       ═══════════════════════════════════════════════════════════════ -->
-  <section class="section-solution" #solutionSection>
-    <div class="solution-inner">
-      <div class="demo-card" #demoCard>
-        <div class="demo-card-header">
-          <span class="demo-card-symbol">BHP.AX</span>
-          <span class="demo-card-sector">Materials</span>
-        </div>
-        <div class="demo-card-sparkline">
-          <svg viewBox="0 0 200 40" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#d4930d" stop-opacity="0.25"/>
-                <stop offset="100%" stop-color="#d4930d" stop-opacity="0"/>
-              </linearGradient>
-            </defs>
-            <path class="sparkline-area"
-              d="M0,35 L15,30 L30,28 L45,32 L60,25 L75,20 L90,22 L105,18 L120,15 L135,20 L150,12 L165,8 L180,10 L195,5 L200,7 L200,40 L0,40 Z"
-              fill="url(#sparkGrad)"/>
-            <polyline class="sparkline-line"
-              points="0,35 15,30 30,28 45,32 60,25 75,20 90,22 105,18 120,15 135,20 150,12 165,8 180,10 195,5 200,7"
-              fill="none" stroke="#d4930d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <span class="sparkline-label">12M</span>
-        </div>
-        <div class="demo-card-score-area">
-          <span class="demo-card-score" #demoScore>0</span>
-          <span class="demo-card-rating" #demoRating>Strong</span>
-        </div>
-        <div class="demo-card-ratios" #demoRatios>
-          <div class="demo-ratio-row">
-            <span class="demo-ratio-label">P/E Ratio</span>
-            <span class="demo-ratio-value">14.5</span>
-            <div class="demo-ratio-bar"><div class="demo-ratio-fill" style="--target-width: 80%" data-color="#84cc16"></div></div>
-          </div>
-          <div class="demo-ratio-row">
-            <span class="demo-ratio-label">ROE</span>
-            <span class="demo-ratio-value">28.3%</span>
-            <div class="demo-ratio-bar"><div class="demo-ratio-fill" style="--target-width: 100%" data-color="#22c55e"></div></div>
-          </div>
-          <div class="demo-ratio-row">
-            <span class="demo-ratio-label">Debt/Equity</span>
-            <span class="demo-ratio-value">0.45</span>
-            <div class="demo-ratio-bar"><div class="demo-ratio-fill" style="--target-width: 60%" data-color="#d4930d"></div></div>
-          </div>
-          <div class="demo-ratio-row">
-            <span class="demo-ratio-label">Dividend Yield</span>
-            <span class="demo-ratio-value">8.7%</span>
-            <div class="demo-ratio-bar"><div class="demo-ratio-fill" style="--target-width: 90%" data-color="#84cc16"></div></div>
-          </div>
-          <div class="demo-ratio-row">
-            <span class="demo-ratio-label">Current Ratio</span>
-            <span class="demo-ratio-value">1.23</span>
-            <div class="demo-ratio-bar"><div class="demo-ratio-fill" style="--target-width: 50%" data-color="#d4930d"></div></div>
-          </div>
-        </div>
-      </div>
-      <p class="solution-caption" #solutionCaption>
-        EquityLens scores every ASX stock against sector-calibrated financial models.
+  <!-- ═══════════════════════════════════════════
+       STATS STRIP
+       ═══════════════════════════════════════════ -->
+  <section class="stats" #statsStrip>
+    <div class="stat">
+      <span class="stat-num" #statCompanies>0</span>
+      <span class="stat-label">companies scored</span>
+    </div>
+    <div class="stat">
+      <span class="stat-num" #statSectors>0</span>
+      <span class="stat-label">sector models</span>
+    </div>
+    <div class="stat">
+      <span class="stat-num" #statRatios>0</span>
+      <span class="stat-label">ratios per model</span>
+    </div>
+    <div class="stat">
+      <span class="stat-num stat-num-text">daily</span>
+      <span class="stat-label">score refresh</span>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       METHODOLOGY
+       ═══════════════════════════════════════════ -->
+  <section class="method" id="method">
+    <div class="section-head reveal">
+      <p class="eyebrow">Methodology</p>
+      <h2 class="section-title">How a score is built</h2>
+      <p class="section-sub">
+        Every ticker page shows this working in full. Nothing is scored that
+        can't be traced back to a filing.
       </p>
     </div>
+
+    <div class="method-flow">
+      <div class="method-thread" #methodThread></div>
+
+      <div class="stage reveal">
+        <span class="stage-marker"></span>
+        <h3 class="stage-title">Read the accounts</h3>
+        <div class="stage-visual">
+          <div class="ledger">
+            <div class="ledger-caption">Latest filings &middot; BHP Group</div>
+            <div class="ledger-row"><span>Revenue</span><i>55.7B</i></div>
+            <div class="ledger-row"><span>Net profit</span><i>10.6B</i></div>
+            <div class="ledger-row"><span>Total debt</span><i>18.1B</i></div>
+            <div class="ledger-row"><span>Shareholder equity</span><i>44.5B</i></div>
+          </div>
+        </div>
+        <p class="stage-desc">
+          Seven ratios are computed from each company's published financials:
+          margins, returns, liquidity and leverage.
+        </p>
+      </div>
+
+      <div class="stage reveal">
+        <span class="stage-marker"></span>
+        <h3 class="stage-title">Calibrate to the sector</h3>
+        <div class="stage-visual">
+          <div class="calib">
+            <div class="calib-caption">Debt to equity &middot; 0.53</div>
+            <div class="calib-scale">
+              <span class="seg s-poor"></span>
+              <span class="seg s-weak"></span>
+              <span class="seg s-neutral"></span>
+              <span class="seg s-good active"></span>
+              <span class="seg s-strong"></span>
+            </div>
+            <div class="calib-labels"><span>poor</span><span class="calib-hit">good</span><span>strong</span></div>
+          </div>
+        </div>
+        <p class="stage-desc">
+          Each ratio lands in a band set per sector. A debt load that's routine
+          for a utility would raise flags at a miner.
+        </p>
+      </div>
+
+      <div class="stage reveal">
+        <span class="stage-marker"></span>
+        <h3 class="stage-title">Weigh and score</h3>
+        <div class="stage-visual">
+          <div class="composite">
+            <div class="composite-score">
+              <span class="composite-num">84</span>
+              <span class="pv-pill">Very strong</span>
+            </div>
+            <div class="composite-weights">
+              <div class="w-row"><span>Debt to equity</span><i>25%</i></div>
+              <div class="w-row"><span>Return on equity</span><i>22%</i></div>
+              <div class="w-row"><span>Net profit margin</span><i>22%</i></div>
+            </div>
+          </div>
+        </div>
+        <p class="stage-desc">
+          Bands are weighted by what matters most in that sector, then rolled
+          into a composite from 0 to 100.
+        </p>
+      </div>
+    </div>
+
+    <div class="method-cta reveal">
+      <a routerLink="/ticker/BHP.AX" class="text-link">See a full breakdown on a real ticker</a>
+    </div>
   </section>
 
+  <!-- ═══════════════════════════════════════════
+       LIVE BOARD
+       ═══════════════════════════════════════════ -->
+  <section class="board" id="live">
+    <div class="section-head reveal">
+      <p class="eyebrow">Live board</p>
+      <h2 class="section-title">Today's movers</h2>
+      <p class="section-sub">
+        The day's biggest price swings across the scored ASX&nbsp;300, with each
+        company's fundamentals score alongside. Price is noise; the score is the signal.
+      </p>
+    </div>
 
-  <!-- Section divider -->
-  <div class="section-divider" #sectionDivider></div>
+    <div class="movers-grid reveal">
+      <div class="movers-col">
+        <h3 class="movers-title movers-title-up">Gainers</h3>
+        <div class="board-table">
+          @if (moversLoading()) {
+            @for (i of skeletonRows; track i) {
+              <div class="board-row is-skeleton">
+                <span class="brd-sym sk"></span>
+                <span class="brd-name sk"></span>
+                <span class="brd-chg sk"></span>
+                <span class="brd-score sk"></span>
+              </div>
+            }
+          } @else {
+            @for (row of movers().gainers; track row.symbol) {
+              <a class="board-row" [routerLink]="['/ticker', row.symbol]">
+                <span class="brd-sym">{{ row.symbol }}</span>
+                <span class="brd-name">{{ row.name }}</span>
+                <span class="brd-price">{{ row.price }}</span>
+                <span class="brd-chg is-up">{{ row.change }}</span>
+                <span class="brd-score">
+                  @if (row.score !== null) {
+                    <i>{{ row.score }}</i><em>score</em>
+                  } @else {
+                    <i class="no-score">&ndash;</i>
+                  }
+                </span>
+              </a>
+            }
+          }
+        </div>
+      </div>
 
-  <!-- ═══════════════════════════════════════════════════════════════
-       SECTION 3 — HOW IT WORKS
-       Pinned full-viewport step showcase
-       ═══════════════════════════════════════════════════════════════ -->
-  <section class="section-how" #howSection>
-    <div class="how-slide" #howStep1>
-      <span class="how-watermark">01</span>
-      <div class="how-slide-content">
-        <ng-icon name="lucideScanEye" class="how-icon"></ng-icon>
-        <h3 class="how-heading">Search any ASX ticker</h3>
-        <p class="how-desc">Enter a symbol and get instant analysis</p>
+      <div class="movers-col">
+        <h3 class="movers-title movers-title-down">Fallers</h3>
+        <div class="board-table">
+          @if (moversLoading()) {
+            @for (i of skeletonRows; track i) {
+              <div class="board-row is-skeleton">
+                <span class="brd-sym sk"></span>
+                <span class="brd-name sk"></span>
+                <span class="brd-chg sk"></span>
+                <span class="brd-score sk"></span>
+              </div>
+            }
+          } @else {
+            @for (row of movers().fallers; track row.symbol) {
+              <a class="board-row" [routerLink]="['/ticker', row.symbol]">
+                <span class="brd-sym">{{ row.symbol }}</span>
+                <span class="brd-name">{{ row.name }}</span>
+                <span class="brd-price">{{ row.price }}</span>
+                <span class="brd-chg is-down">{{ row.change }}</span>
+                <span class="brd-score">
+                  @if (row.score !== null) {
+                    <i>{{ row.score }}</i><em>score</em>
+                  } @else {
+                    <i class="no-score">&ndash;</i>
+                  }
+                </span>
+              </a>
+            }
+          }
+        </div>
       </div>
     </div>
-    <div class="how-slide" #howStep2>
-      <span class="how-watermark">02</span>
-      <div class="how-slide-content">
-        <ng-icon name="lucideBrainCircuit" class="how-icon"></ng-icon>
-        <h3 class="how-heading">Sector-calibrated scoring</h3>
-        <p class="how-desc">Financial ratios weighted by industry benchmarks</p>
-      </div>
-    </div>
-    <div class="how-slide" #howStep3>
-      <span class="how-watermark">03</span>
-      <div class="how-slide-content">
-        <ng-icon name="lucideRadar" class="how-icon"></ng-icon>
-        <h3 class="how-heading">Compare, filter, decide</h3>
-        <p class="how-desc">Screen the entire ASX with one click</p>
-      </div>
-    </div>
-    <div class="how-indicators" #howIndicators>
-      <span class="how-dot"></span>
-      <span class="how-dot"></span>
-      <span class="how-dot"></span>
+
+    <div class="board-cta reveal">
+      <a routerLink="/screener" class="btn btn-outline">Open the full screener</a>
     </div>
   </section>
 
+  <!-- ═══════════════════════════════════════════
+       SECTORS
+       ═══════════════════════════════════════════ -->
+  <section class="sectors" id="sectors">
+    <div class="section-head reveal">
+      <p class="eyebrow">Coverage</p>
+      <h2 class="section-title">Eleven sectors, eleven yardsticks</h2>
+      <p class="section-sub">
+        Banks aren't miners. Each sector gets its own thresholds and weights,
+        so a score always means "strong for its kind".
+      </p>
+    </div>
+    <div class="sector-chips reveal">
+      @for (s of sectorChips(); track s.name) {
+        <a class="sector-chip" [routerLink]="['/sector', s.key]">{{ s.name }}</a>
+      }
+    </div>
+  </section>
 
-  <!-- ═══════════════════════════════════════════════════════════════
-       SECTION 4 — CTA (viewport 8)
-       ═══════════════════════════════════════════════════════════════ -->
-  <section class="section-cta" #ctaSection>
-    <div class="cta-inner" #ctaInner>
+  <!-- ═══════════════════════════════════════════
+       HONESTY
+       ═══════════════════════════════════════════ -->
+  <section class="honest">
+    <div class="honest-inner reveal">
+      <h2 class="section-title">What EquityLens won't tell you</h2>
+      <div class="honest-items">
+        <div class="honest-item">
+          <h3>Where the price goes next.</h3>
+          <p>Scores read filings, not sentiment. Momentum is somebody else's game.</p>
+        </div>
+        <div class="honest-item">
+          <h3>What you should buy.</h3>
+          <p>A high score means strong fundamentals for its sector. It is never a recommendation.</p>
+        </div>
+        <div class="honest-item">
+          <h3>More than the data can carry.</h3>
+          <p>When a filing is missing a figure, we score without it and say so on the ticker page.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       CTA / SIGN IN
+       ═══════════════════════════════════════════ -->
+  <section class="cta" id="signin">
+    <div class="cta-inner reveal">
       @if (auth.isLoggedIn()) {
         <h2 class="cta-headline">Welcome back.</h2>
         <div class="cta-buttons">
-          <a routerLink="/screener" class="cta-btn cta-btn-dashboard">
-            <svg class="cta-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="3" width="7" height="9"/>
-              <rect x="14" y="3" width="7" height="5"/>
-              <rect x="14" y="12" width="7" height="9"/>
-              <rect x="3" y="16" width="7" height="5"/>
-            </svg>
-            <span>Go to Dashboard</span>
-          </a>
+          <a routerLink="/screener" class="btn btn-solid btn-lg cta-wide">Go to dashboard</a>
         </div>
       } @else {
         <h2 class="cta-headline">See through the noise.</h2>
+        <p class="cta-sub">Everything is free for now. An account just makes it yours.</p>
+
+        <div class="cta-compare">
+          <div class="compare-card">
+            <span class="compare-title">Just browsing</span>
+            <ul class="compare-list">
+              <li>The full screener, all 298 companies</li>
+              <li>Every score and full breakdown</li>
+              <li>Sector boards and rankings</li>
+            </ul>
+          </div>
+          <div class="compare-card compare-card-account">
+            <span class="compare-title">With a free account</span>
+            <ul class="compare-list">
+              <li>Everything in browsing</li>
+              <li>A watchlist that follows you across devices</li>
+              <li>Your own dashboard with your stocks front and centre</li>
+            </ul>
+          </div>
+        </div>
+
         <div class="cta-buttons">
-          <a [href]="googleAuthUrl" class="cta-btn" (click)="onOAuthClick('google')">
-            <svg class="cta-btn-icon" viewBox="0 0 24 24" fill="none">
+          <a [href]="googleAuthUrl" class="oauth-btn" (click)="onOAuthClick('google')">
+            <svg class="oauth-icon" viewBox="0 0 24 24" fill="none">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
               <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
               <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18A10.96 10.96 0 0 0 1 12c0 1.77.42 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
@@ -246,8 +379,8 @@
               <span class="last-used-tag">last used</span>
             }
           </a>
-          <a [href]="githubAuthUrl" class="cta-btn" (click)="onOAuthClick('github')">
-            <svg class="cta-btn-icon" viewBox="0 0 24 24" fill="currentColor">
+          <a [href]="githubAuthUrl" class="oauth-btn" (click)="onOAuthClick('github')">
+            <svg class="oauth-icon" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
             </svg>
             <span>Continue with GitHub</span>
@@ -256,17 +389,43 @@
             }
           </a>
         </div>
-        <a routerLink="/screener" class="cta-explore">or explore without an account &rarr;</a>
+        <a routerLink="/screener" class="text-link">or explore without an account</a>
       }
     </div>
-    <footer class="landing-footer">
-      <span>Built by Adam Jarick · Models by Adam O'Brien</span>
-      <div class="footer-links">
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       FOOTER
+       ═══════════════════════════════════════════ -->
+  <footer class="footer">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <span class="footer-brand-row">
+          <app-logo-mark [size]="20" />
+          <span class="brand-word brand-word-sm">EQUITY<em>LENS</em></span>
+        </span>
+        <p class="footer-tag">Fundamental scoring for the ASX&nbsp;300.</p>
+      </div>
+      <div class="footer-col">
+        <span class="footer-col-title">Explore</span>
+        <a routerLink="/screener">Screener</a>
+        <button class="footer-link-btn" (click)="scrollToSection('sectors')">Sectors</button>
+        <button class="footer-link-btn" (click)="scrollToSection('method')">Methodology</button>
+      </div>
+      <div class="footer-col">
+        <span class="footer-col-title">Legal</span>
         <a routerLink="/privacy">Privacy</a>
-        <span class="footer-sep">·</span>
         <a routerLink="/terms">Terms</a>
       </div>
-    </footer>
-  </section>
+    </div>
+    <div class="footer-base">
+      <p class="footer-disclaimer">
+        EquityLens provides general information only, not financial advice. Scores are
+        computed from published financials and are not a recommendation to buy or sell
+        any security. Consider your own circumstances before acting.
+      </p>
+      <p class="footer-credit">Built by Adam Jarick &middot; Models by Adam O'Brien</p>
+    </div>
+  </footer>
 
 </div>

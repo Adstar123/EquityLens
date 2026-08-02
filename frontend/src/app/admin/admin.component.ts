@@ -526,19 +526,19 @@ export class AdminComponent implements OnInit {
   weightValid = computed(() => Math.abs(this.weightSum() - 1.0) <= 0.001);
 
   readonly rangeBuckets = [
-    { key: 'strong', label: 'Strong', color: '#22c55e' },
-    { key: 'good', label: 'Good', color: '#84cc16' },
-    { key: 'neutral', label: 'Neutral', color: '#d4930d' },
-    { key: 'weak', label: 'Weak', color: '#f97316' },
-    { key: 'poor', label: 'Poor', color: '#ef4444' },
+    { key: 'strong', label: 'Strong', color: '#2ebd70' },
+    { key: 'good', label: 'Good', color: '#8fc63d' },
+    { key: 'neutral', label: 'Neutral', color: '#e2a428' },
+    { key: 'weak', label: 'Weak', color: '#f0883e' },
+    { key: 'poor', label: 'Poor', color: '#e5484d' },
   ];
 
   readonly ratingLevels = [
-    { key: 'strong_buy', label: 'Very Strong', color: '#22c55e' },
-    { key: 'buy', label: 'Strong', color: '#84cc16' },
-    { key: 'hold', label: 'Neutral', color: '#d4930d' },
-    { key: 'sell', label: 'Weak', color: '#f97316' },
-    { key: 'strong_sell', label: 'Very Weak', color: '#ef4444' },
+    { key: 'strong_buy', label: 'Very Strong', color: '#2ebd70' },
+    { key: 'buy', label: 'Strong', color: '#8fc63d' },
+    { key: 'hold', label: 'Neutral', color: '#e2a428' },
+    { key: 'sell', label: 'Weak', color: '#f0883e' },
+    { key: 'strong_sell', label: 'Very Weak', color: '#e5484d' },
   ];
 
   get ratiosArray(): FormArray {
@@ -817,13 +817,13 @@ export class AdminComponent implements OnInit {
 
   ratingColor(rating: string): string {
     const map: Record<string, string> = {
-      strong_buy: '#22c55e',
-      buy: '#84cc16',
-      hold: '#d4930d',
-      sell: '#f97316',
-      strong_sell: '#ef4444',
+      strong_buy: '#2ebd70',
+      buy: '#8fc63d',
+      hold: '#e2a428',
+      sell: '#f0883e',
+      strong_sell: '#e5484d',
     };
-    return map[rating] ?? '#8888a0';
+    return map[rating] ?? '#93a1af';
   }
 
   formatDate(dateStr: string): string {

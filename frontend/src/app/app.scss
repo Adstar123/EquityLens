@@ -5,3 +5,9 @@
     height: 100dvh;
   }
 }
+
+@media (max-width: 768px) {
+  .app-shell.has-chrome .app-main {
+    padding-top: 56px;
+  }
+}

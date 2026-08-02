@@ -49,10 +49,12 @@ type SortDir = 'asc' | 'desc';
       <div class="sector-page">
         <!-- Header -->
         <header class="sector-header">
+          <p class="sector-eyebrow">Sector</p>
           <h1 class="sector-name">{{ sector()!.display_name }}</h1>
           <p class="sector-desc">{{ sector()!.description }}</p>
           <div class="sector-stats">
-            {{ items().length }} companies | Avg score: {{ avgScore() }}
+            <span class="stat-chip"><i>{{ items().length }}</i> companies</span>
+            <span class="stat-chip"><i>{{ avgScore() }}</i> average score</span>
           </div>
         </header>
 
@@ -115,15 +117,17 @@ type SortDir = 'asc' | 'desc';
                           {{ ratingDisplayLabel(item.rating) }}
                         </span>
                       </td>
-                      @if (item.breakdown && item.breakdown.ratios) {
-                        @for (ratio of item.breakdown.ratios; track ratio.key) {
-                          <td class="cell-ratio">
+                      @for (col of ratioHeadersWithDesc(); track col.name) {
+                        <td class="cell-ratio">
+                          @if (ratioByName(item, col.name); as ratio) {
                             <div class="ratio-cell">
                               <span class="ratio-value">{{ formatRatio(ratio.value) }}</span>
                               <app-ratio-bar [value]="ratio.value" [rangeBucket]="ratio.range_bucket" />
                             </div>
-                          </td>
-                        }
+                          } @else {
+                            <span class="ratio-empty">&ndash;</span>
+                          }
+                        </td>
                       }
                     </tr>
                   }
@@ -182,26 +186,64 @@ type SortDir = 'asc' | 'desc';
       margin-bottom: 2rem;
     }
 
-    .sector-name {
-      font-family: 'Inter', system-ui, sans-serif;
+    .sector-eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.68rem;
       font-weight: 700;
-      font-size: 1.75rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin: 0 0 0.5rem;
+    }
+
+    .sector-eyebrow::before {
+      content: '';
+      width: 18px;
+      height: 1px;
+      background: var(--accent);
+    }
+
+    .sector-name {
+      font-family: 'Archivo', sans-serif;
+      font-stretch: 104%;
+      font-weight: 720;
+      font-size: 1.7rem;
+      letter-spacing: -0.02em;
       color: var(--text-primary);
       margin: 0 0 0.375rem;
-      line-height: 1.2;
+      line-height: 1.15;
     }
 
     .sector-desc {
       font-size: 0.875rem;
       color: var(--text-secondary);
-      margin: 0 0 0.75rem;
-      line-height: 1.5;
+      margin: 0 0 0.9rem;
+      line-height: 1.6;
+      max-width: 640px;
     }
 
     .sector-stats {
+      display: flex;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+
+    .stat-chip {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 4px 12px;
+    }
+
+    .stat-chip i {
+      font-style: normal;
       font-family: 'JetBrains Mono', monospace;
-      font-size: 0.8125rem;
-      color: var(--text-muted);
+      font-weight: 600;
+      color: var(--text-primary);
     }
 
     /* Table */
@@ -304,7 +346,8 @@ type SortDir = 'asc' | 'desc';
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.04em;
-      padding: 2px 6px;
+      padding: 2px 8px;
+      border-radius: 999px;
       line-height: 1.2;
       white-space: nowrap;
     }
@@ -324,6 +367,11 @@ type SortDir = 'asc' | 'desc';
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.6875rem;
       color: var(--text-secondary);
+    }
+
+    .ratio-empty {
+      color: var(--text-muted);
+      opacity: 0.5;
     }
 
     .empty-state {
@@ -356,6 +404,7 @@ type SortDir = 'asc' | 'desc';
     .analytics-card {
       background: var(--bg-elevated);
       border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
       padding: 1.25rem;
     }
 
@@ -456,7 +505,7 @@ export class SectorComponent implements OnInit {
     }
 
     const isDark = this.theme.theme() === 'dark';
-    const labelColor = isDark ? '#8888a0' : '#4a4a65';
+    const labelColor = isDark ? '#93a1af' : '#4a4a65';
 
     return {
       tooltip: {
@@ -473,23 +522,23 @@ export class SectorComponent implements OnInit {
         data: ['Very Strong', 'Strong', 'Neutral', 'Weak', 'Very Weak'],
         axisLabel: { color: labelColor, fontSize: 10, fontFamily: 'Inter' },
         axisTick: { show: false },
-        axisLine: { lineStyle: { color: isDark ? '#252540' : '#d8d8e4' } },
+        axisLine: { lineStyle: { color: isDark ? '#243040' : '#d8d8e4' } },
       },
       yAxis: {
         type: 'value',
         axisLabel: { color: labelColor, fontSize: 10 },
-        splitLine: { lineStyle: { color: isDark ? '#1a1a2e' : '#eaeaf0' } },
+        splitLine: { lineStyle: { color: isDark ? '#1e2833' : '#eaeaf0' } },
         axisLine: { show: false },
         axisTick: { show: false },
       },
       series: [{
         type: 'bar',
         data: [
-          { value: buckets['strong_buy'], itemStyle: { color: '#22c55e' } },
-          { value: buckets['buy'], itemStyle: { color: '#84cc16' } },
-          { value: buckets['hold'], itemStyle: { color: '#d4930d' } },
-          { value: buckets['sell'], itemStyle: { color: '#ef4444' } },
-          { value: buckets['strong_sell'], itemStyle: { color: '#dc2626' } },
+          { value: buckets['strong_buy'], itemStyle: { color: '#2ebd70' } },
+          { value: buckets['buy'], itemStyle: { color: '#8fc63d' } },
+          { value: buckets['hold'], itemStyle: { color: '#e2a428' } },
+          { value: buckets['sell'], itemStyle: { color: '#e5484d' } },
+          { value: buckets['strong_sell'], itemStyle: { color: '#d03136' } },
         ],
         barWidth: '55%',
         itemStyle: { borderRadius: [3, 3, 0, 0] },
@@ -522,8 +571,8 @@ export class SectorComponent implements OnInit {
     );
 
     const isDark = this.theme.theme() === 'dark';
-    const labelColor = isDark ? '#8888a0' : '#4a4a65';
-    const splitColor = isDark ? '#252540' : '#d8d8e4';
+    const labelColor = isDark ? '#93a1af' : '#4a4a65';
+    const splitColor = isDark ? '#243040' : '#d8d8e4';
 
     return {
       tooltip: {
@@ -555,9 +604,9 @@ export class SectorComponent implements OnInit {
         data: [{
           value: avgs,
           name: 'Sector Average',
-          areaStyle: { color: 'rgba(212, 147, 13, 0.15)' },
-          lineStyle: { color: '#d4930d', width: 2 },
-          itemStyle: { color: '#d4930d', borderColor: '#d4930d' },
+          areaStyle: { color: 'rgba(226, 164, 40, 0.15)' },
+          lineStyle: { color: '#e2a428', width: 2 },
+          itemStyle: { color: '#e2a428', borderColor: '#e2a428' },
           symbol: 'circle',
           symbolSize: 6,
         }],
@@ -600,6 +649,10 @@ export class SectorComponent implements OnInit {
     this.router.navigate(['/ticker', symbol]);
   }
 
+  ratioByName(item: ScreenerItem, name: string) {
+    return item.breakdown?.ratios?.find(r => r.name === name) ?? null;
+  }
+
   formatRatio(value: number): string {
     if (Math.abs(value) >= 1000) return value.toFixed(0);
     if (Math.abs(value) >= 100) return value.toFixed(1);
@@ -616,24 +669,24 @@ export class SectorComponent implements OnInit {
 
   ratingColor(rating: string): string {
     const map: Record<string, string> = {
-      strong_buy: '#22c55e',
-      buy: '#84cc16',
-      hold: '#d4930d',
-      sell: '#ef4444',
-      strong_sell: '#dc2626',
+      strong_buy: '#2ebd70',
+      buy: '#8fc63d',
+      hold: '#e2a428',
+      sell: '#e5484d',
+      strong_sell: '#d03136',
     };
-    return map[rating] ?? '#8888a0';
+    return map[rating] ?? '#93a1af';
   }
 
   ratingBg(rating: string): string {
     const map: Record<string, string> = {
-      strong_buy: 'rgba(34, 197, 94, 0.12)',
-      buy: 'rgba(132, 204, 22, 0.12)',
-      hold: 'rgba(212, 147, 13, 0.12)',
-      sell: 'rgba(239, 68, 68, 0.12)',
-      strong_sell: 'rgba(220, 38, 38, 0.12)',
+      strong_buy: 'rgba(46, 189, 112, 0.12)',
+      buy: 'rgba(143, 198, 61, 0.12)',
+      hold: 'rgba(226, 164, 40, 0.12)',
+      sell: 'rgba(229, 72, 77, 0.12)',
+      strong_sell: 'rgba(208, 49, 54, 0.12)',
     };
-    return map[rating] ?? 'rgba(136, 136, 160, 0.12)';
+    return map[rating] ?? 'rgba(147, 161, 175, 0.12)';
   }
 
   private ratingOrder(rating: string): number {

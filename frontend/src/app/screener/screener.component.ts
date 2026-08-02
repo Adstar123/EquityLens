@@ -1,74 +1,63 @@
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import {
-  trigger,
-  transition,
-  style,
-  animate,
-  query,
-  stagger,
-} from '@angular/animations';
+import { NgIcon } from '@ng-icons/core';
+import { lucideSearch } from '@ng-icons/lucide';
 import { ApiService, ScreenerItem, Sector, Quote, Company, Definition } from '../core/api.service';
 import { ScoreBadgeComponent } from '../shared/components/score-badge.component';
 import { RatioBarComponent } from '../shared/components/ratio-bar.component';
 import { InfoTooltipComponent } from '../shared/components/info-tooltip.component';
 
+type SortKey = 'score' | 'symbol' | 'price' | 'mcap' | 'sector';
+
 @Component({
   selector: 'app-screener',
   standalone: true,
-  imports: [FormsModule, ScoreBadgeComponent, RatioBarComponent, InfoTooltipComponent],
-  animations: [
-    trigger('tableStagger', [
-      transition(':enter', [
-        query('.table-row', [
-          style({ opacity: 0, transform: 'translateY(8px)' }),
-          stagger('50ms', [
-            animate('200ms ease-out', style({ opacity: 1, transform: 'translateY(0)' })),
-          ]),
-        ], { optional: true, limit: 20 }),
-      ]),
-    ]),
-  ],
+  imports: [FormsModule, NgIcon, ScoreBadgeComponent, RatioBarComponent, InfoTooltipComponent],
   template: `
     <div class="screener-container">
-      <!-- Search -->
-      <div class="search-bar">
-        <div class="search-wrap">
-          <input
-            type="text"
-            class="search-input"
-            placeholder="Search ticker or company..."
-            [ngModel]="searchQuery()"
-            (ngModelChange)="onSearch($event)"
-            (keydown.enter)="goToFirstResult()"
-            (blur)="clearSearchDelayed()"
-          />
-          @if (searchResults().length > 0) {
-            <div class="search-dropdown">
-              @for (result of searchResults(); track result.symbol) {
-                <div class="search-result" (mousedown)="goToTicker(result.symbol)">
-                  <span class="sr-symbol">{{ result.symbol }}</span>
-                  <span class="sr-name">{{ result.name }}</span>
-                </div>
-              }
-            </div>
-          }
-        </div>
-      </div>
+      <!-- Toolbar -->
+      <header class="toolbar">
+        <div class="toolbar-row">
+          <div class="page-title-wrap">
+            <h1 class="page-title">Screener</h1>
+            <span class="page-count">{{ filteredItems().length }} of {{ items().length }}</span>
+          </div>
 
-      <!-- Header -->
-      <header class="screener-header">
-        <h1 class="screener-title">SCREENER</h1>
-        <div class="filter-bar">
+          <div class="search-wrap">
+            <ng-icon [svg]="searchIcon" class="search-icon" size="15" />
+            <input
+              type="text"
+              class="search-input"
+              placeholder="Search ticker or company"
+              [ngModel]="searchQuery()"
+              (ngModelChange)="onSearch($event)"
+              (keydown.enter)="goToFirstResult()"
+              (blur)="clearSearchDelayed()"
+            />
+            @if (searchResults().length > 0) {
+              <div class="search-dropdown">
+                @for (result of searchResults(); track result.symbol) {
+                  <div class="search-result" (mousedown)="goToTicker(result.symbol)">
+                    <span class="sr-symbol">{{ result.symbol }}</span>
+                    <span class="sr-name">{{ result.name }}</span>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        </div>
+
+        <div class="toolbar-row filters-row">
           <div class="filter-group">
-            <label class="filter-label">SECTOR</label>
+            <label class="filter-label" for="sector-filter">Sector</label>
             <select
+              id="sector-filter"
               class="filter-select"
               [ngModel]="selectedSector()"
               (ngModelChange)="onSectorChange($event)"
             >
-              <option value="">All Sectors</option>
+              <option value="">All sectors</option>
               @for (sector of sectors(); track sector.key) {
                 <option [value]="sector.key">{{ sector.display_name }}</option>
               }
@@ -76,8 +65,9 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
           </div>
 
           <div class="filter-group">
-            <label class="filter-label">MIN SCORE</label>
+            <label class="filter-label" for="min-score">Min score</label>
             <input
+              id="min-score"
               type="number"
               class="filter-input"
               [ngModel]="minScore()"
@@ -89,52 +79,68 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
             />
           </div>
 
-          <div class="filter-group">
-            <label class="filter-label">SORT BY</label>
-            <select
-              class="filter-select"
-              [ngModel]="sortBy()"
-              (ngModelChange)="onSortChange($event)"
-            >
-              <option value="score">Score</option>
-              <option value="symbol">Symbol</option>
-              <option value="price">Price</option>
-              <option value="mcap">Market Cap</option>
-              <option value="sector">Sector</option>
-            </select>
-          </div>
-
-          <div class="result-count">
-            {{ filteredItems().length }} results
-          </div>
+          <span class="sort-hint">Click a column header to sort</span>
         </div>
       </header>
 
       <!-- Table -->
       @if (loading()) {
-        <div class="loading-state">Loading...</div>
-      } @else {
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
                 <th class="col-symbol">Symbol</th>
+                <th>Company</th>
+                <th>Price</th>
+                <th>Mkt cap</th>
+                <th>Sector</th>
+                <th>Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (i of skeletonRows; track i) {
+                <tr class="sk-row">
+                  <td><span class="sk" style="width: 52px"></span></td>
+                  <td><span class="sk" style="width: 140px"></span></td>
+                  <td><span class="sk" style="width: 72px"></span></td>
+                  <td><span class="sk" style="width: 48px"></span></td>
+                  <td><span class="sk" style="width: 90px"></span></td>
+                  <td><span class="sk" style="width: 96px"></span></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th class="col-symbol sortable" (click)="setSort('symbol')">
+                  Symbol <span class="sort-arrow">{{ arrowFor('symbol') }}</span>
+                </th>
                 <th class="col-name">Company</th>
-                <th class="col-price">Price</th>
-                <th class="col-mcap">
-                  Mkt Cap
+                <th class="sortable" (click)="setSort('price')">
+                  Price <span class="sort-arrow">{{ arrowFor('price') }}</span>
+                </th>
+                <th class="sortable" (click)="setSort('mcap')">
+                  Mkt cap
                   @if (definitions()['market_cap']; as def) {
                     <app-info-tooltip [description]="def.description" />
                   }
+                  <span class="sort-arrow">{{ arrowFor('mcap') }}</span>
                 </th>
-                <th class="col-sector">Sector</th>
-                <th class="col-score">
+                <th class="sortable" (click)="setSort('sector')">
+                  Sector <span class="sort-arrow">{{ arrowFor('sector') }}</span>
+                </th>
+                <th class="sortable" (click)="setSort('score')">
                   Score
                   @if (definitions()['composite_score']; as def) {
                     <app-info-tooltip [description]="def.description" />
                   }
+                  <span class="sort-arrow">{{ arrowFor('score') }}</span>
                 </th>
-                @for (col of ratioHeadersWithDesc(); track col.name) {
+                @for (col of ratioHeadersWithDesc(); track col.key) {
                   <th class="col-ratio">
                     {{ col.name }}
                     @if (col.description) {
@@ -170,24 +176,26 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
                   <td class="cell-score">
                     <app-score-badge [score]="item.composite_score" [rating]="item.rating" />
                   </td>
-                  @if (item.breakdown && item.breakdown.ratios && item.breakdown.ratios.length) {
-                    @for (ratio of item.breakdown.ratios; track ratio.key) {
-                      <td class="cell-ratio">
+                  @for (col of ratioHeadersWithDesc(); track col.key) {
+                    <td class="cell-ratio">
+                      @if (ratioFor(item, col.key); as ratio) {
                         <div class="ratio-cell">
                           <span class="ratio-value">{{ formatRatio(ratio.value) }}</span>
                           <app-ratio-bar [value]="ratio.value" [rangeBucket]="ratio.range_bucket" />
                         </div>
-                      </td>
-                    }
+                      } @else {
+                        <span class="ratio-empty">&ndash;</span>
+                      }
+                    </td>
                   }
                 </tr>
               } @empty {
                 <tr>
-                  <td [attr.colspan]="7 + maxRatioCols()" class="empty-state">
+                  <td [attr.colspan]="6 + maxRatioCols()" class="empty-state">
                     @if (selectedSector()) {
-                      No scored stocks found for this sector.
+                      No scored stocks in this sector match the filters.
                     } @else {
-                      Select a sector or adjust filters.
+                      No stocks match the filters. Try lowering the minimum score.
                     }
                   </td>
                 </tr>
@@ -199,9 +207,12 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
         <!-- Pagination -->
         @if (totalPages() > 1) {
           <div class="pagination">
-            <button class="page-btn" [disabled]="currentPage() === 1" (click)="prevPage()">← Prev</button>
-            <span class="page-info">Page {{ currentPage() }} of {{ totalPages() }}</span>
-            <button class="page-btn" [disabled]="currentPage() === totalPages()" (click)="nextPage()">Next →</button>
+            <span class="page-range">{{ pageRangeLabel() }}</span>
+            <div class="page-controls">
+              <button class="page-btn" [disabled]="currentPage() === 1" (click)="prevPage()">&larr; Prev</button>
+              <span class="page-info">{{ currentPage() }} / {{ totalPages() }}</span>
+              <button class="page-btn" [disabled]="currentPage() === totalPages()" (click)="nextPage()">Next &rarr;</button>
+            </div>
           </div>
         }
       }
@@ -220,38 +231,142 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
       background: var(--bg-base);
     }
 
-    .screener-header {
-      padding: 1rem 1.5rem 0.75rem;
+    // ── Toolbar ──
+    .toolbar {
+      flex-shrink: 0;
       border-bottom: 1px solid var(--border);
+      padding: 1rem 1.5rem 0.85rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+
+    .toolbar-row {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+    }
+
+    .page-title-wrap {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
       flex-shrink: 0;
     }
 
-    .screener-title {
-      font-size: 0.75rem;
-      font-weight: 600;
-      letter-spacing: 0.12em;
-      color: var(--text-muted);
-      margin: 0 0 0.75rem;
-      text-transform: uppercase;
+    .page-title {
+      font-family: 'Archivo', sans-serif;
+      font-stretch: 104%;
+      font-weight: 720;
+      font-size: 1.25rem;
+      letter-spacing: -0.015em;
+      color: var(--text-primary);
+      margin: 0;
     }
 
-    .filter-bar {
+    .page-count {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+
+    .search-wrap {
+      position: relative;
+      flex: 1;
+      max-width: 420px;
+      margin-left: auto;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 11px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      pointer-events: none;
       display: flex;
-      align-items: flex-end;
+    }
+
+    .search-input {
+      width: 100%;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text-primary);
+      font-size: 0.85rem;
+      padding: 0.5rem 0.75rem 0.5rem 2rem;
+      outline: none;
+      transition: border-color 160ms ease, box-shadow 160ms ease;
+      box-sizing: border-box;
+    }
+
+    .search-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .search-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+
+    .search-dropdown {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-card);
+      z-index: 30;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .search-result {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.55rem 0.75rem;
+      cursor: pointer;
+      transition: background 100ms ease;
+    }
+
+    .search-result:hover {
+      background: var(--bg-surface);
+    }
+
+    .sr-symbol {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 0.8rem;
+      color: var(--text-primary);
+      min-width: 70px;
+    }
+
+    .sr-name {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .filters-row {
       gap: 1rem;
       flex-wrap: wrap;
     }
 
     .filter-group {
       display: flex;
-      flex-direction: column;
-      gap: 4px;
+      align-items: center;
+      gap: 8px;
     }
 
     .filter-label {
-      font-size: 0.625rem;
-      font-weight: 500;
-      letter-spacing: 0.08em;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.07em;
       color: var(--text-muted);
       text-transform: uppercase;
     }
@@ -260,17 +375,21 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
     .filter-input {
       background: var(--bg-surface);
       border: 1px solid var(--border);
+      border-radius: var(--radius);
       color: var(--text-primary);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.8125rem;
-      padding: 0.375rem 0.5rem;
+      font-size: 0.82rem;
+      padding: 0.4rem 0.6rem;
       outline: none;
-      min-width: 140px;
+      min-width: 150px;
+      transition: border-color 160ms ease;
+      cursor: pointer;
     }
 
     .filter-input {
-      min-width: 80px;
-      max-width: 100px;
+      min-width: 70px;
+      max-width: 84px;
+      font-family: 'JetBrains Mono', monospace;
+      cursor: text;
       -moz-appearance: textfield;
     }
 
@@ -285,14 +404,13 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
       border-color: var(--accent);
     }
 
-    .result-count {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      padding-bottom: 0.375rem;
+    .sort-hint {
       margin-left: auto;
+      font-size: 0.72rem;
+      color: var(--text-muted);
     }
 
+    // ── Table ──
     .table-wrap {
       flex: 1;
       overflow: auto;
@@ -308,31 +426,52 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
       top: 0;
       background: var(--bg-base);
       z-index: 10;
-      padding: 0.5rem 0.75rem;
+      padding: 0.55rem 0.75rem;
       text-align: left;
-      font-size: 0.6875rem;
-      font-weight: 500;
+      font-size: 0.67rem;
+      font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.07em;
       color: var(--text-muted);
-      border-bottom: 1px solid var(--border);
+      border-bottom: 1px solid var(--border-strong);
       white-space: nowrap;
+      user-select: none;
     }
 
-    tbody tr {
+    th.sortable {
+      cursor: pointer;
+      transition: color 120ms ease;
+    }
+
+    th.sortable:hover {
+      color: var(--text-primary);
+    }
+
+    .sort-arrow {
+      display: inline-block;
+      width: 0.8em;
+      color: var(--accent);
+      font-size: 0.8rem;
+    }
+
+    tbody tr.table-row {
       cursor: pointer;
       transition: background 100ms ease;
     }
 
-    tbody tr:hover td {
+    tbody tr.table-row:hover td {
       background: var(--bg-surface);
     }
 
+    tbody tr.table-row:hover .cell-symbol {
+      color: var(--accent);
+    }
+
     td {
-      padding: 0.4rem 0.75rem;
+      padding: 0.44rem 0.75rem;
       font-size: 0.8125rem;
       color: var(--text-primary);
-      border-bottom: 1px solid var(--bg-surface);
+      border-bottom: 1px solid var(--border);
       white-space: nowrap;
     }
 
@@ -341,6 +480,7 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
       font-weight: 700;
       color: var(--text-primary);
       letter-spacing: 0.02em;
+      transition: color 100ms ease;
     }
 
     .cell-name {
@@ -360,7 +500,7 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
     }
 
     .cell-ratio {
-      padding: 0.4rem 0.5rem;
+      padding: 0.44rem 0.5rem;
     }
 
     .ratio-cell {
@@ -376,6 +516,11 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
       color: var(--text-secondary);
     }
 
+    .ratio-empty {
+      color: var(--text-muted);
+      opacity: 0.5;
+    }
+
     .empty-state {
       text-align: center;
       color: var(--text-muted);
@@ -383,33 +528,57 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
       font-size: 0.875rem;
     }
 
-    .loading-state {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex: 1;
-      color: var(--text-muted);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.875rem;
+    // ── Skeleton ──
+    .sk-row td {
+      padding-top: 0.62rem;
+      padding-bottom: 0.62rem;
     }
 
+    .sk {
+      display: inline-block;
+      height: 11px;
+      border-radius: 4px;
+      background: linear-gradient(100deg, var(--bg-surface) 40%, var(--border) 50%, var(--bg-surface) 60%);
+      background-size: 200% 100%;
+      animation: skShimmer 1.4s ease infinite;
+    }
+
+    @keyframes skShimmer {
+      from { background-position: 120% 0; }
+      to { background-position: -80% 0; }
+    }
+
+    // ── Pagination ──
     .pagination {
       display: flex;
       align-items: center;
-      justify-content: center;
+      justify-content: space-between;
       gap: 1rem;
-      padding: 0.75rem 1.5rem;
+      padding: 0.65rem 1.5rem;
       border-top: 1px solid var(--border);
       flex-shrink: 0;
+    }
+
+    .page-range {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+
+    .page-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
     }
 
     .page-btn {
       background: var(--bg-surface);
       border: 1px solid var(--border);
+      border-radius: var(--radius);
       color: var(--text-primary);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.75rem;
-      padding: 0.375rem 0.75rem;
+      font-size: 0.78rem;
+      font-weight: 500;
+      padding: 0.4rem 0.85rem;
       cursor: pointer;
       transition: border-color 150ms, background 150ms;
     }
@@ -419,7 +588,7 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
     }
 
     .page-btn:disabled {
-      opacity: 0.3;
+      opacity: 0.35;
       cursor: not-allowed;
     }
 
@@ -446,8 +615,8 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
       font-weight: 600;
     }
 
-    .price-change.positive { color: #22c55e; }
-    .price-change.negative { color: #ef4444; }
+    .price-change.positive { color: var(--up); }
+    .price-change.negative { color: var(--down); }
 
     .price-placeholder {
       color: var(--text-muted);
@@ -461,128 +630,59 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
       white-space: nowrap;
     }
 
-    .search-bar {
-      padding: 1rem 1.5rem 0;
-      flex-shrink: 0;
-    }
-
-    .search-wrap {
-      position: relative;
-    }
-
-    .search-input {
-      width: 100%;
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      color: var(--text-primary);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.875rem;
-      padding: 0.625rem 0.75rem;
-      outline: none;
-      transition: border-color 200ms ease;
-      box-sizing: border-box;
-    }
-
-    .search-input::placeholder {
-      color: var(--text-muted);
-    }
-
-    .search-input:focus {
-      border-color: var(--accent);
-    }
-
-    .search-dropdown {
-      position: absolute;
-      top: 100%;
-      left: 0;
-      right: 0;
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      border-top: none;
-      z-index: 20;
-      max-height: 280px;
-      overflow-y: auto;
-    }
-
-    .search-result {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      padding: 0.5rem 0.75rem;
-      cursor: pointer;
-      transition: background 100ms ease;
-    }
-
-    .search-result:hover {
-      background: var(--border);
-    }
-
-    .sr-symbol {
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 700;
-      font-size: 0.8125rem;
-      color: var(--text-primary);
-      min-width: 70px;
-    }
-
-    .sr-name {
-      font-size: 0.8125rem;
-      color: var(--text-secondary);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
+    // ── Mobile ──
     @media (max-width: 768px) {
-      .screener-header {
-        padding: 0.75rem 0.75rem 0.5rem;
+      .toolbar {
+        padding: 0.75rem 0.85rem 0.65rem;
+        gap: 0.65rem;
       }
 
-      .filter-bar {
-        gap: 0.5rem;
+      .toolbar-row {
+        flex-wrap: wrap;
+        gap: 0.65rem;
+      }
+
+      .search-wrap {
+        flex-basis: 100%;
+        max-width: none;
+        margin-left: 0;
+        order: 2;
       }
 
       .filter-group {
-        flex: 1 1 calc(50% - 0.5rem);
-        min-width: 0;
+        flex: 1;
       }
 
-      .filter-select,
-      .filter-input {
+      .filter-select {
         min-width: 0;
-        width: 100%;
-        font-size: 0.75rem;
-        padding: 0.5rem;
+        flex: 1;
       }
 
-      .result-count {
-        width: 100%;
-        text-align: right;
+      .sort-hint {
+        display: none;
       }
 
       td, th {
-        padding: 0.4rem 0.5rem;
+        padding: 0.42rem 0.5rem;
         font-size: 0.75rem;
       }
 
       .cell-name {
-        max-width: 120px;
+        max-width: 110px;
       }
 
       .pagination {
-        padding: 0.75rem 1rem;
-        padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
-        gap: 0.75rem;
+        padding: 0.65rem 0.85rem;
+        padding-bottom: calc(0.65rem + env(safe-area-inset-bottom, 0px));
       }
 
       .page-btn {
-        padding: 0.625rem 1.25rem;
-        font-size: 0.8125rem;
-        min-height: 44px;
+        padding: 0.55rem 1rem;
+        min-height: 42px;
       }
 
-      .page-info {
-        font-size: 0.8125rem;
+      .page-range {
+        display: none;
       }
     }
   `],
@@ -590,6 +690,8 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
 export class ScreenerComponent implements OnInit {
   private api = inject(ApiService);
   private router = inject(Router);
+
+  searchIcon = lucideSearch;
 
   sectors = signal<Sector[]>([]);
   items = signal<ScreenerItem[]>([]);
@@ -603,9 +705,11 @@ export class ScreenerComponent implements OnInit {
 
   selectedSector = signal('');
   minScore = signal(0);
-  sortBy = signal<'score' | 'symbol' | 'price' | 'mcap' | 'sector'>('score');
+  sortBy = signal<SortKey>('score');
+  sortDir = signal<'asc' | 'desc'>('desc');
   currentPage = signal(1);
   readonly pageSize = 50;
+  readonly skeletonRows = Array.from({ length: 14 }, (_, i) => i);
 
   filteredItems = computed(() => {
     let list = [...this.items()];
@@ -616,17 +720,18 @@ export class ScreenerComponent implements OnInit {
     }
 
     const sort = this.sortBy();
+    const dir = this.sortDir() === 'asc' ? 1 : -1;
     const q = this.quotes();
     if (sort === 'symbol') {
-      list.sort((a, b) => a.symbol.localeCompare(b.symbol));
+      list.sort((a, b) => dir * a.symbol.localeCompare(b.symbol));
     } else if (sort === 'price') {
-      list.sort((a, b) => (q[b.symbol]?.price ?? 0) - (q[a.symbol]?.price ?? 0));
+      list.sort((a, b) => dir * ((q[a.symbol]?.price ?? 0) - (q[b.symbol]?.price ?? 0)));
     } else if (sort === 'mcap') {
-      list.sort((a, b) => (q[b.symbol]?.market_cap ?? 0) - (q[a.symbol]?.market_cap ?? 0));
+      list.sort((a, b) => dir * ((q[a.symbol]?.market_cap ?? 0) - (q[b.symbol]?.market_cap ?? 0)));
     } else if (sort === 'sector') {
-      list.sort((a, b) => a.sector_name.localeCompare(b.sector_name));
+      list.sort((a, b) => dir * a.sector_name.localeCompare(b.sector_name));
     } else {
-      list.sort((a, b) => b.composite_score - a.composite_score);
+      list.sort((a, b) => dir * (a.composite_score - b.composite_score));
     }
 
     return list;
@@ -640,6 +745,14 @@ export class ScreenerComponent implements OnInit {
     return this.filteredItems().slice(start, start + this.pageSize);
   });
 
+  pageRangeLabel = computed(() => {
+    const total = this.filteredItems().length;
+    if (!total) return '';
+    const start = (this.currentPage() - 1) * this.pageSize + 1;
+    const end = Math.min(this.currentPage() * this.pageSize, total);
+    return `${start}-${end} of ${total}`;
+  });
+
   maxRatioCols = computed(() => {
     let max = 0;
     for (const item of this.items()) {
@@ -649,23 +762,22 @@ export class ScreenerComponent implements OnInit {
     return max || 1;
   });
 
-  ratioHeaders = computed(() => {
-    for (const item of this.items()) {
-      if (item.breakdown?.ratios?.length) {
-        return item.breakdown.ratios.map(r => r.name);
-      }
-    }
-    return [];
-  });
-
+  // Headers come from the first row that has ratios; each row's cells are
+  // then matched by ratio key so partial-data companies stay column-aligned
   ratioHeadersWithDesc = computed(() => {
     const items = this.filteredItems();
-    if (!items.length || !items[0].breakdown?.ratios?.length) return [];
-    return items[0].breakdown.ratios.map(r => ({
+    const first = items.find(i => i.breakdown?.ratios?.length);
+    if (!first) return [];
+    return first.breakdown.ratios.map(r => ({
+      key: r.key,
       name: r.name,
       description: r.description || '',
     }));
   });
+
+  ratioFor(item: ScreenerItem, key: string) {
+    return item.breakdown?.ratios?.find(r => r.key === key) ?? null;
+  }
 
   ngOnInit(): void {
     this.api.listSectors().subscribe({
@@ -684,6 +796,23 @@ export class ScreenerComponent implements OnInit {
     this.loadData();
   }
 
+  setSort(key: SortKey): void {
+    if (this.sortBy() === key) {
+      this.sortDir.update(d => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      this.sortBy.set(key);
+      // Text columns read better ascending by default, numbers descending
+      this.sortDir.set(key === 'symbol' || key === 'sector' ? 'asc' : 'desc');
+    }
+    this.currentPage.set(1);
+    this.loadQuotesForPage();
+  }
+
+  arrowFor(key: SortKey): string {
+    if (this.sortBy() !== key) return '';
+    return this.sortDir() === 'asc' ? '↑' : '↓';
+  }
+
   onSectorChange(sector: string): void {
     this.selectedSector.set(sector);
     this.currentPage.set(1);
@@ -692,11 +821,6 @@ export class ScreenerComponent implements OnInit {
 
   onMinScoreChange(val: number): void {
     this.minScore.set(val ?? 0);
-    this.currentPage.set(1);
-  }
-
-  onSortChange(sort: string): void {
-    this.sortBy.set(sort as any);
     this.currentPage.set(1);
   }
 

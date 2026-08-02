@@ -94,7 +94,13 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
         @if (detail()!.score) {
           <!-- Score area -->
           <section class="score-section">
-            <div class="score-hero">
+            <div class="score-card">
+              <div class="score-sub">
+                Composite score
+                @if (definitions()['composite_score']; as def) {
+                  <app-info-tooltip [description]="def.description" />
+                }
+              </div>
               <div class="score-number-area">
                 <span class="score-big">{{ displayScore() }}</span>
                 <span
@@ -103,14 +109,20 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
                   [style.color]="ratingColor()"
                 >{{ ratingLabel() }}</span>
               </div>
-              <div class="score-sub">
-                COMPOSITE SCORE
-                @if (definitions()['composite_score']; as def) {
-                  <app-info-tooltip [description]="def.description" />
-                }
-              </div>
+              @if (sectorRank() && sectorTotal()) {
+                <div class="rank-block">
+                  <div class="rank-line">
+                    Ranked <strong>#{{ sectorRank() }}</strong> of {{ sectorTotal() }} in {{ sectorName() }}
+                  </div>
+                  <div class="rank-track">
+                    <span class="rank-fill" [style.width.%]="sectorBeatPct()"></span>
+                  </div>
+                  <div class="rank-pct">Top {{ sectorPercentile() }}% of sector</div>
+                </div>
+              }
             </div>
-            <div class="radar-chart-container">
+            <div class="radar-card">
+              <div class="score-sub">Ratio profile</div>
               <div
                 echarts
                 [options]="radarOptions()"
@@ -118,16 +130,6 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
               ></div>
             </div>
           </section>
-
-          <!-- Sector rank context -->
-          @if (sectorRank() && sectorTotal()) {
-            <div class="sector-rank-bar">
-              <span class="rank-text">
-                Ranked <strong>#{{ sectorRank() }}</strong> of {{ sectorTotal() }} in {{ sectorName() }}
-              </span>
-              <span class="rank-percentile">Top {{ sectorPercentile() }}%</span>
-            </div>
-          }
 
           <!-- Breakdown table -->
           <section class="breakdown-section" @rowStagger>
@@ -260,9 +262,11 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
     }
 
     .company-name {
-      font-family: 'Inter', system-ui, sans-serif;
-      font-weight: 700;
+      font-family: 'Archivo', sans-serif;
+      font-stretch: 104%;
+      font-weight: 720;
       font-size: 1.75rem;
+      letter-spacing: -0.02em;
       color: var(--text-primary);
       margin: 0;
       line-height: 1.2;
@@ -281,7 +285,7 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
       text-transform: uppercase;
       letter-spacing: 0.04em;
       padding: 2px 8px;
-      background: rgba(136, 136, 160, 0.12);
+      background: rgba(147, 161, 175, 0.12);
       color: var(--text-secondary);
       white-space: nowrap;
     }
@@ -304,7 +308,7 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
 
     .watchlist-btn:hover {
       color: var(--accent);
-      border-color: rgba(212, 147, 13, 0.3);
+      border-color: rgba(226, 164, 40, 0.3);
       transform: scale(1.15);
     }
 
@@ -314,21 +318,70 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
 
     /* Score section */
     .score-section {
-      display: flex;
-      align-items: flex-start;
-      gap: 2rem;
-      margin-bottom: 2.5rem;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+      align-items: stretch;
     }
 
-    .score-hero {
-      flex-shrink: 0;
+    .score-card,
+    .radar-card {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.25rem 1.4rem;
+    }
+
+    .score-card {
+      display: flex;
+      flex-direction: column;
     }
 
     .score-number-area {
       display: flex;
       align-items: center;
       gap: 1rem;
+      margin-top: 0.75rem;
+    }
+
+    .rank-block {
+      margin-top: auto;
+      padding-top: 1.5rem;
+    }
+
+    .rank-line {
+      font-size: 0.8125rem;
+      color: var(--text-secondary);
+      margin-bottom: 0.55rem;
+    }
+
+    .rank-line strong {
+      color: var(--text-primary);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .rank-track {
+      height: 5px;
+      border-radius: 3px;
+      background: var(--bg-surface);
+      overflow: hidden;
+      margin-bottom: 0.45rem;
+    }
+
+    .rank-fill {
+      display: block;
+      height: 100%;
+      border-radius: 3px;
+      background: linear-gradient(to right, var(--accent), var(--accent-light));
+      transition: width 600ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .rank-pct {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--accent);
     }
 
     .score-big {
@@ -346,52 +399,33 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
       text-transform: uppercase;
       letter-spacing: 0.04em;
       padding: 4px 12px;
+      border-radius: 999px;
       white-space: nowrap;
       align-self: center;
     }
 
     .score-sub {
-      font-size: 0.625rem;
-      font-weight: 500;
+      font-size: 0.66rem;
+      font-weight: 600;
       letter-spacing: 0.12em;
       color: var(--text-muted);
       text-transform: uppercase;
-      margin-top: 0.5rem;
-    }
-
-    .radar-chart-container {
-      flex-shrink: 0;
     }
 
     .radar-chart {
-      width: 360px;
-      height: 360px;
+      width: 100%;
+      height: 300px;
+      margin-top: 0.5rem;
     }
 
-    .sector-rank-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
-      padding: 0.75rem 1rem;
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      margin-bottom: 2rem;
-      font-size: 0.8125rem;
-      color: var(--text-secondary);
-    }
+    @media (max-width: 768px) {
+      .score-section {
+        grid-template-columns: 1fr;
+      }
 
-    .rank-text strong {
-      color: var(--text-primary);
-      font-family: 'JetBrains Mono', monospace;
-    }
-
-    .rank-percentile {
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 600;
-      color: var(--accent);
-      font-size: 0.8125rem;
-      white-space: nowrap;
+      .radar-chart {
+        height: 260px;
+      }
     }
 
     /* Breakdown section */
@@ -410,6 +444,7 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
 
     .breakdown-table {
       border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
       overflow: hidden;
     }
 
@@ -503,11 +538,11 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
       line-height: 0;
     }
 
-    .threshold-segment.poor { background: #ef4444; }
-    .threshold-segment.weak { background: #f97316; }
+    .threshold-segment.poor { background: #e5484d; }
+    .threshold-segment.weak { background: #f0883e; }
     .threshold-segment.neutral { background: var(--accent); }
-    .threshold-segment.good { background: #84cc16; }
-    .threshold-segment.strong { background: #22c55e; }
+    .threshold-segment.good { background: #8fc63d; }
+    .threshold-segment.strong { background: #2ebd70; }
 
     .current-marker {
       display: flex;
@@ -546,8 +581,8 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
       font-weight: 600;
     }
 
-    .price-change-lg.positive { color: #22c55e; }
-    .price-change-lg.negative { color: #ef4444; }
+    .price-change-lg.positive { color: #2ebd70; }
+    .price-change-lg.negative { color: #e5484d; }
 
     .price-meta {
       display: flex;
@@ -587,8 +622,9 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
       flex-direction: column;
       gap: 4px;
       padding: 0.75rem 1rem;
-      background: var(--bg-surface);
+      background: var(--bg-elevated);
       border: 1px solid var(--border);
+      border-radius: var(--radius);
       min-width: 120px;
     }
 
@@ -641,7 +677,16 @@ export class TickerComponent implements OnInit, AfterViewInit {
   sectorName = signal<string | null>(null);
   sectorRank = signal<number | null>(null);
   sectorTotal = signal<number | null>(null);
+  // Rank 20 of 65 puts a company in the top 31% (20/65), not the top 71%
   sectorPercentile = computed(() => {
+    const rank = this.sectorRank();
+    const total = this.sectorTotal();
+    if (!rank || !total) return 0;
+    return Math.max(1, Math.round((rank / total) * 100));
+  });
+
+  // Share of the sector this company ranks at or above; drives the bar fill
+  sectorBeatPct = computed(() => {
     const rank = this.sectorRank();
     const total = this.sectorTotal();
     if (!rank || !total) return 0;
@@ -671,24 +716,24 @@ export class TickerComponent implements OnInit, AfterViewInit {
 
   ratingColor = computed(() => {
     const map: Record<string, string> = {
-      strong_buy: '#22c55e',
-      buy: '#84cc16',
-      hold: '#d4930d',
-      sell: '#ef4444',
-      strong_sell: '#dc2626',
+      strong_buy: '#2ebd70',
+      buy: '#8fc63d',
+      hold: '#e2a428',
+      sell: '#e5484d',
+      strong_sell: '#d03136',
     };
-    return map[this.detail()?.score?.rating ?? ''] ?? '#8888a0';
+    return map[this.detail()?.score?.rating ?? ''] ?? '#93a1af';
   });
 
   ratingBg = computed(() => {
     const map: Record<string, string> = {
-      strong_buy: 'rgba(34, 197, 94, 0.12)',
-      buy: 'rgba(132, 204, 22, 0.12)',
-      hold: 'rgba(212, 147, 13, 0.12)',
-      sell: 'rgba(239, 68, 68, 0.12)',
-      strong_sell: 'rgba(220, 38, 38, 0.12)',
+      strong_buy: 'rgba(46, 189, 112, 0.12)',
+      buy: 'rgba(143, 198, 61, 0.12)',
+      hold: 'rgba(226, 164, 40, 0.12)',
+      sell: 'rgba(229, 72, 77, 0.12)',
+      strong_sell: 'rgba(208, 49, 54, 0.12)',
     };
-    return map[this.detail()?.score?.rating ?? ''] ?? 'rgba(136, 136, 160, 0.12)';
+    return map[this.detail()?.score?.rating ?? ''] ?? 'rgba(147, 161, 175, 0.12)';
   });
 
   radarOptions = computed<EChartsCoreOption>(() => {
@@ -703,7 +748,7 @@ export class TickerComponent implements OnInit, AfterViewInit {
         radius: '55%',
         shape: 'polygon' as const,
         axisName: {
-          color: this.theme.theme() === 'dark' ? '#8888a0' : '#4a4a65',
+          color: this.theme.theme() === 'dark' ? '#93a1af' : '#4a4a65',
           fontSize: 11,
         },
         splitArea: {
@@ -715,12 +760,12 @@ export class TickerComponent implements OnInit, AfterViewInit {
         },
         splitLine: {
           lineStyle: {
-            color: this.theme.theme() === 'dark' ? '#252540' : '#d8d8e4',
+            color: this.theme.theme() === 'dark' ? '#243040' : '#d8d8e4',
           },
         },
         axisLine: {
           lineStyle: {
-            color: this.theme.theme() === 'dark' ? '#252540' : '#d8d8e4',
+            color: this.theme.theme() === 'dark' ? '#243040' : '#d8d8e4',
           },
         },
       },
@@ -729,14 +774,14 @@ export class TickerComponent implements OnInit, AfterViewInit {
         data: [{
           value: r.map(ratio => ratio.points),
           areaStyle: {
-            color: 'rgba(212, 147, 13, 0.2)',
+            color: 'rgba(226, 164, 40, 0.2)',
           },
           lineStyle: {
-            color: '#d4930d',
+            color: '#e2a428',
             width: 2,
           },
           itemStyle: {
-            color: '#d4930d',
+            color: '#e2a428',
           },
         }],
       }],
@@ -766,13 +811,13 @@ export class TickerComponent implements OnInit, AfterViewInit {
 
   bucketColor(bucket: string): string {
     const map: Record<string, string> = {
-      strong: '#22c55e',
-      good: '#84cc16',
-      neutral: '#d4930d',
-      weak: '#f97316',
-      poor: '#ef4444',
+      strong: '#2ebd70',
+      good: '#8fc63d',
+      neutral: '#e2a428',
+      weak: '#f0883e',
+      poor: '#e5484d',
     };
-    return map[bucket] ?? '#8888a0';
+    return map[bucket] ?? '#93a1af';
   }
 
   formatRatio(value: number): string {

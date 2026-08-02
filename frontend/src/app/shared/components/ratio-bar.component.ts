@@ -50,12 +50,12 @@ export class RatioBarComponent {
 
   fillColor = computed(() => {
     const map: Record<string, string> = {
-      strong: '#22c55e',
-      good: '#84cc16',
-      neutral: '#d4930d',
-      weak: '#f97316',
-      poor: '#ef4444',
+      strong: '#2ebd70',
+      good: '#8fc63d',
+      neutral: '#e2a428',
+      weak: '#f0883e',
+      poor: '#e5484d',
     };
-    return map[this.rangeBucket()] ?? '#555570';
+    return map[this.rangeBucket()] ?? '#5c6b79';
   });
 }

@@ -1,8 +1,8 @@
-<div class="flex h-screen">
+<div class="flex h-screen app-shell" [class.has-chrome]="!isLandingPage()">
   @if (!isLandingPage()) {
     <app-sidebar />
   }
-  <main class="flex-1 overflow-auto">
+  <main class="flex-1 overflow-auto app-main">
     <router-outlet />
   </main>
 </div>

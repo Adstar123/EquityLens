@@ -32,7 +32,8 @@ import { Component, input, computed } from '@angular/core';
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.04em;
-      padding: 2px 6px;
+      padding: 2px 8px;
+      border-radius: 999px;
       line-height: 1.2;
       white-space: nowrap;
     }
@@ -54,23 +55,23 @@ export class ScoreBadgeComponent {
 
   ratingColor = computed(() => {
     const map: Record<string, string> = {
-      strong_buy: '#22c55e',
-      buy: '#84cc16',
-      hold: '#d4930d',
-      sell: '#ef4444',
-      strong_sell: '#dc2626',
+      strong_buy: '#2ebd70',
+      buy: '#8fc63d',
+      hold: '#e2a428',
+      sell: '#e5484d',
+      strong_sell: '#d03136',
     };
-    return map[this.rating()] ?? '#8888a0';
+    return map[this.rating()] ?? '#93a1af';
   });
 
   ratingBg = computed(() => {
     const map: Record<string, string> = {
-      strong_buy: 'rgba(34, 197, 94, 0.12)',
-      buy: 'rgba(132, 204, 22, 0.12)',
-      hold: 'rgba(212, 147, 13, 0.12)',
-      sell: 'rgba(239, 68, 68, 0.12)',
-      strong_sell: 'rgba(220, 38, 38, 0.12)',
+      strong_buy: 'rgba(46, 189, 112, 0.12)',
+      buy: 'rgba(143, 198, 61, 0.12)',
+      hold: 'rgba(226, 164, 40, 0.12)',
+      sell: 'rgba(229, 72, 77, 0.12)',
+      strong_sell: 'rgba(208, 49, 54, 0.12)',
     };
-    return map[this.rating()] ?? 'rgba(136, 136, 160, 0.12)';
+    return map[this.rating()] ?? 'rgba(147, 161, 175, 0.12)';
   });
 }
