@@ -1,5 +1,6 @@
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { Title } from '@angular/platform-browser';
 import {
   trigger,
   transition,
@@ -23,7 +24,7 @@ type SortDir = 'asc' | 'desc';
 @Component({
   selector: 'app-sector',
   standalone: true,
-  imports: [ScoreBadgeComponent, RatioBarComponent, NgxEchartsDirective, InfoTooltipComponent],
+  imports: [RouterLink, ScoreBadgeComponent, RatioBarComponent, NgxEchartsDirective, InfoTooltipComponent],
   animations: [
     trigger('tableStagger', [
       transition(':enter', [
@@ -105,7 +106,9 @@ type SortDir = 'asc' | 'desc';
                   @for (item of sortedItems(); track item.symbol; let i = $index) {
                     <tr class="table-row" (click)="goToTicker(item.symbol)">
                       <td class="cell-rank">{{ i + 1 }}</td>
-                      <td class="cell-symbol">{{ item.symbol }}</td>
+                      <td class="cell-symbol">
+                        <a class="symbol-link" [routerLink]="['/ticker', item.symbol]" (click)="$event.stopPropagation()">{{ item.symbol }}</a>
+                      </td>
                       <td class="cell-name">{{ item.company_name }}</td>
                       <td class="cell-score">
                         <app-score-badge [score]="item.composite_score" [rating]="item.rating" />
@@ -312,18 +315,62 @@ type SortDir = 'asc' | 'desc';
       white-space: nowrap;
     }
 
+    th.col-rank,
     .cell-rank {
+      position: sticky;
+      left: 0;
+      background: var(--bg-base);
+      width: 34px;
+      min-width: 34px;
+      max-width: 34px;
+      box-sizing: border-box;
+    }
+
+    th.col-rank {
+      z-index: 12;
+    }
+
+    .cell-rank {
+      z-index: 5;
       font-family: 'JetBrains Mono', monospace;
       color: var(--text-muted);
       font-size: 0.6875rem;
-      width: 30px;
+    }
+
+    th.col-symbol,
+    .cell-symbol {
+      position: sticky;
+      left: 34px;
+      background: var(--bg-base);
+      border-right: 1px solid var(--border);
+    }
+
+    th.col-symbol {
+      z-index: 12;
     }
 
     .cell-symbol {
+      z-index: 5;
       font-family: 'JetBrains Mono', monospace;
       font-weight: 700;
       color: var(--text-primary);
       letter-spacing: 0.02em;
+    }
+
+    tbody tr:hover .cell-rank,
+    tbody tr:hover .cell-symbol {
+      background: var(--bg-surface);
+    }
+
+    .symbol-link {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .symbol-link:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+      border-radius: 3px;
     }
 
     .cell-name {
@@ -423,6 +470,7 @@ type SortDir = 'asc' | 'desc';
 export class SectorComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
+  private titleService = inject(Title);
   private api = inject(ApiService);
   private theme = inject(ThemeService);
 
@@ -713,6 +761,9 @@ export class SectorComponent implements OnInit {
         this.sector.set(found ?? null);
         this.items.set(found ? items : []);
         this.loading.set(false);
+        this.titleService.setTitle(
+          found ? `${found.display_name} · EquityLens` : 'Sector not found · EquityLens',
+        );
       },
       error: () => {
         this.sector.set(null);

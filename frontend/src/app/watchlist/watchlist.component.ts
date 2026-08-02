@@ -1,5 +1,5 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import {
   trigger,
   transition,
@@ -24,7 +24,7 @@ interface WatchlistRow {
 @Component({
   selector: 'app-watchlist',
   standalone: true,
-  imports: [ScoreBadgeComponent],
+  imports: [RouterLink, ScoreBadgeComponent],
   animations: [
     trigger('fadeIn', [
       transition(':enter', [
@@ -73,7 +73,9 @@ interface WatchlistRow {
             <tbody>
               @for (row of rows(); track row.symbol) {
                 <tr class="wl-row" (click)="goToTicker(row.symbol)">
-                  <td class="cell-symbol">{{ row.symbol }}</td>
+                  <td class="cell-symbol">
+                    <a class="symbol-link" [routerLink]="['/ticker', row.symbol]" (click)="$event.stopPropagation()">{{ row.symbol }}</a>
+                  </td>
                   <td class="cell-name">{{ row.name }}</td>
                   <td class="cell-sector">{{ row.sector_id ?? '—' }}</td>
                   <td class="cell-score">
@@ -192,6 +194,17 @@ interface WatchlistRow {
       font-weight: 700;
       color: var(--text-primary);
       letter-spacing: 0.02em;
+    }
+
+    .symbol-link {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .symbol-link:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+      border-radius: 3px;
     }
 
     .cell-name {

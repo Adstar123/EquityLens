@@ -1,5 +1,7 @@
 import { Component, inject, signal, computed, OnInit, AfterViewInit } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { Location } from '@angular/common';
+import { Title } from '@angular/platform-browser';
 import {
   trigger,
   transition,
@@ -15,11 +17,18 @@ import { AuthService } from '../core/auth.service';
 import { ThemeService } from '../core/theme.service';
 import { RatioBarComponent } from '../shared/components/ratio-bar.component';
 import { InfoTooltipComponent } from '../shared/components/info-tooltip.component';
+import { TickerSearchComponent } from '../shared/components/ticker-search.component';
+
+interface SectorPeer {
+  symbol: string;
+  name: string;
+  score: number;
+}
 
 @Component({
   selector: 'app-ticker',
   standalone: true,
-  imports: [RouterLink, RatioBarComponent, NgxEchartsDirective, InfoTooltipComponent],
+  imports: [RouterLink, RatioBarComponent, NgxEchartsDirective, InfoTooltipComponent, TickerSearchComponent],
   animations: [
     trigger('rowStagger', [
       transition(':enter', [
@@ -44,7 +53,7 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
     } @else if (detail()) {
       <div class="ticker-page" @fadeIn>
         <!-- Back link -->
-        <a routerLink="/screener" class="back-link">&larr; Screener</a>
+        <button class="back-link" (click)="goBack()">&larr; Back</button>
 
         <!-- Top section: company info -->
         <header class="company-header">
@@ -188,6 +197,22 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
             </div>
           </section>
 
+          <!-- Sector peers -->
+          @if (sectorPeers().length > 0) {
+            <section class="peers-section">
+              <h2 class="peers-title">Top of {{ sectorName() }}</h2>
+              <div class="peers-row">
+                @for (peer of sectorPeers(); track peer.symbol) {
+                  <a class="peer-card" [routerLink]="['/ticker', peer.symbol]">
+                    <span class="peer-symbol">{{ peer.symbol }}</span>
+                    <span class="peer-name">{{ peer.name }}</span>
+                    <span class="peer-score">{{ peer.score }}</span>
+                  </a>
+                }
+              </div>
+            </section>
+          }
+
           <!-- Context ratios (display-only) -->
           @if (contextRatios().length > 0) {
             <section class="context-section">
@@ -215,7 +240,18 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
         }
       </div>
     } @else {
-      <div class="error-state">Ticker not found.</div>
+      <div class="nf-state">
+        <p class="nf-code">Not found</p>
+        <h1 class="nf-title">No ticker called {{ requestedSymbol() }}.</h1>
+        <p class="nf-sub">
+          It may not be in the ASX&nbsp;300, or the symbol was mistyped.
+          Try a search, or browse the full screener.
+        </p>
+        <div class="nf-search">
+          <app-ticker-search placeholder="Search any ASX ticker or company" />
+        </div>
+        <a routerLink="/screener" class="nf-screener-link">Open the screener</a>
+      </div>
     }
   `,
   styles: [`
@@ -243,10 +279,132 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
       text-decoration: none;
       margin-bottom: 1.5rem;
       transition: color 150ms ease;
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      font-family: inherit;
     }
 
     .back-link:hover {
       color: var(--accent);
+    }
+
+    /* Not-found state */
+    .nf-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      min-height: 100%;
+      max-width: 440px;
+      margin: 0 auto;
+      padding: 4rem 1.5rem;
+    }
+
+    .nf-code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin: 0 0 0.5rem;
+    }
+
+    .nf-title {
+      font-family: 'Archivo', sans-serif;
+      font-stretch: 104%;
+      font-weight: 720;
+      font-size: 1.5rem;
+      letter-spacing: -0.02em;
+      color: var(--text-primary);
+      margin: 0 0 0.6rem;
+    }
+
+    .nf-sub {
+      font-size: 0.875rem;
+      line-height: 1.65;
+      color: var(--text-secondary);
+      margin: 0 0 1.5rem;
+    }
+
+    .nf-search {
+      width: 100%;
+      margin-bottom: 1.25rem;
+    }
+
+    .nf-screener-link {
+      font-size: 0.84rem;
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .nf-screener-link:hover {
+      color: var(--accent-light);
+    }
+
+    /* Sector peers */
+    .peers-section {
+      margin-top: 2rem;
+    }
+
+    .peers-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin: 0 0 0.75rem;
+    }
+
+    .peers-row {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .peer-card {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 0.65rem 0.9rem;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      text-decoration: none;
+      min-width: 130px;
+      transition: border-color 150ms ease, transform 150ms ease;
+    }
+
+    .peer-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-1px);
+    }
+
+    .peer-symbol {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 0.8rem;
+      color: var(--text-primary);
+    }
+
+    .peer-name {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      max-width: 140px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .peer-score {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: var(--accent);
+      margin-top: 3px;
     }
 
     /* Company header */
@@ -660,6 +818,9 @@ import { InfoTooltipComponent } from '../shared/components/info-tooltip.componen
 })
 export class TickerComponent implements OnInit, AfterViewInit {
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
+  private location = inject(Location);
+  private titleService = inject(Title);
   private api = inject(ApiService);
   readonly auth = inject(AuthService);
   private theme = inject(ThemeService);
@@ -677,6 +838,8 @@ export class TickerComponent implements OnInit, AfterViewInit {
   sectorName = signal<string | null>(null);
   sectorRank = signal<number | null>(null);
   sectorTotal = signal<number | null>(null);
+  sectorPeers = signal<SectorPeer[]>([]);
+  requestedSymbol = signal('');
   // Rank 20 of 65 puts a company in the top 31% (20/65), not the top 71%
   sectorPercentile = computed(() => {
     const rank = this.sectorRank();
@@ -788,10 +951,22 @@ export class TickerComponent implements OnInit, AfterViewInit {
     };
   });
 
+  goBack(): void {
+    // Prefer real history so back returns to the exact screener/sector state;
+    // fall back to the screener for direct visits
+    const state = window.history.state as { navigationId?: number } | null;
+    if (state?.navigationId && state.navigationId > 1) {
+      this.location.back();
+    } else {
+      this.router.navigate(['/screener']);
+    }
+  }
+
   ngOnInit(): void {
     this.route.paramMap.subscribe(params => {
       const symbol = params.get('symbol');
       if (symbol) {
+        this.requestedSymbol.set(symbol.toUpperCase());
         this.loadTicker(symbol);
         this.checkWatchlistStatus(symbol);
       }
@@ -878,6 +1053,7 @@ export class TickerComponent implements OnInit, AfterViewInit {
       next: (data) => {
         this.detail.set(data);
         this.loading.set(false);
+        this.titleService.setTitle(`${data.company.symbol} ${data.company.name} · EquityLens`);
         this.api.getQuote(symbol).subscribe({
           next: (q) => this.quote.set(q),
           error: () => this.quote.set(null),
@@ -893,6 +1069,7 @@ export class TickerComponent implements OnInit, AfterViewInit {
       error: () => {
         this.detail.set(null);
         this.loading.set(false);
+        this.titleService.setTitle('Ticker not found · EquityLens');
       },
     });
   }
@@ -904,13 +1081,23 @@ export class TickerComponent implements OnInit, AfterViewInit {
         if (!sector) return;
         this.sectorName.set(sector.display_name);
 
-        // Load sector screener to find rank
+        // Load sector screener to find rank + peers
         this.api.screener({ sector: sector.key }).subscribe({
           next: (items) => {
             const sorted = [...items].sort((a, b) => b.composite_score - a.composite_score);
             const rank = sorted.findIndex(i => i.symbol.toUpperCase() === symbol.toUpperCase()) + 1;
             this.sectorTotal.set(sorted.length);
             this.sectorRank.set(rank > 0 ? rank : null);
+            this.sectorPeers.set(
+              sorted
+                .filter(i => i.symbol.toUpperCase() !== symbol.toUpperCase() && i.rating !== 'insufficient_data')
+                .slice(0, 5)
+                .map(i => ({
+                  symbol: i.symbol,
+                  name: i.company_name,
+                  score: Math.round(i.composite_score),
+                })),
+            );
           },
         });
       },

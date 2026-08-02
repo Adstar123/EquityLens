@@ -1,19 +1,18 @@
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { NgIcon } from '@ng-icons/core';
-import { lucideSearch } from '@ng-icons/lucide';
-import { ApiService, ScreenerItem, Sector, Quote, Company, Definition } from '../core/api.service';
+import { ApiService, ScreenerItem, Sector, Quote, Definition } from '../core/api.service';
 import { ScoreBadgeComponent } from '../shared/components/score-badge.component';
 import { RatioBarComponent } from '../shared/components/ratio-bar.component';
 import { InfoTooltipComponent } from '../shared/components/info-tooltip.component';
+import { TickerSearchComponent } from '../shared/components/ticker-search.component';
 
 type SortKey = 'score' | 'symbol' | 'price' | 'mcap' | 'sector';
 
 @Component({
   selector: 'app-screener',
   standalone: true,
-  imports: [FormsModule, NgIcon, ScoreBadgeComponent, RatioBarComponent, InfoTooltipComponent],
+  imports: [FormsModule, RouterLink, ScoreBadgeComponent, RatioBarComponent, InfoTooltipComponent, TickerSearchComponent],
   template: `
     <div class="screener-container">
       <!-- Toolbar -->
@@ -24,27 +23,8 @@ type SortKey = 'score' | 'symbol' | 'price' | 'mcap' | 'sector';
             <span class="page-count">{{ filteredItems().length }} of {{ items().length }}</span>
           </div>
 
-          <div class="search-wrap">
-            <ng-icon [svg]="searchIcon" class="search-icon" size="15" />
-            <input
-              type="text"
-              class="search-input"
-              placeholder="Search ticker or company"
-              [ngModel]="searchQuery()"
-              (ngModelChange)="onSearch($event)"
-              (keydown.enter)="goToFirstResult()"
-              (blur)="clearSearchDelayed()"
-            />
-            @if (searchResults().length > 0) {
-              <div class="search-dropdown">
-                @for (result of searchResults(); track result.symbol) {
-                  <div class="search-result" (mousedown)="goToTicker(result.symbol)">
-                    <span class="sr-symbol">{{ result.symbol }}</span>
-                    <span class="sr-name">{{ result.name }}</span>
-                  </div>
-                }
-              </div>
-            }
+          <div class="search-slot">
+            <app-ticker-search />
           </div>
         </div>
 
@@ -153,7 +133,9 @@ type SortKey = 'score' | 'symbol' | 'price' | 'mcap' | 'sector';
             <tbody>
               @for (item of pagedItems(); track item.symbol) {
                 <tr class="table-row" (click)="goToTicker(item.symbol)">
-                  <td class="cell-symbol">{{ item.symbol }}</td>
+                  <td class="cell-symbol">
+                    <a class="symbol-link" [routerLink]="['/ticker', item.symbol]" (click)="$event.stopPropagation()">{{ item.symbol }}</a>
+                  </td>
                   <td class="cell-name">{{ item.company_name }}</td>
                   <td class="cell-price">
                     @if (quotes()[item.symbol]; as q) {
@@ -270,86 +252,10 @@ type SortKey = 'score' | 'symbol' | 'price' | 'mcap' | 'sector';
       color: var(--text-muted);
     }
 
-    .search-wrap {
-      position: relative;
+    .search-slot {
       flex: 1;
       max-width: 420px;
       margin-left: auto;
-    }
-
-    .search-icon {
-      position: absolute;
-      left: 11px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--text-muted);
-      pointer-events: none;
-      display: flex;
-    }
-
-    .search-input {
-      width: 100%;
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      color: var(--text-primary);
-      font-size: 0.85rem;
-      padding: 0.5rem 0.75rem 0.5rem 2rem;
-      outline: none;
-      transition: border-color 160ms ease, box-shadow 160ms ease;
-      box-sizing: border-box;
-    }
-
-    .search-input::placeholder {
-      color: var(--text-muted);
-    }
-
-    .search-input:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--accent-soft);
-    }
-
-    .search-dropdown {
-      position: absolute;
-      top: calc(100% + 4px);
-      left: 0;
-      right: 0;
-      background: var(--bg-elevated);
-      border: 1px solid var(--border-strong);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow-card);
-      z-index: 30;
-      max-height: 300px;
-      overflow-y: auto;
-    }
-
-    .search-result {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      padding: 0.55rem 0.75rem;
-      cursor: pointer;
-      transition: background 100ms ease;
-    }
-
-    .search-result:hover {
-      background: var(--bg-surface);
-    }
-
-    .sr-symbol {
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 700;
-      font-size: 0.8rem;
-      color: var(--text-primary);
-      min-width: 70px;
-    }
-
-    .sr-name {
-      font-size: 0.8rem;
-      color: var(--text-secondary);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
     }
 
     .filters-row {
@@ -475,12 +381,38 @@ type SortKey = 'score' | 'symbol' | 'price' | 'mcap' | 'sector';
       white-space: nowrap;
     }
 
+    th.col-symbol {
+      left: 0;
+      z-index: 12;
+      border-right: 1px solid var(--border);
+    }
+
     .cell-symbol {
+      position: sticky;
+      left: 0;
+      z-index: 5;
+      background: var(--bg-base);
+      border-right: 1px solid var(--border);
       font-family: 'JetBrains Mono', monospace;
       font-weight: 700;
       color: var(--text-primary);
       letter-spacing: 0.02em;
       transition: color 100ms ease;
+    }
+
+    tbody tr.table-row:hover .cell-symbol {
+      background: var(--bg-surface);
+    }
+
+    .symbol-link {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .symbol-link:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+      border-radius: 3px;
     }
 
     .cell-name {
@@ -642,7 +574,7 @@ type SortKey = 'score' | 'symbol' | 'price' | 'mcap' | 'sector';
         gap: 0.65rem;
       }
 
-      .search-wrap {
+      .search-slot {
         flex-basis: 100%;
         max-width: none;
         margin-left: 0;
@@ -691,16 +623,11 @@ export class ScreenerComponent implements OnInit {
   private api = inject(ApiService);
   private router = inject(Router);
 
-  searchIcon = lucideSearch;
-
   sectors = signal<Sector[]>([]);
   items = signal<ScreenerItem[]>([]);
   loading = signal(false);
   quotes = signal<Record<string, Quote>>({});
   definitions = signal<Record<string, Definition>>({});
-  searchQuery = signal('');
-  searchResults = signal<Company[]>([]);
-  private searchTimeout: ReturnType<typeof setTimeout> | null = null;
   quotesLoading = signal(false);
 
   selectedSector = signal('');
@@ -822,38 +749,6 @@ export class ScreenerComponent implements OnInit {
   onMinScoreChange(val: number): void {
     this.minScore.set(val ?? 0);
     this.currentPage.set(1);
-  }
-
-  onSearch(query: string): void {
-    this.searchQuery.set(query);
-    if (this.searchTimeout) clearTimeout(this.searchTimeout);
-    if (!query || query.length < 1) {
-      this.searchResults.set([]);
-      return;
-    }
-    this.searchTimeout = setTimeout(() => {
-      this.api.searchTickers(query).subscribe({
-        next: (results) => this.searchResults.set(results.slice(0, 8)),
-        error: () => this.searchResults.set([]),
-      });
-    }, 250);
-  }
-
-  goToFirstResult(): void {
-    const results = this.searchResults();
-    if (results.length > 0) {
-      this.goToTicker(results[0].symbol);
-    } else {
-      const q = this.searchQuery().trim().toUpperCase();
-      if (q) this.goToTicker(q);
-    }
-  }
-
-  clearSearchDelayed(): void {
-    setTimeout(() => {
-      this.searchQuery.set('');
-      this.searchResults.set([]);
-    }, 200);
   }
 
   nextPage(): void {

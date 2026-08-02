@@ -31,5 +31,22 @@ export class App {
       .subscribe((e) => {
         this.isLandingPage.set(e.urlAfterRedirects === '/');
       });
+
+    // "/" focuses the nearest ticker search box, terminal style
+    document.addEventListener('keydown', (event: KeyboardEvent) => {
+      if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target && (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable
+      )) return;
+      const search = document.querySelector<HTMLInputElement>('[data-ticker-search]');
+      if (search) {
+        event.preventDefault();
+        search.focus();
+      }
+    });
   }
 }

@@ -43,7 +43,8 @@ export class ScoreBadgeComponent {
   score = input.required<number>();
   rating = input.required<string>();
 
-  formattedScore = computed(() => this.score().toFixed(1));
+  // Whole numbers only; a decimal place implies precision the model doesn't have
+  formattedScore = computed(() => Math.round(this.score()).toString());
 
   ratingLabel = computed(() => {
     const labels: Record<string, string> = {

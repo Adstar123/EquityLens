@@ -1,13 +1,11 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { FormsModule } from '@angular/forms';
 import { trigger, transition, style, animate } from '@angular/animations';
-import { NgIcon } from '@ng-icons/core';
-import { lucideSearch } from '@ng-icons/lucide';
 import { AuthService } from '../core/auth.service';
-import { ApiService, Company } from '../core/api.service';
+import { ApiService } from '../core/api.service';
 import { loadMoverRows, computeDivergence, MoverRow } from '../core/movers';
 import { ScoreBadgeComponent } from '../shared/components/score-badge.component';
+import { TickerSearchComponent } from '../shared/components/ticker-search.component';
 import { forkJoin } from 'rxjs';
 
 interface WatchlistRow {
@@ -20,7 +18,7 @@ interface WatchlistRow {
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [FormsModule, RouterLink, NgIcon, ScoreBadgeComponent],
+  imports: [RouterLink, ScoreBadgeComponent, TickerSearchComponent],
   animations: [
     trigger('fadeIn', [
       transition(':enter', [
@@ -37,27 +35,7 @@ interface WatchlistRow {
       </header>
 
       <section class="search-section">
-        <div class="search-wrap">
-          <ng-icon [svg]="searchIcon" class="search-icon" size="16" />
-          <input
-            type="text"
-            class="search-input"
-            placeholder="Search any ASX ticker or company"
-            [ngModel]="searchQuery()"
-            (ngModelChange)="onSearch($event)"
-            (keydown.enter)="goToFirstResult()"
-          />
-          @if (searchResults().length > 0) {
-            <div class="search-dropdown">
-              @for (result of searchResults(); track result.symbol) {
-                <div class="search-result" (click)="goToTicker(result.symbol)">
-                  <span class="sr-symbol">{{ result.symbol }}</span>
-                  <span class="sr-name">{{ result.name }}</span>
-                </div>
-              }
-            </div>
-          }
-        </div>
+        <app-ticker-search placeholder="Search any ASX ticker or company" />
       </section>
 
       <div class="dash-grid">
@@ -175,85 +153,6 @@ interface WatchlistRow {
     /* Search */
     .search-section {
       margin-bottom: 2rem;
-    }
-
-    .search-wrap {
-      position: relative;
-    }
-
-    .search-icon {
-      position: absolute;
-      left: 14px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--text-muted);
-      pointer-events: none;
-      display: flex;
-    }
-
-    .search-input {
-      width: 100%;
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      color: var(--text-primary);
-      font-size: 0.95rem;
-      padding: 0.8rem 1rem 0.8rem 2.5rem;
-      outline: none;
-      transition: border-color 180ms ease, box-shadow 180ms ease;
-      box-sizing: border-box;
-    }
-
-    .search-input::placeholder {
-      color: var(--text-muted);
-    }
-
-    .search-input:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--accent-soft);
-    }
-
-    .search-dropdown {
-      position: absolute;
-      top: calc(100% + 6px);
-      left: 0;
-      right: 0;
-      background: var(--bg-elevated);
-      border: 1px solid var(--border-strong);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow-card);
-      z-index: 20;
-      max-height: 300px;
-      overflow-y: auto;
-    }
-
-    .search-result {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      padding: 0.6rem 1rem;
-      cursor: pointer;
-      transition: background 100ms ease;
-    }
-
-    .search-result:hover {
-      background: var(--bg-surface);
-    }
-
-    .sr-symbol {
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 700;
-      font-size: 0.8125rem;
-      color: var(--text-primary);
-      min-width: 70px;
-    }
-
-    .sr-name {
-      font-size: 0.8125rem;
-      color: var(--text-secondary);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
     }
 
     /* Cards */
@@ -420,17 +319,11 @@ export class DashboardComponent implements OnInit {
   private auth = inject(AuthService);
   private api = inject(ApiService);
 
-  searchIcon = lucideSearch;
-
-  searchQuery = signal('');
-  searchResults = signal<Company[]>([]);
   watchlistRows = signal<WatchlistRow[]>([]);
   watchlistLoading = signal(true);
   strongFallers = signal<MoverRow[]>([]);
   weakRallies = signal<MoverRow[]>([]);
   moversLoading = signal(true);
-
-  private searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
   userName = () => {
     const name = this.auth.user()?.name ?? 'there';
@@ -449,42 +342,8 @@ export class DashboardComponent implements OnInit {
     this.loadMoversPanel();
   }
 
-  onSearch(query: string): void {
-    this.searchQuery.set(query);
-
-    if (this.searchTimeout) {
-      clearTimeout(this.searchTimeout);
-    }
-
-    if (!query || query.length < 1) {
-      this.searchResults.set([]);
-      return;
-    }
-
-    this.searchTimeout = setTimeout(() => {
-      this.api.searchTickers(query).subscribe({
-        next: (results) => this.searchResults.set(results.slice(0, 8)),
-        error: () => this.searchResults.set([]),
-      });
-    }, 250);
-  }
-
   goToTicker(symbol: string): void {
-    this.searchQuery.set('');
-    this.searchResults.set([]);
     this.router.navigate(['/ticker', symbol]);
-  }
-
-  goToFirstResult(): void {
-    const results = this.searchResults();
-    if (results.length > 0) {
-      this.goToTicker(results[0].symbol);
-    } else {
-      const q = this.searchQuery().trim().toUpperCase();
-      if (q) {
-        this.goToTicker(q);
-      }
-    }
   }
 
   private loadMoversPanel(): void {
