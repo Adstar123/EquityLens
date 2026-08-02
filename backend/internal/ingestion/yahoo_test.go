@@ -66,7 +66,7 @@ func TestNormalizeFinancials(t *testing.T) {
 		},
 	}
 
-	m := NormalizeFinancials(data)
+	m := NormalizeFinancials(data, nil)
 
 	tests := []struct {
 		key  string
@@ -109,7 +109,7 @@ func TestNormalizeFinancials_MissingFields(t *testing.T) {
 		},
 	}
 
-	m := NormalizeFinancials(data)
+	m := NormalizeFinancials(data, nil)
 
 	if _, ok := m["ctx_pe_ratio"]; !ok {
 		t.Fatal("ctx_pe_ratio should be present")
@@ -119,6 +119,103 @@ func TestNormalizeFinancials_MissingFields(t *testing.T) {
 		if _, ok := m[key]; ok {
 			t.Errorf("key %q should be absent when source fields are zero", key)
 		}
+	}
+}
+
+func TestNormalizeFinancials_Timeseries(t *testing.T) {
+	// quoteSummary history modules empty (the ASX reality); figures arrive
+	// via the fundamentals-timeseries endpoint instead.
+	data := &QuoteSummaryResult{
+		FinancialData: FinancialData{
+			DebtToEquity: YahooValue{Raw: 42.5},
+			TotalRevenue: YahooValue{Raw: 48000000000}, // overridden by ts revenue
+		},
+	}
+	ts := &TimeseriesFundamentals{
+		TotalAssets:     100000000000,
+		EBIT:            15000000000,
+		InterestExpense: 2000000000,
+		TotalRevenue:    50000000000,
+	}
+
+	m := NormalizeFinancials(data, ts)
+
+	if got := m["interest_coverage"]; !almostEqual(got, 7.5, 0.001) {
+		t.Errorf("interest_coverage = %f, want 7.5", got)
+	}
+	if got := m["asset_turnover"]; !almostEqual(got, 0.5, 0.001) {
+		t.Errorf("asset_turnover = %f, want 0.5 (timeseries revenue over timeseries assets)", got)
+	}
+}
+
+func TestNormalizeFinancials_DebtFreeInterestCoverage(t *testing.T) {
+	// Effectively debt-free (D/E 0.02) with no reported interest expense:
+	// coverage is top band, not missing.
+	debtFree := &QuoteSummaryResult{
+		FinancialData: FinancialData{
+			DebtToEquity: YahooValue{Raw: 2}, // Yahoo %-style -> 0.02
+		},
+	}
+	m := NormalizeFinancials(debtFree, &TimeseriesFundamentals{EBIT: 150000000})
+	if got, ok := m["interest_coverage"]; !ok || got != DebtFreeInterestCoverage {
+		t.Errorf("debt-free interest_coverage = %v (present %v), want sentinel %v", got, ok, DebtFreeInterestCoverage)
+	}
+
+	// Carries debt (D/E 0.5) but no interest expense reported: stays missing.
+	indebted := &QuoteSummaryResult{
+		FinancialData: FinancialData{
+			DebtToEquity: YahooValue{Raw: 50},
+		},
+	}
+	m = NormalizeFinancials(indebted, &TimeseriesFundamentals{EBIT: 150000000})
+	if _, ok := m["interest_coverage"]; ok {
+		t.Error("interest_coverage should stay missing when a company has debt but no interest expense data")
+	}
+
+	// No D/E at all: stays missing, missing debt data is not the same as no debt.
+	m = NormalizeFinancials(&QuoteSummaryResult{}, &TimeseriesFundamentals{EBIT: 150000000})
+	if _, ok := m["interest_coverage"]; ok {
+		t.Error("interest_coverage should stay missing when debt_to_equity is unknown")
+	}
+}
+
+// ---------- FetchTimeseries test ----------
+
+func TestFetchTimeseries(t *testing.T) {
+	fixture, err := os.ReadFile("testdata/bhp_timeseries.json")
+	if err != nil {
+		t.Fatalf("reading fixture: %v", err)
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(fixture)
+	}))
+	defer srv.Close()
+
+	client := &YahooClient{
+		httpClient:  srv.Client(),
+		rateLimiter: rate.NewLimiter(rate.Inf, 1),
+		baseURL:     srv.URL,
+	}
+
+	ts, err := client.FetchTimeseries(context.Background(), "BHP.AX")
+	if err != nil {
+		t.Fatalf("FetchTimeseries: %v", err)
+	}
+
+	// Latest year should win, and null entries must be skipped.
+	if !almostEqual(ts.EBIT, 20227000000, 1) {
+		t.Errorf("EBIT = %f, want 20227000000", ts.EBIT)
+	}
+	if !almostEqual(ts.InterestExpense, 1874000000, 1) {
+		t.Errorf("InterestExpense = %f, want 1874000000", ts.InterestExpense)
+	}
+	if !almostEqual(ts.TotalAssets, 102000000000, 1) {
+		t.Errorf("TotalAssets = %f, want 102000000000", ts.TotalAssets)
+	}
+	if !almostEqual(ts.TotalRevenue, 51262000000, 1) {
+		t.Errorf("TotalRevenue = %f, want 51262000000", ts.TotalRevenue)
 	}
 }
 

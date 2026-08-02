@@ -154,6 +154,48 @@ type BalanceSheet struct {
 	TotalAssets YahooValue `json:"totalAssets"`
 }
 
+// ---------- fundamentals timeseries types ----------
+
+// TimeseriesFundamentals holds the latest annual filing figures from Yahoo's
+// fundamentals-timeseries endpoint. quoteSummary's incomeStatementHistory and
+// balanceSheetHistory modules come back empty for ASX companies, but this
+// endpoint serves the same figures. Zero means missing.
+type TimeseriesFundamentals struct {
+	TotalAssets     float64
+	EBIT            float64
+	InterestExpense float64
+	TotalRevenue    float64
+}
+
+type timeseriesResponse struct {
+	Timeseries struct {
+		Result []timeseriesResult `json:"result"`
+	} `json:"timeseries"`
+}
+
+// Each result block carries one type; entries can be null for missing years.
+type timeseriesResult struct {
+	AnnualTotalAssets     []*timeseriesEntry `json:"annualTotalAssets"`
+	AnnualEBIT            []*timeseriesEntry `json:"annualEBIT"`
+	AnnualInterestExpense []*timeseriesEntry `json:"annualInterestExpense"`
+	AnnualTotalRevenue    []*timeseriesEntry `json:"annualTotalRevenue"`
+}
+
+type timeseriesEntry struct {
+	AsOfDate      string     `json:"asOfDate"`
+	ReportedValue YahooValue `json:"reportedValue"`
+}
+
+// latestEntry returns the most recent non-null value in a timeseries, or 0.
+func latestEntry(entries []*timeseriesEntry) float64 {
+	for i := len(entries) - 1; i >= 0; i-- {
+		if entries[i] != nil && entries[i].ReportedValue.Raw != 0 {
+			return entries[i].ReportedValue.Raw
+		}
+	}
+	return 0
+}
+
 // ---------- batch quote types ----------
 
 // BatchQuoteResponse is the response from Yahoo's v7/finance/quote endpoint.
@@ -414,6 +456,81 @@ func (c *YahooClient) FetchProfile(ctx context.Context, symbol string) (*Company
 	}, nil
 }
 
+// timeseriesTypes are the annual filing figures fetched per company. They feed
+// interest_coverage (EBIT / interest expense) and asset_turnover (revenue /
+// total assets), which quoteSummary can no longer provide for ASX symbols.
+const timeseriesTypes = "annualTotalAssets,annualEBIT,annualInterestExpense,annualTotalRevenue"
+
+// FetchTimeseries returns the latest annual filing figures for a symbol from
+// Yahoo's fundamentals-timeseries endpoint. Unlike quoteSummary, it does not
+// require crumb auth.
+func (c *YahooClient) FetchTimeseries(ctx context.Context, symbol string) (*TimeseriesFundamentals, error) {
+	url := fmt.Sprintf(
+		"%s/ws/fundamentals-timeseries/v1/finance/timeseries/%s?type=%s&period1=1262304000&period2=%d",
+		c.baseURL, symbol, timeseriesTypes, time.Now().Unix(),
+	)
+
+	maxRetries := 2
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if err := c.rateLimiter.Wait(ctx); err != nil {
+			return nil, fmt.Errorf("rate limiter: %w", err)
+		}
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return nil, fmt.Errorf("building request: %w", err)
+		}
+		req.Header.Set("User-Agent", yahooUserAgent)
+
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("executing request: %w", err)
+		}
+
+		if resp.StatusCode == 429 {
+			resp.Body.Close()
+			if attempt < maxRetries {
+				backoff := time.Duration(30*(attempt+1)) * time.Second
+				fmt.Printf("yahoo: timeseries 429 for %s, backing off %v (attempt %d/%d)\n", symbol, backoff, attempt+1, maxRetries)
+				time.Sleep(backoff)
+				continue
+			}
+			return nil, fmt.Errorf("yahoo timeseries rate limited after %d retries for %s", maxRetries, symbol)
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			return nil, fmt.Errorf("yahoo timeseries returned status %d for %s", resp.StatusCode, symbol)
+		}
+
+		var envelope timeseriesResponse
+		if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+			resp.Body.Close()
+			return nil, fmt.Errorf("decoding timeseries response: %w", err)
+		}
+		resp.Body.Close()
+
+		out := &TimeseriesFundamentals{}
+		for _, r := range envelope.Timeseries.Result {
+			if v := latestEntry(r.AnnualTotalAssets); v != 0 {
+				out.TotalAssets = v
+			}
+			if v := latestEntry(r.AnnualEBIT); v != 0 {
+				out.EBIT = v
+			}
+			if v := latestEntry(r.AnnualInterestExpense); v != 0 {
+				out.InterestExpense = v
+			}
+			if v := latestEntry(r.AnnualTotalRevenue); v != 0 {
+				out.TotalRevenue = v
+			}
+		}
+		return out, nil
+	}
+
+	return nil, fmt.Errorf("exhausted timeseries retries for %s", symbol)
+}
+
 // FetchFinancials returns a normalised map of financial ratios ready for the
 // scoring engine.
 func (c *YahooClient) FetchFinancials(ctx context.Context, symbol string) (map[string]float64, error) {
@@ -422,8 +539,16 @@ func (c *YahooClient) FetchFinancials(ctx context.Context, symbol string) (map[s
 		return nil, err
 	}
 
+	// Best effort: interest coverage and asset turnover need filing figures
+	// the quoteSummary modules no longer carry. Score without them if the
+	// timeseries endpoint is unavailable.
+	ts, tsErr := c.FetchTimeseries(ctx, symbol)
+	if tsErr != nil {
+		fmt.Printf("yahoo: timeseries fetch failed for %s: %v (scoring without)\n", symbol, tsErr)
+		ts = nil
+	}
 
-	return NormalizeFinancials(result), nil
+	return NormalizeFinancials(result, ts), nil
 }
 
 // FetchBatchQuotes fetches price data for multiple symbols in a single request

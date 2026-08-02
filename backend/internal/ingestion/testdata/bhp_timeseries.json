@@ -1,0 +1,39 @@
+{
+  "timeseries": {
+    "result": [
+      {
+        "meta": { "symbol": ["BHP.AX"], "type": ["annualEBIT"] },
+        "timestamp": [1719705600, 1751241600],
+        "annualEBIT": [
+          { "asOfDate": "2024-06-30", "periodType": "12M", "currencyCode": "USD", "reportedValue": { "raw": 1.823e10, "fmt": "18.23B" } },
+          { "asOfDate": "2025-06-30", "periodType": "12M", "currencyCode": "USD", "reportedValue": { "raw": 2.0227e10, "fmt": "20.23B" } }
+        ]
+      },
+      {
+        "meta": { "symbol": ["BHP.AX"], "type": ["annualInterestExpense"] },
+        "timestamp": [1719705600, 1751241600],
+        "annualInterestExpense": [
+          { "asOfDate": "2024-06-30", "periodType": "12M", "currencyCode": "USD", "reportedValue": { "raw": 2.182e9, "fmt": "2.18B" } },
+          { "asOfDate": "2025-06-30", "periodType": "12M", "currencyCode": "USD", "reportedValue": { "raw": 1.874e9, "fmt": "1.87B" } }
+        ]
+      },
+      {
+        "meta": { "symbol": ["BHP.AX"], "type": ["annualTotalAssets"] },
+        "timestamp": [1719705600, 1751241600],
+        "annualTotalAssets": [
+          { "asOfDate": "2024-06-30", "periodType": "12M", "currencyCode": "USD", "reportedValue": { "raw": 1.02362e11, "fmt": "102.36B" } },
+          { "asOfDate": "2025-06-30", "periodType": "12M", "currencyCode": "USD", "reportedValue": { "raw": 1.02e11, "fmt": "102.00B" } }
+        ]
+      },
+      {
+        "meta": { "symbol": ["BHP.AX"], "type": ["annualTotalRevenue"] },
+        "timestamp": [1719705600, 1751241600, 1782777600],
+        "annualTotalRevenue": [
+          { "asOfDate": "2024-06-30", "periodType": "12M", "currencyCode": "USD", "reportedValue": { "raw": 5.5658e10, "fmt": "55.66B" } },
+          { "asOfDate": "2025-06-30", "periodType": "12M", "currencyCode": "USD", "reportedValue": { "raw": 5.1262e10, "fmt": "51.26B" } },
+          null
+        ]
+      }
+    ]
+  }
+}
