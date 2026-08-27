@@ -15,6 +15,7 @@ $ash: #5c6b79;
 $gold: #e2a428;
 $gold-light: #f2c14e;
 $up: #2ebd70;
+$lime: #8fc63d;   // 'buy' / good band, matches the ticker page
 $down: #e5484d;
 
 .landing {
@@ -477,8 +478,8 @@ $down: #e5484d;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  color: $up;
-  background: rgba(46, 189, 112, 0.13);
+  color: $lime;
+  background: rgba(143, 198, 61, 0.13);
   padding: 4px 10px;
   border-radius: 999px;
   white-space: nowrap;
@@ -517,7 +518,7 @@ $down: #e5484d;
     background: $gold;
 
     &.b-strong { background: $up; }
-    &.b-good { background: #8fc63d; }
+    &.b-good { background: $lime; }
   }
 }
 

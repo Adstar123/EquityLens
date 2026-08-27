@@ -90,7 +90,7 @@ const FALLBACK_TAPE: TapeItem[] = [
 const FALLBACK_SECTORS: SectorChip[] = [
   'Financials', 'Mining & Resources', 'Healthcare', 'Technology',
   'Consumer Staples', 'Consumer Discretionary', 'Industrials', 'Energy',
-  'Real Estate', 'Utilities', 'Communication Services',
+  'REITs', 'Utilities', 'Communication Services',
 ].map(name => ({ key: '', name }));
 
 @Component({
