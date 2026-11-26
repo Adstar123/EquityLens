@@ -141,7 +141,7 @@ const MIX_LABELS: Record<Band, string> = {
                         <td class="col-ratio">
                           @if (ratioByName(item, col.name); as ratio) {
                             <span class="ratio">
-                              <span class="ratio-value">{{ fmtRatio(ratio.value) }}</span>
+                              <span class="ratio-value">{{ fmtRatio(ratio.value, ratio.key) }}</span>
                               <app-band-meter [band]="ratio.range_bucket" />
                             </span>
                           } @else {

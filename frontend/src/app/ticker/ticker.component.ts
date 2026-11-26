@@ -1065,7 +1065,7 @@ export class TickerComponent implements OnInit, OnDestroy {
           key: r.key,
           name: r.name,
           description: r.description,
-          value: formatRatio(r.value),
+          value: formatRatio(r.value, r.key),
           band: r.range_bucket,
           bandLabel: BAND_LABELS[r.range_bucket as Band] ?? r.range_bucket,
           points: trim(pts),

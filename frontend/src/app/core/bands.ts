@@ -56,9 +56,10 @@ export function bandVar(band: string | null | undefined): string {
 }
 
 // Display helpers shared by every table
-export function formatRatio(value: number): string {
-  // Backend sentinel for debt-free interest coverage
-  if (value >= 998) return 'No debt';
+export function formatRatio(value: number, key?: string): string {
+  // Backend sentinel for debt-free interest coverage; other ratios (e.g. a
+  // listed investment company's current ratio) can legitimately exceed it
+  if (key === 'interest_coverage' && value >= 998) return 'No debt';
   if (Math.abs(value) >= 1000) return value.toFixed(0);
   if (Math.abs(value) >= 100) return value.toFixed(1);
   return value.toFixed(2);

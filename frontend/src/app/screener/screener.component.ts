@@ -165,7 +165,7 @@ const SORT_LABELS: Record<SortKey, [string, string]> = {
                     <td class="col-ratio">
                       @if (ratioFor(item, col.key); as ratio) {
                         <span class="ratio">
-                          <span class="ratio-value">{{ fmtRatio(ratio.value) }}</span>
+                          <span class="ratio-value">{{ fmtRatio(ratio.value, ratio.key) }}</span>
                           <app-band-meter [band]="ratio.range_bucket" />
                         </span>
                       } @else {
