@@ -573,6 +573,9 @@ export class MarketFieldComponent implements AfterViewInit, OnDestroy {
 
   private cleanup: (() => void)[] = [];
   private pointerType = 'mouse';
+  // Taps don't always report a touch pointer before the click, so also ask
+  // whether this device can hover at all
+  private noHover = window.matchMedia('(hover: none)').matches;
   private shown = false;
 
   bandOf(cell: FieldCell) {
@@ -622,7 +625,7 @@ export class MarketFieldComponent implements AfterViewInit, OnDestroy {
         if (i < 0) return;
         const cell = this.cells()[i];
         if (!cell) return;
-        if (this.pointerType === 'mouse') {
+        if (this.pointerType === 'mouse' && !this.noHover) {
           this.zone.run(() => this.router.navigate(['/ticker', cell.symbol]));
         } else {
           // Touch: a tap shows the card; the readout button opens it

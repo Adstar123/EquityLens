@@ -51,8 +51,8 @@
           <div>
             <h2 class="market-title">The market under the lens</h2>
             <p class="market-meta">
-              {{ companiesCount() }} companies in {{ sectorChips().length }} sectors,
-              strongest first. Point at any tile to read it.
+              {{ companiesCount() }} companies in {{ sectorChips().length }} districts. Height is
+              the score, colour is the band. Point at any tower to read it.
             </p>
           </div>
           <div class="legend" aria-label="Score bands">
@@ -67,7 +67,7 @@
             <span class="legend-end">Very strong</span>
           </div>
         </div>
-        <app-market-field [items]="fieldItems()" featured="BHP.AX" />
+        <app-market-city [items]="fieldItems()" featured="BHP.AX" />
       </div>
     </div>
   </section>

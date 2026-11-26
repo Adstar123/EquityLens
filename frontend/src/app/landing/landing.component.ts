@@ -19,7 +19,7 @@ import { ApiService, ScreenerItem } from '../core/api.service';
 import { loadMoverRows, computeDivergence, DivergenceBoard } from '../core/movers';
 import { BANDS, Band, ratingBand, shortName } from '../core/bands';
 import { LogoMarkComponent } from '../shared/components/logo-mark.component';
-import { MarketFieldComponent } from '../shared/components/market-field.component';
+import { MarketCityComponent } from '../shared/components/city/market-city.component';
 import { BandMeterComponent } from '../shared/components/band-meter.component';
 
 gsap.registerPlugin(ScrollTrigger);
@@ -88,7 +88,7 @@ const FALLBACK_SECTORS: SectorChip[] = [
 @Component({
   selector: 'app-landing',
   standalone: true,
-  imports: [RouterLink, LogoMarkComponent, MarketFieldComponent, BandMeterComponent],
+  imports: [RouterLink, LogoMarkComponent, MarketCityComponent, BandMeterComponent],
   templateUrl: './landing.component.html',
   styleUrl: './landing.component.scss',
 })
