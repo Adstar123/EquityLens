@@ -20,16 +20,16 @@ import {
   template: `
     <div class="admin-container">
       <header class="admin-header">
-        <h1 class="admin-title">CONFIG EDITOR</h1>
+        <h1 class="admin-title">Scoring models</h1>
         <div class="header-controls">
           <div class="selector-group">
-            <label class="field-label">SECTOR</label>
+            <label class="field-label">Sector</label>
             <select
               class="field-select"
               [ngModel]="selectedSectorKey()"
               (ngModelChange)="onSectorChange($event)"
             >
-              <option value="">-- Select sector --</option>
+              <option value="">Select a sector</option>
               @for (item of sectorList(); track item.sector.key) {
                 <option [value]="item.sector.key">
                   {{ item.sector.display_name }}{{ item.active_config ? ' (v' + item.active_config.version + ')' : ' (no config)' }}
@@ -41,7 +41,7 @@ import {
       </header>
 
       @if (loading()) {
-        <div class="loading-state">Loading...</div>
+        <div class="loading-state">Loading</div>
       } @else if (selectedSectorKey() && configForm) {
 
         <!-- Tabs -->
@@ -75,7 +75,7 @@ import {
             <!-- Weight Validation Bar -->
             <div class="weight-bar-section">
               <div class="weight-bar-header">
-                <span class="field-label">WEIGHT ALLOCATION</span>
+                <span class="field-label">Weight allocation</span>
                 <span
                   class="weight-sum"
                   [class.valid]="weightValid()"
@@ -105,8 +105,8 @@ import {
             <!-- Ratio Cards -->
             <div class="ratios-section">
               <div class="section-header">
-                <span class="section-title">RATIOS</span>
-                <button class="btn-add" (click)="addRatio()">+ Add Ratio</button>
+                <span class="section-title">Ratios</span>
+                <button class="btn-add" (click)="addRatio()">Add ratio</button>
               </div>
 
               <div formArrayName="ratios" class="ratio-cards">
@@ -124,15 +124,15 @@ import {
                     <div class="ratio-fields">
                       <div class="field-row">
                         <div class="field-group flex-2">
-                          <label class="field-label">NAME</label>
+                          <label class="field-label">Name</label>
                           <input type="text" class="field-input" formControlName="name" placeholder="P/E Ratio" />
                         </div>
                         <div class="field-group flex-1">
-                          <label class="field-label">KEY</label>
+                          <label class="field-label">Key</label>
                           <input type="text" class="field-input mono" formControlName="key" placeholder="pe_ratio" />
                         </div>
                         <div class="field-group flex-1">
-                          <label class="field-label">WEIGHT</label>
+                          <label class="field-label">Weight</label>
                           <div class="weight-input-wrap">
                             <input
                               type="number"
@@ -146,7 +146,7 @@ import {
                           </div>
                         </div>
                         <div class="field-group flex-shrink">
-                          <label class="field-label">LOWER IS BETTER</label>
+                          <label class="field-label">Lower is better</label>
                           <label class="toggle-switch">
                             <input type="checkbox" formControlName="lower_is_better" />
                             <span class="toggle-slider"></span>
@@ -156,11 +156,11 @@ import {
 
                       <div class="field-row">
                         <div class="field-group flex-1">
-                          <label class="field-label">DESCRIPTION (TOOLTIP)</label>
+                          <label class="field-label">Description (tooltip)</label>
                           <textarea
                             class="field-input field-textarea"
                             formControlName="description"
-                            placeholder="Short description shown in tooltip..."
+                            placeholder="Short description shown in the tooltip"
                             rows="2"
                           ></textarea>
                         </div>
@@ -168,7 +168,7 @@ import {
 
                       <!-- Range Thresholds -->
                       <div class="ranges-section" formGroupName="ranges">
-                        <label class="field-label">RANGE THRESHOLDS</label>
+                        <label class="field-label">Range thresholds</label>
                         <div class="ranges-grid">
                           @for (bucket of rangeBuckets; track bucket.key) {
                             <div class="range-group" [formGroupName]="bucket.key">
@@ -202,10 +202,10 @@ import {
 
             <!-- Edge Cases -->
             <div class="section-block" formGroupName="edge_cases">
-              <span class="section-title">EDGE CASES</span>
+              <span class="section-title">Edge cases</span>
               <div class="field-row mt-8">
                 <div class="field-group flex-2">
-                  <label class="field-label">NEGATIVE EARNINGS RULE</label>
+                  <label class="field-label">Negative earnings rule</label>
                   <select class="field-select" formControlName="negative_earnings">
                     <option value="exclude_pe_redistribute">Exclude P/E, Redistribute</option>
                     <option value="exclude_pe_skip">Exclude P/E, Skip</option>
@@ -214,7 +214,7 @@ import {
                   </select>
                 </div>
                 <div class="field-group flex-1">
-                  <label class="field-label">MISSING DATA THRESHOLD</label>
+                  <label class="field-label">Missing data threshold</label>
                   <input
                     type="number"
                     class="field-input mono"
@@ -229,7 +229,7 @@ import {
 
             <!-- Rating Scale -->
             <div class="section-block" formGroupName="rating_scale">
-              <span class="section-title">RATING SCALE</span>
+              <span class="section-title">Rating scale</span>
               <div class="rating-grid mt-8">
                 @for (rating of ratingLevels; track rating.key) {
                   <div class="rating-row" [formGroupName]="rating.key">
@@ -264,9 +264,9 @@ import {
                 (click)="saveConfig()"
               >
                 @if (saving()) {
-                  Saving...
+                  Saving
                 } @else {
-                  Save Draft
+                  Save draft
                 }
               </button>
               <button
@@ -275,9 +275,9 @@ import {
                 (click)="runPreview()"
               >
                 @if (previewing()) {
-                  Loading...
+                  Loading
                 } @else {
-                  Preview Scores
+                  Preview scores
                 }
               </button>
               <button
@@ -286,7 +286,7 @@ import {
                 (click)="confirmPublish()"
               >
                 @if (publishing()) {
-                  Publishing...
+                  Publishing
                 } @else {
                   Publish
                 }
@@ -306,7 +306,7 @@ import {
           <div class="preview-content">
             @if (!previewData()) {
               <div class="preview-empty">
-                Click "Preview Scores" in the editor to see a side-by-side comparison.
+                Press "Preview scores" in the editor to see a side-by-side comparison.
               </div>
             } @else {
               <div class="preview-table-wrap">
@@ -315,10 +315,10 @@ import {
                     <tr>
                       <th>Symbol</th>
                       <th>Company</th>
-                      <th>Current Score</th>
-                      <th>Current Rating</th>
-                      <th>Preview Score</th>
-                      <th>Preview Rating</th>
+                      <th>Current score</th>
+                      <th>Current rating</th>
+                      <th>Preview score</th>
+                      <th>Preview rating</th>
                       <th>Delta</th>
                     </tr>
                   </thead>
@@ -357,7 +357,7 @@ import {
         @if (activeTab() === 'versions') {
           <div class="versions-content">
             @if (versionsLoading()) {
-              <div class="loading-state">Loading versions...</div>
+              <div class="loading-state">Loading versions</div>
             } @else {
               <table class="versions-table">
                 <thead>
@@ -375,11 +375,11 @@ import {
                       <td class="cell-mono">v{{ ver.version }}</td>
                       <td>
                         @if (ver.is_active) {
-                          <span class="status-active">ACTIVE</span>
+                          <span class="status-active">Active</span>
                         } @else if (ver.published_at) {
-                          <span class="status-published">PUBLISHED</span>
+                          <span class="status-published">Published</span>
                         } @else {
-                          <span class="status-draft">DRAFT</span>
+                          <span class="status-draft">Draft</span>
                         }
                       </td>
                       <td class="cell-dim">{{ ver.published_at ? formatDate(ver.published_at) : '--' }}</td>
@@ -405,7 +405,7 @@ import {
         @if (activeTab() === 'definitions') {
           <div class="definitions-content">
             @if (definitionsLoading()) {
-              <div class="loading-state">Loading definitions...</div>
+              <div class="loading-state">Loading definitions</div>
             } @else {
               <p class="definitions-hint">Edit the tooltip descriptions shown next to UI elements across the app.</p>
               @for (def of definitions(); track def.key) {
@@ -413,12 +413,12 @@ import {
                   <div class="def-header">
                     <span class="def-key mono">{{ def.key }}</span>
                     @if (definitionsSaving() === def.key) {
-                      <span class="def-saving">Saving...</span>
+                      <span class="def-saving">Saving</span>
                     }
                   </div>
                   <div class="def-fields">
                     <div class="field-group">
-                      <label class="field-label">LABEL</label>
+                      <label class="field-label">Label</label>
                       <input
                         type="text"
                         class="field-input"
@@ -427,7 +427,7 @@ import {
                       />
                     </div>
                     <div class="field-group">
-                      <label class="field-label">DESCRIPTION</label>
+                      <label class="field-label">Description</label>
                       <textarea
                         class="field-input field-textarea"
                         rows="2"
@@ -459,7 +459,7 @@ import {
       @if (showConfirmDialog()) {
         <div class="dialog-backdrop" (click)="showConfirmDialog.set(false)">
           <div class="dialog-box" (click)="$event.stopPropagation()">
-            <div class="dialog-title">Publish Config</div>
+            <div class="dialog-title">Publish model</div>
             <p class="dialog-msg">This will re-score all companies in this sector. Continue?</p>
             <div class="dialog-actions">
               <button class="btn-cancel" (click)="showConfirmDialog.set(false)">Cancel</button>
@@ -526,19 +526,19 @@ export class AdminComponent implements OnInit {
   weightValid = computed(() => Math.abs(this.weightSum() - 1.0) <= 0.001);
 
   readonly rangeBuckets = [
-    { key: 'strong', label: 'Strong', color: '#2ebd70' },
-    { key: 'good', label: 'Good', color: '#8fc63d' },
-    { key: 'neutral', label: 'Neutral', color: '#e2a428' },
-    { key: 'weak', label: 'Weak', color: '#f0883e' },
-    { key: 'poor', label: 'Poor', color: '#e5484d' },
+    { key: 'strong', label: 'Strong', color: 'var(--band-strong)' },
+    { key: 'good', label: 'Good', color: 'var(--band-good)' },
+    { key: 'neutral', label: 'Neutral', color: 'var(--band-neutral)' },
+    { key: 'weak', label: 'Weak', color: 'var(--band-weak)' },
+    { key: 'poor', label: 'Poor', color: 'var(--band-poor)' },
   ];
 
   readonly ratingLevels = [
-    { key: 'strong_buy', label: 'Very Strong', color: '#2ebd70' },
-    { key: 'buy', label: 'Strong', color: '#8fc63d' },
-    { key: 'hold', label: 'Neutral', color: '#e2a428' },
-    { key: 'sell', label: 'Weak', color: '#f0883e' },
-    { key: 'strong_sell', label: 'Very Weak', color: '#e5484d' },
+    { key: 'strong_buy', label: 'Very strong', color: 'var(--band-strong)' },
+    { key: 'buy', label: 'Strong', color: 'var(--band-good)' },
+    { key: 'hold', label: 'Neutral', color: 'var(--band-neutral)' },
+    { key: 'sell', label: 'Weak', color: 'var(--band-weak)' },
+    { key: 'strong_sell', label: 'Very weak', color: 'var(--band-poor)' },
   ];
 
   get ratiosArray(): FormArray {
@@ -809,21 +809,21 @@ export class AdminComponent implements OnInit {
 
   ratingDisplayLabel(rating: string): string {
     const labels: Record<string, string> = {
-      strong_buy: 'Very Strong', buy: 'Strong', hold: 'Neutral',
-      sell: 'Weak', strong_sell: 'Very Weak', insufficient_data: 'No Data',
+      strong_buy: 'Very strong', buy: 'Strong', hold: 'Neutral',
+      sell: 'Weak', strong_sell: 'Very weak', insufficient_data: 'No data',
     };
     return labels[rating] ?? rating.replace(/_/g, ' ');
   }
 
   ratingColor(rating: string): string {
     const map: Record<string, string> = {
-      strong_buy: '#2ebd70',
-      buy: '#8fc63d',
-      hold: '#e2a428',
-      sell: '#f0883e',
-      strong_sell: '#e5484d',
+      strong_buy: 'var(--band-strong)',
+      buy: 'var(--band-good)',
+      hold: 'var(--band-neutral)',
+      sell: 'var(--band-weak)',
+      strong_sell: 'var(--band-poor)',
     };
-    return map[rating] ?? '#93a1af';
+    return map[rating] ?? 'var(--text-muted)';
   }
 
   formatDate(dateStr: string): string {

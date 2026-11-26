@@ -1,134 +1,155 @@
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Title } from '@angular/platform-browser';
-import {
-  trigger,
-  transition,
-  style,
-  animate,
-  query,
-  stagger,
-} from '@angular/animations';
-import { NgxEchartsDirective } from 'ngx-echarts';
-import { EChartsCoreOption } from 'echarts/core';
+import { NgIcon } from '@ng-icons/core';
+import { lucideArrowDown, lucideArrowUp } from '@ng-icons/lucide';
 import { forkJoin } from 'rxjs';
 import { ApiService, Sector, ScreenerItem, Definition } from '../core/api.service';
-import { ThemeService } from '../core/theme.service';
+import { BANDS, Band, bandVar, formatRatio, ratingBand, ratingLabel, ratingLevel, shortName, shortSymbol } from '../core/bands';
 import { ScoreBadgeComponent } from '../shared/components/score-badge.component';
-import { RatioBarComponent } from '../shared/components/ratio-bar.component';
+import { BandMeterComponent } from '../shared/components/band-meter.component';
 import { InfoTooltipComponent } from '../shared/components/info-tooltip.component';
 
 type SortColumn = 'rank' | 'symbol' | 'company' | 'score' | 'rating' | string;
 type SortDir = 'asc' | 'desc';
 
+const MIX_LABELS: Record<Band, string> = {
+  strong: 'Very strong',
+  good: 'Strong',
+  neutral: 'Neutral',
+  weak: 'Weak',
+  poor: 'Very weak',
+};
+
 @Component({
   selector: 'app-sector',
   standalone: true,
-  imports: [RouterLink, ScoreBadgeComponent, RatioBarComponent, NgxEchartsDirective, InfoTooltipComponent],
-  animations: [
-    trigger('tableStagger', [
-      transition(':enter', [
-        query('.table-row', [
-          style({ opacity: 0, transform: 'translateY(8px)' }),
-          stagger('50ms', [
-            animate('200ms ease-out', style({ opacity: 1, transform: 'translateY(0)' })),
-          ]),
-        ], { optional: true, limit: 30 }),
-      ]),
-    ]),
-    trigger('fadeIn', [
-      transition(':enter', [
-        style({ opacity: 0, transform: 'translateY(12px)' }),
-        animate('400ms 200ms ease-out', style({ opacity: 1, transform: 'translateY(0)' })),
-      ]),
-    ]),
-  ],
+  imports: [RouterLink, NgIcon, ScoreBadgeComponent, BandMeterComponent, InfoTooltipComponent],
   template: `
     @if (loading()) {
-      <div class="loading-state">Loading...</div>
-    } @else if (sector()) {
-      <div class="sector-page">
-        <!-- Header -->
-        <header class="sector-header">
-          <p class="sector-eyebrow">Sector</p>
-          <h1 class="sector-name">{{ sector()!.display_name }}</h1>
-          <p class="sector-desc">{{ sector()!.description }}</p>
-          <div class="sector-stats">
-            <span class="stat-chip"><i>{{ items().length }}</i> companies</span>
-            <span class="stat-chip"><i>{{ avgScore() }}</i> average score</span>
+      <div class="page" aria-busy="true">
+        <div class="sk sk-title"></div>
+        <div class="sk sk-line"></div>
+        <div class="sk sk-panel"></div>
+      </div>
+    } @else if (sector(); as s) {
+      <div class="page">
+        <header class="head">
+          <div class="head-copy">
+            <a class="crumb" routerLink="/screener" [queryParams]="{ sector: s.key }">Sector</a>
+            <h1 class="page-heading">{{ s.display_name }}</h1>
+            @if (s.description) {
+              <p class="desc">{{ s.description }}</p>
+            }
           </div>
+          <dl class="figures">
+            <div class="figure">
+              <dt>Companies</dt>
+              <dd>{{ scored().length }}</dd>
+            </div>
+            <div class="figure">
+              <dt>Average score</dt>
+              <dd>{{ avgScore() }}</dd>
+            </div>
+            @if (leader(); as l) {
+              <div class="figure">
+                <dt>Strongest</dt>
+                <dd><a [routerLink]="['/ticker', l.symbol]">{{ l.symbol }}</a> <span>{{ l.score }}</span></dd>
+              </div>
+            }
+          </dl>
         </header>
 
-        <!-- Rankings Table -->
         @if (sortedItems().length) {
-          <section class="table-section" @tableStagger>
+          <section class="card field-card">
+            <div class="card-head">
+              <h2 class="card-title">The sector under the lens</h2>
+              <span class="card-note">Strongest first, coloured by band</span>
+            </div>
+            <div class="tiles">
+              @for (t of tiles(); track t.symbol; let i = $index) {
+                <a
+                  class="tile"
+                  [routerLink]="['/ticker', t.symbol]"
+                  [style.--c]="t.colour"
+                  [style.--d]="(i * 12) + 'ms'"
+                  [title]="t.name + ', ' + t.label"
+                >
+                  <b>{{ t.short }}</b>
+                  <i>{{ t.score }}</i>
+                </a>
+              }
+            </div>
+          </section>
+
+          <section class="table-section">
+            <div class="table-head">
+              <h2 class="card-title">Rankings</h2>
+              <span class="card-note">Ratio columns sort by band</span>
+            </div>
             <div class="table-wrap">
               <table>
                 <thead>
                   <tr>
-                    <th class="col-rank sortable" (click)="toggleSort('rank')"
-                        [class.active-sort]="sortColumn() === 'rank'">
-                      # <span class="sort-arrow">{{ sortArrow('rank') }}</span>
+                    <th class="col-rank">
+                      <button class="th-btn" (click)="toggleSort('rank')" [class.is-sorted]="sortColumn() === 'rank'">
+                        # @if (sortArrow('rank'); as a) { <ng-icon [svg]="a" size="12" strokeWidth="2" class="th-arrow" /> }
+                      </button>
                     </th>
-                    <th class="col-symbol sortable" (click)="toggleSort('symbol')"
-                        [class.active-sort]="sortColumn() === 'symbol'">
-                      Symbol <span class="sort-arrow">{{ sortArrow('symbol') }}</span>
+                    <th class="col-symbol">
+                      <button class="th-btn" (click)="toggleSort('symbol')" [class.is-sorted]="sortColumn() === 'symbol'">
+                        Symbol @if (sortArrow('symbol'); as a) { <ng-icon [svg]="a" size="12" strokeWidth="2" class="th-arrow" /> }
+                      </button>
                     </th>
-                    <th class="col-name sortable" (click)="toggleSort('company')"
-                        [class.active-sort]="sortColumn() === 'company'">
-                      Company <span class="sort-arrow">{{ sortArrow('company') }}</span>
+                    <th>
+                      <button class="th-btn" (click)="toggleSort('company')" [class.is-sorted]="sortColumn() === 'company'">
+                        Company @if (sortArrow('company'); as a) { <ng-icon [svg]="a" size="12" strokeWidth="2" class="th-arrow" /> }
+                      </button>
                     </th>
-                    <th class="col-score sortable" (click)="toggleSort('score')"
-                        [class.active-sort]="sortColumn() === 'score'">
-                      Score
+                    <th>
+                      <button class="th-btn" (click)="toggleSort('score')" [class.is-sorted]="sortColumn() === 'score'">
+                        Score @if (sortArrow('score'); as a) { <ng-icon [svg]="a" size="12" strokeWidth="2" class="th-arrow" /> }
+                      </button>
                       @if (definitions()['composite_score']; as def) {
                         <app-info-tooltip [description]="def.description" />
                       }
-                      <span class="sort-arrow">{{ sortArrow('score') }}</span>
                     </th>
-                    <th class="col-rating sortable" (click)="toggleSort('rating')"
-                        [class.active-sort]="sortColumn() === 'rating'">
-                      Rating <span class="sort-arrow">{{ sortArrow('rating') }}</span>
+                    <th>
+                      <button class="th-btn" (click)="toggleSort('rating')" [class.is-sorted]="sortColumn() === 'rating'">
+                        Rating @if (sortArrow('rating'); as a) { <ng-icon [svg]="a" size="12" strokeWidth="2" class="th-arrow" /> }
+                      </button>
                     </th>
-                    @for (col of ratioHeadersWithDesc(); track col.name) {
-                      <th class="col-ratio sortable" (click)="toggleSort('ratio:' + col.name)"
-                          [class.active-sort]="sortColumn() === 'ratio:' + col.name">
-                        {{ col.name }}
+                    @for (col of ratioHeaders(); track col.name) {
+                      <th class="col-ratio">
+                        <button class="th-btn" (click)="toggleSort('ratio:' + col.name)" [class.is-sorted]="sortColumn() === 'ratio:' + col.name">
+                          {{ col.name }} @if (sortArrow('ratio:' + col.name); as a) { <ng-icon [svg]="a" size="12" strokeWidth="2" class="th-arrow" /> }
+                        </button>
                         @if (col.description) {
                           <app-info-tooltip [description]="col.description" />
                         }
-                        <span class="sort-arrow">{{ sortArrow('ratio:' + col.name) }}</span>
                       </th>
                     }
                   </tr>
                 </thead>
                 <tbody>
-                  @for (item of sortedItems(); track item.symbol; let i = $index) {
-                    <tr class="table-row" (click)="goToTicker(item.symbol)">
-                      <td class="cell-rank">{{ i + 1 }}</td>
-                      <td class="cell-symbol">
+                  @for (item of sortedItems(); track item.symbol) {
+                    <tr class="row" (click)="goToTicker(item.symbol)">
+                      <td class="col-rank">{{ rankOf(item.symbol) }}</td>
+                      <td class="col-symbol">
                         <a class="symbol-link" [routerLink]="['/ticker', item.symbol]" (click)="$event.stopPropagation()">{{ item.symbol }}</a>
                       </td>
                       <td class="cell-name">{{ item.company_name }}</td>
-                      <td class="cell-score">
-                        <app-score-badge [score]="item.composite_score" [rating]="item.rating" />
-                      </td>
-                      <td class="cell-rating">
-                        <span class="rating-pill"
-                              [style.background]="ratingBg(item.rating)"
-                              [style.color]="ratingColor(item.rating)">
-                          {{ ratingDisplayLabel(item.rating) }}
-                        </span>
-                      </td>
-                      @for (col of ratioHeadersWithDesc(); track col.name) {
-                        <td class="cell-ratio">
+                      <td><app-score-badge [score]="item.composite_score" [rating]="item.rating" /></td>
+                      <td class="cell-rating" [class.is-strong]="isStrong(item.rating)">{{ labelOf(item.rating) }}</td>
+                      @for (col of ratioHeaders(); track col.name) {
+                        <td class="col-ratio">
                           @if (ratioByName(item, col.name); as ratio) {
-                            <div class="ratio-cell">
-                              <span class="ratio-value">{{ formatRatio(ratio.value) }}</span>
-                              <app-ratio-bar [value]="ratio.value" [rangeBucket]="ratio.range_bucket" />
-                            </div>
+                            <span class="ratio">
+                              <span class="ratio-value">{{ fmtRatio(ratio.value) }}</span>
+                              <app-band-meter [band]="ratio.range_bucket" />
+                            </span>
                           } @else {
-                            <span class="ratio-empty">&ndash;</span>
+                            <span class="is-empty">&ndash;</span>
                           }
                         </td>
                       }
@@ -139,330 +160,565 @@ type SortDir = 'asc' | 'desc';
             </div>
           </section>
 
-          <!-- Analytics -->
-          @if (distributionOptions() || radarOptions()) {
-            <section class="analytics-section" @fadeIn>
-              <div class="analytics-grid">
-                @if (distributionOptions()) {
-                  <div class="analytics-card">
-                    <h2 class="section-title">STRENGTH DISTRIBUTION</h2>
-                    <div echarts [options]="distributionOptions()!" class="analytics-chart"></div>
-                  </div>
+          <div class="grid">
+            <section class="card">
+              <div class="card-head">
+                <h2 class="card-title">Band mix</h2>
+                <span class="card-note">{{ scored().length }} companies</span>
+              </div>
+              <div class="mix" role="img" [attr.aria-label]="mixAria()">
+                @for (m of mix(); track m.band) {
+                  @if (m.count) {
+                    <i [style.flex-grow]="m.count" [style.background]="m.colour"></i>
+                  }
                 }
-                @if (radarOptions()) {
-                  <div class="analytics-card">
-                    <h2 class="section-title">SECTOR RATIO PROFILE</h2>
-                    <div echarts [options]="radarOptions()!" class="analytics-chart"></div>
+              </div>
+              <div class="mix-legend">
+                @for (m of mix(); track m.band) {
+                  <div class="mix-row" [class.is-zero]="!m.count">
+                    <span class="swatch" [style.background]="m.colour"></span>
+                    <span class="mix-label">{{ m.label }}</span>
+                    <span class="mix-count">{{ m.count }}</span>
+                    <span class="mix-share">{{ m.share }}%</span>
                   </div>
                 }
               </div>
             </section>
-          }
+
+            <section class="card">
+              <div class="card-head">
+                <h2 class="card-title">Ratio profile</h2>
+                <span class="card-note">Average band across the sector</span>
+              </div>
+              <div class="profile">
+                @for (p of profile(); track p.name) {
+                  <div class="profile-row">
+                    <span class="profile-name">{{ p.name }}</span>
+                    <span class="profile-track"><b [style.width.%]="p.pct"></b></span>
+                    <span class="profile-val">{{ p.avg }}<span> / 5</span></span>
+                  </div>
+                }
+              </div>
+            </section>
+          </div>
         } @else {
-          <div class="empty-state">No scored companies found in this sector.</div>
+          <div class="card empty">
+            <span class="empty-title">No scored companies yet</span>
+            <span class="empty-sub">Nothing in this sector has enough reported figures to score.</span>
+          </div>
         }
       </div>
     } @else {
-      <div class="error-state">Sector not found.</div>
+      <div class="page nf">
+        <h1 class="page-heading">Sector not found</h1>
+        <a class="ui-link" routerLink="/screener">Open the screener</a>
+      </div>
     }
   `,
   styles: [`
-    .loading-state,
-    .error-state {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100%;
-      color: var(--text-muted);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.875rem;
+    :host {
+      display: block;
     }
 
-    .sector-page {
-      max-width: 1200px;
+    .page {
+      max-width: 1280px;
       margin: 0 auto;
-      padding: 2rem 1.5rem 4rem;
+      padding: 32px 32px 64px;
     }
 
-    /* Header */
-    .sector-header {
-      margin-bottom: 2rem;
-    }
-
-    .sector-eyebrow {
+    // ── Header ──
+    .head {
       display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 0.68rem;
-      font-weight: 700;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin: 0 0 0.5rem;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 48px;
+      margin-bottom: 32px;
     }
 
-    .sector-eyebrow::before {
-      content: '';
-      width: 18px;
-      height: 1px;
-      background: var(--accent);
+    .crumb {
+      display: inline-block;
+      margin-bottom: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--accent-ink);
+      text-decoration: none;
     }
 
-    .sector-name {
-      font-family: 'Archivo', sans-serif;
-      font-stretch: 104%;
-      font-weight: 720;
-      font-size: 1.7rem;
-      letter-spacing: -0.02em;
+    .crumb:hover {
       color: var(--text-primary);
-      margin: 0 0 0.375rem;
-      line-height: 1.15;
     }
 
-    .sector-desc {
-      font-size: 0.875rem;
-      color: var(--text-secondary);
-      margin: 0 0 0.9rem;
+    .desc {
+      margin: 12px 0 0;
+      max-width: 600px;
+      font-size: 14px;
       line-height: 1.6;
-      max-width: 640px;
-    }
-
-    .sector-stats {
-      display: flex;
-      gap: 0.6rem;
-      flex-wrap: wrap;
-    }
-
-    .stat-chip {
-      font-size: 0.75rem;
       color: var(--text-secondary);
+    }
+
+    .figures {
+      display: flex;
+      gap: 40px;
+      margin: 0;
+    }
+
+    .figure dt {
+      font-size: 12px;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .figure dd {
+      margin: 4px 0 0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 24px;
+      font-weight: 500;
+      color: var(--text-primary);
+      white-space: nowrap;
+    }
+
+    .figure dd a {
+      color: var(--accent-ink);
+      text-decoration: none;
+    }
+
+    .figure dd span {
+      margin-left: 6px;
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    // ── Cards ──
+    .card {
+      padding: 24px;
       background: var(--bg-surface);
       border: 1px solid var(--border);
-      border-radius: 999px;
-      padding: 4px 12px;
+      border-radius: var(--radius-lg);
+      min-width: 0;
     }
 
-    .stat-chip i {
-      font-style: normal;
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 600;
+    .card-head,
+    .table-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .card-title {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 500;
       color: var(--text-primary);
     }
 
-    /* Table */
+    .card-note {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .field-card {
+      margin-bottom: 40px;
+    }
+
+    .tiles {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+      gap: 4px;
+    }
+
+    .tile {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      height: 48px;
+      border-radius: 6px;
+      background: var(--c);
+      color: var(--on-accent);
+      text-decoration: none;
+      line-height: 1;
+      animation: tileIn 420ms var(--ease) both;
+      animation-delay: var(--d);
+      transition: transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+    }
+
+    .tile:hover {
+      box-shadow: 0 0 0 2px var(--bg-surface), 0 0 0 4px var(--text-primary);
+    }
+
+    .tile:active {
+      transform: scale(0.96);
+    }
+
+    .tile b {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .tile i {
+      font-family: 'JetBrains Mono', monospace;
+      font-style: normal;
+      font-size: 11px;
+      opacity: 0.72;
+    }
+
+    @keyframes tileIn {
+      from { opacity: 0; transform: scale(0.85); }
+    }
+
+    // ── Table ──
     .table-section {
-      margin-bottom: 2.5rem;
+      margin-bottom: 40px;
     }
 
     .table-wrap {
       overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
     }
 
     table {
       width: 100%;
-      border-collapse: collapse;
+      border-collapse: separate;
+      border-spacing: 0;
     }
 
     th {
-      position: sticky;
-      top: 0;
-      background: var(--bg-base);
-      z-index: 10;
-      padding: 0.4rem 0.5rem;
+      height: 40px;
+      padding: 0 16px;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-strong);
       text-align: left;
-      font-size: 0.625rem;
+      font-size: 12px;
       font-weight: 500;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
       color: var(--text-muted);
-      border-bottom: 1px solid var(--border);
       white-space: nowrap;
-      user-select: none;
     }
 
-    th.sortable {
+    .th-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      height: 28px;
+      margin: 0 -6px;
+      padding: 0 6px;
+      border: none;
+      border-radius: 6px;
+      background: none;
+      color: inherit;
+      font: inherit;
       cursor: pointer;
-      transition: color 150ms ease;
+      transition: color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease);
     }
 
-    th.sortable:hover {
-      color: var(--text-secondary);
+    .th-btn:hover {
+      color: var(--text-primary);
+      background: var(--bg-hover);
     }
 
-    th.active-sort {
+    .th-btn.is-sorted {
+      color: var(--text-primary);
+    }
+
+    .th-arrow {
+      display: flex;
       color: var(--accent);
     }
 
-    .sort-arrow {
-      font-size: 0.625rem;
-      margin-left: 2px;
-    }
-
-    tbody tr {
-      cursor: pointer;
-      transition: background 100ms ease;
-    }
-
-    tbody tr:hover td {
-      background: var(--bg-surface);
-    }
-
     td {
-      padding: 0.35rem 0.5rem;
-      font-size: 0.75rem;
+      height: 44px;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-base);
+      font-size: 13px;
       color: var(--text-primary);
-      border-bottom: 1px solid var(--bg-surface);
       white-space: nowrap;
+      transition: background-color var(--dur-fast) var(--ease);
     }
 
-    th.col-rank,
-    .cell-rank {
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr.row {
+      cursor: pointer;
+    }
+
+    tr.row:hover td {
+      background: var(--bg-hover);
+    }
+
+    .col-rank {
       position: sticky;
       left: 0;
-      background: var(--bg-base);
-      width: 34px;
-      min-width: 34px;
-      max-width: 34px;
-      box-sizing: border-box;
+      z-index: 2;
+      width: 24px;
+      padding-right: 0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text-muted);
+      text-align: right;
     }
 
     th.col-rank {
-      z-index: 12;
+      z-index: 3;
     }
 
-    .cell-rank {
-      z-index: 5;
-      font-family: 'JetBrains Mono', monospace;
-      color: var(--text-muted);
-      font-size: 0.6875rem;
-    }
-
-    th.col-symbol,
-    .cell-symbol {
+    .col-symbol {
       position: sticky;
-      left: 34px;
-      background: var(--bg-base);
-      border-right: 1px solid var(--border);
+      left: 40px;
+      z-index: 2;
+      box-shadow: inset -1px 0 0 var(--border);
     }
 
     th.col-symbol {
-      z-index: 12;
-    }
-
-    .cell-symbol {
-      z-index: 5;
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 700;
-      color: var(--text-primary);
-      letter-spacing: 0.02em;
-    }
-
-    tbody tr:hover .cell-rank,
-    tbody tr:hover .cell-symbol {
-      background: var(--bg-surface);
+      z-index: 3;
     }
 
     .symbol-link {
-      color: inherit;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 500;
+      color: var(--text-primary);
       text-decoration: none;
+      border-radius: 4px;
     }
 
-    .symbol-link:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 2px;
-      border-radius: 3px;
+    tr.row:hover .symbol-link {
+      color: var(--accent-ink);
     }
 
     .cell-name {
-      color: var(--text-secondary);
-      max-width: 150px;
+      max-width: 220px;
       overflow: hidden;
       text-overflow: ellipsis;
-    }
-
-    .cell-score {
-      white-space: nowrap;
+      color: var(--text-secondary);
     }
 
     .cell-rating {
-      white-space: nowrap;
+      font-size: 13px;
+      color: var(--text-muted);
     }
 
-    .rating-pill {
-      font-size: 0.625rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      padding: 2px 8px;
-      border-radius: 999px;
-      line-height: 1.2;
-      white-space: nowrap;
-    }
-
-    .cell-ratio {
-      padding: 0.35rem 0.4rem;
-    }
-
-    .ratio-cell {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 1px;
-    }
-
-    .ratio-value {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.6875rem;
+    .cell-rating.is-strong {
       color: var(--text-secondary);
     }
 
-    .ratio-empty {
+    .col-ratio {
+      padding: 0 12px;
+    }
+
+    .ratio {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .ratio-value {
+      min-width: 48px;
+      text-align: right;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .is-empty {
       color: var(--text-muted);
-      opacity: 0.5;
     }
 
-    .empty-state {
-      text-align: center;
-      color: var(--text-muted);
-      padding: 3rem 1rem;
-      font-size: 0.875rem;
-    }
-
-    /* Analytics */
-    .analytics-section {
-      margin-top: 1rem;
-    }
-
-    .section-title {
-      font-size: 0.75rem;
-      font-weight: 600;
-      letter-spacing: 0.12em;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      margin: 0 0 0.75rem;
-    }
-
-    .analytics-grid {
+    // ── Analytics ──
+    .grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1.5rem;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
     }
 
-    .analytics-card {
-      background: var(--bg-elevated);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      padding: 1.25rem;
+    .mix {
+      display: flex;
+      gap: 2px;
+      height: 12px;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 20px;
     }
 
-    .analytics-chart {
-      width: 100%;
-      height: 300px;
+    .mix i {
+      display: block;
+      flex-basis: 0;
+    }
+
+    .mix-legend {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .mix-row {
+      display: grid;
+      grid-template-columns: 12px minmax(0, 1fr) 40px 48px;
+      align-items: center;
+      gap: 12px;
+      height: 36px;
+      border-top: 1px solid var(--border);
+      font-size: 13px;
+    }
+
+    .mix-row.is-zero {
+      opacity: 0.45;
+    }
+
+    .swatch {
+      width: 12px;
+      height: 6px;
+      border-radius: 2px;
+    }
+
+    .mix-label {
+      color: var(--text-secondary);
+    }
+
+    .mix-count,
+    .mix-share {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      text-align: right;
+    }
+
+    .mix-count {
+      color: var(--text-primary);
+    }
+
+    .mix-share {
+      color: var(--text-muted);
+    }
+
+    .profile {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .profile-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) 56px;
+      align-items: center;
+      gap: 16px;
+      height: 36px;
+      border-top: 1px solid var(--border);
+      font-size: 13px;
+    }
+
+    .profile-name {
+      color: var(--text-secondary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .profile-track {
+      height: 6px;
+      border-radius: 3px;
+      background: var(--band-off);
+      overflow: hidden;
+    }
+
+    .profile-track b {
+      display: block;
+      height: 100%;
+      background: var(--text-muted);
+    }
+
+    .profile-row:first-child .profile-track b {
+      background: var(--accent);
+    }
+
+    .profile-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text-primary);
+      text-align: right;
+    }
+
+    .profile-val span {
+      color: var(--text-muted);
+    }
+
+    // ── States ──
+    .sk {
+      border-radius: var(--radius);
+      background: var(--band-off);
+    }
+
+    .sk-title { width: 280px; height: 32px; margin: 32px 0 12px; }
+    .sk-line { width: 420px; max-width: 90%; height: 14px; margin-bottom: 32px; }
+    .sk-panel { height: 240px; opacity: 0.6; border-radius: var(--radius-lg); }
+
+    .empty {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 48px 24px;
+      text-align: center;
+    }
+
+    .empty-title {
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    .empty-sub {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .nf {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      padding-top: 120px;
+    }
+
+    @media (max-width: 1024px) {
+      .head {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 24px;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
     }
 
     @media (max-width: 768px) {
-      .analytics-grid {
-        grid-template-columns: 1fr;
+      .page {
+        padding: 24px 16px 48px;
+      }
+
+      .figures {
+        gap: 24px;
+      }
+
+      .figure dd {
+        font-size: 20px;
+      }
+
+      .card {
+        padding: 20px 16px;
+      }
+
+      th, td {
+        padding: 0 12px;
+      }
+
+      .col-symbol {
+        left: 36px;
+      }
+
+      .cell-name {
+        max-width: 140px;
       }
     }
   `],
@@ -472,7 +728,6 @@ export class SectorComponent implements OnInit {
   private router = inject(Router);
   private titleService = inject(Title);
   private api = inject(ApiService);
-  private theme = inject(ThemeService);
 
   loading = signal(true);
   sector = signal<Sector | null>(null);
@@ -482,45 +737,53 @@ export class SectorComponent implements OnInit {
   sortColumn = signal<SortColumn>('score');
   sortDir = signal<SortDir>('desc');
 
-  /** All unique ratio names across companies, ordered by first appearance,
-   * so a ratio the top company lacks (e.g. interest coverage) still shows */
-  ratioNames = computed(() => {
-    const seen = new Set<string>();
-    for (const item of this.items()) {
-      for (const r of item.breakdown?.ratios ?? []) {
-        seen.add(r.name);
-      }
-    }
-    return [...seen];
-  });
+  fmtRatio = formatRatio;
 
-  /** Ratio headers with descriptions for tooltips */
-  ratioHeadersWithDesc = computed(() => {
+  scored = computed(() => this.items().filter(i => i.rating !== 'insufficient_data'));
+
+  /** Unique ratio names across companies, ordered by first appearance, so a
+   * ratio the top company lacks (e.g. interest coverage) still shows */
+  ratioHeaders = computed(() => {
     const seen = new Map<string, { name: string; description: string }>();
     for (const item of this.items()) {
       for (const r of item.breakdown?.ratios ?? []) {
-        if (!seen.has(r.name)) {
-          seen.set(r.name, { name: r.name, description: r.description || '' });
-        }
+        if (!seen.has(r.name)) seen.set(r.name, { name: r.name, description: r.description || '' });
       }
     }
     return [...seen.values()];
   });
 
-  /** Average composite score */
   avgScore = computed(() => {
-    const list = this.items();
-    if (!list.length) return '0.0';
-    const sum = list.reduce((acc, i) => acc + i.composite_score, 0);
-    return (sum / list.length).toFixed(1);
+    const list = this.scored();
+    if (!list.length) return '0';
+    return Math.round(list.reduce((acc, i) => acc + i.composite_score, 0) / list.length).toString();
   });
 
-  /** Sorted items */
+  private byScore = computed(() => [...this.items()].sort((a, b) => b.composite_score - a.composite_score));
+
+  leader = computed(() => {
+    const top = this.byScore()[0];
+    return top ? { symbol: top.symbol, score: Math.round(top.composite_score) } : null;
+  });
+
+  tiles = computed(() =>
+    this.byScore()
+      .filter(i => i.rating !== 'insufficient_data')
+      .map(i => ({
+        symbol: i.symbol,
+        short: shortSymbol(i.symbol),
+        name: shortName(i.company_name),
+        score: Math.round(i.composite_score),
+        label: ratingLabel(i.rating),
+        colour: bandVar(ratingBand(i.rating)),
+      })));
+
+  private ranks = computed(() => new Map(this.byScore().map((i, idx) => [i.symbol, idx + 1])));
+
   sortedItems = computed(() => {
     const list = [...this.items()];
     const col = this.sortColumn();
-    const dir = this.sortDir();
-    const mul = dir === 'asc' ? 1 : -1;
+    const mul = this.sortDir() === 'asc' ? 1 : -1;
 
     list.sort((a, b) => {
       let cmp = 0;
@@ -531,149 +794,63 @@ export class SectorComponent implements OnInit {
       } else if (col === 'company') {
         cmp = a.company_name.localeCompare(b.company_name);
       } else if (col === 'rating') {
-        cmp = this.ratingOrder(a.rating) - this.ratingOrder(b.rating);
+        cmp = ratingLevel(a.rating) - ratingLevel(b.rating);
       } else if (col.startsWith('ratio:')) {
         const name = col.slice(6);
-        const aVal = a.breakdown?.ratios?.find(r => r.name === name)?.points ?? 0;
-        const bVal = b.breakdown?.ratios?.find(r => r.name === name)?.points ?? 0;
+        const aVal = a.breakdown?.ratios?.find(r => r.name === name)?.points ?? -1;
+        const bVal = b.breakdown?.ratios?.find(r => r.name === name)?.points ?? -1;
         cmp = aVal - bVal;
       }
       return cmp * mul;
     });
-
     return list;
   });
 
-  /** Strength distribution bar chart */
-  distributionOptions = computed<EChartsCoreOption | null>(() => {
-    const list = this.items();
-    if (!list.length) return null;
-
-    const buckets: Record<string, number> = {
-      strong_buy: 0, buy: 0, hold: 0, sell: 0, strong_sell: 0,
-    };
-    for (const item of list) {
-      if (buckets[item.rating] !== undefined) {
-        buckets[item.rating]++;
-      }
+  mix = computed(() => {
+    const list = this.scored();
+    const counts = new Map<Band, number>();
+    for (const i of list) {
+      const b = ratingBand(i.rating);
+      if (b) counts.set(b, (counts.get(b) ?? 0) + 1);
     }
-
-    const isDark = this.theme.theme() === 'dark';
-    const labelColor = isDark ? '#93a1af' : '#4a4a65';
-
-    return {
-      tooltip: {
-        trigger: 'axis',
-        axisPointer: { type: 'shadow' },
-        formatter: (params: any) => {
-          const p = params[0];
-          return `<b>${p.name}</b><br/>${p.value} companies`;
-        },
-      },
-      grid: { top: 16, bottom: 32, left: 40, right: 16 },
-      xAxis: {
-        type: 'category',
-        data: ['Very Strong', 'Strong', 'Neutral', 'Weak', 'Very Weak'],
-        axisLabel: { color: labelColor, fontSize: 10, fontFamily: 'Inter' },
-        axisTick: { show: false },
-        axisLine: { lineStyle: { color: isDark ? '#243040' : '#d8d8e4' } },
-      },
-      yAxis: {
-        type: 'value',
-        axisLabel: { color: labelColor, fontSize: 10 },
-        splitLine: { lineStyle: { color: isDark ? '#1e2833' : '#eaeaf0' } },
-        axisLine: { show: false },
-        axisTick: { show: false },
-      },
-      series: [{
-        type: 'bar',
-        data: [
-          { value: buckets['strong_buy'], itemStyle: { color: '#2ebd70' } },
-          { value: buckets['buy'], itemStyle: { color: '#8fc63d' } },
-          { value: buckets['hold'], itemStyle: { color: '#e2a428' } },
-          { value: buckets['sell'], itemStyle: { color: '#e5484d' } },
-          { value: buckets['strong_sell'], itemStyle: { color: '#d03136' } },
-        ],
-        barWidth: '55%',
-        itemStyle: { borderRadius: [3, 3, 0, 0] },
-      }],
-    };
+    return [...BANDS].reverse().map(band => {
+      const count = counts.get(band) ?? 0;
+      return {
+        band,
+        label: MIX_LABELS[band],
+        count,
+        share: list.length ? Math.round((count / list.length) * 100) : 0,
+        colour: bandVar(band),
+      };
+    });
   });
 
-  /** Sector average ratio radar chart */
-  radarOptions = computed<EChartsCoreOption | null>(() => {
-    const list = this.items();
-    const names = this.ratioNames();
-    if (!list.length || !names.length) return null;
+  mixAria = computed(() =>
+    this.mix().filter(m => m.count).map(m => `${m.count} ${m.label.toLowerCase()}`).join(', '));
 
-    const sums = new Array(names.length).fill(0);
-    const counts = new Array(names.length).fill(0);
-
-    for (const item of list) {
-      const ratios = item.breakdown?.ratios ?? [];
-      for (let i = 0; i < names.length; i++) {
-        const ratio = ratios.find(r => r.name === names[i]);
-        if (ratio) {
-          sums[i] += ratio.points;
-          counts[i]++;
+  /** Average points (out of 5) per ratio, strongest first */
+  profile = computed(() => {
+    const names = this.ratioHeaders().map(h => h.name);
+    const rows = names.map(name => {
+      let sum = 0;
+      let n = 0;
+      for (const item of this.items()) {
+        const r = item.breakdown?.ratios?.find(x => x.name === name);
+        if (r) {
+          sum += r.points;
+          n++;
         }
       }
-    }
-
-    const avgs = sums.map((s: number, i: number) =>
-      counts[i] > 0 ? +(s / counts[i]).toFixed(2) : 0
-    );
-
-    const isDark = this.theme.theme() === 'dark';
-    const labelColor = isDark ? '#93a1af' : '#4a4a65';
-    const splitColor = isDark ? '#243040' : '#d8d8e4';
-
-    return {
-      tooltip: {
-        trigger: 'item',
-        formatter: (params: any) => {
-          const d = params.data;
-          return d.value.map((v: number, i: number) =>
-            `${names[i]}: <b>${v}</b> / 5`
-          ).join('<br/>');
-        },
-      },
-      radar: {
-        indicator: names.map(name => ({ name, max: 5 })),
-        shape: 'polygon',
-        splitNumber: 5,
-        center: ['50%', '55%'],
-        radius: '65%',
-        axisName: {
-          color: labelColor,
-          fontSize: 11,
-          fontFamily: 'Inter',
-        },
-        splitLine: { lineStyle: { color: splitColor } },
-        splitArea: { show: false },
-        axisLine: { lineStyle: { color: splitColor } },
-      },
-      series: [{
-        type: 'radar',
-        data: [{
-          value: avgs,
-          name: 'Sector Average',
-          areaStyle: { color: 'rgba(226, 164, 40, 0.15)' },
-          lineStyle: { color: '#e2a428', width: 2 },
-          itemStyle: { color: '#e2a428', borderColor: '#e2a428' },
-          symbol: 'circle',
-          symbolSize: 6,
-        }],
-      }],
-    };
+      const avg = n ? sum / n : 0;
+      return { name, avg: avg.toFixed(1), pct: (avg / 5) * 100, raw: avg };
+    });
+    return rows.sort((a, b) => b.raw - a.raw);
   });
 
   ngOnInit(): void {
     this.route.paramMap.subscribe(params => {
       const key = params.get('key');
-      if (key) {
-        this.loadSector(key);
-      }
+      if (key) this.loadSector(key);
     });
     this.api.getDefinitions().subscribe({
       next: (defs) => {
@@ -684,19 +861,32 @@ export class SectorComponent implements OnInit {
     });
   }
 
+  rankOf(symbol: string): number {
+    return this.ranks().get(symbol) ?? 0;
+  }
+
+  labelOf(rating: string): string {
+    return ratingLabel(rating);
+  }
+
+  isStrong(rating: string): boolean {
+    return ratingLevel(rating) >= 4;
+  }
+
   toggleSort(col: SortColumn): void {
     if (this.sortColumn() === col) {
       this.sortDir.set(this.sortDir() === 'desc' ? 'asc' : 'desc');
     } else {
       this.sortColumn.set(col);
-      // Default to descending for numeric columns, ascending for text
       this.sortDir.set(col === 'symbol' || col === 'company' ? 'asc' : 'desc');
     }
   }
 
   sortArrow(col: SortColumn): string {
     if (this.sortColumn() !== col) return '';
-    return this.sortDir() === 'desc' ? '\u2193' : '\u2191';
+    // Rank 1 is the highest score, so rank ascending reads as score descending
+    const dir = col === 'rank' ? (this.sortDir() === 'desc' ? 'asc' : 'desc') : this.sortDir();
+    return dir === 'desc' ? lucideArrowDown : lucideArrowUp;
   }
 
   goToTicker(symbol: string): void {
@@ -707,59 +897,8 @@ export class SectorComponent implements OnInit {
     return item.breakdown?.ratios?.find(r => r.name === name) ?? null;
   }
 
-  formatRatio(value: number): string {
-    // Backend sentinel for debt-free interest coverage
-    if (value >= 998) return 'No debt';
-    if (Math.abs(value) >= 1000) return value.toFixed(0);
-    if (Math.abs(value) >= 100) return value.toFixed(1);
-    return value.toFixed(2);
-  }
-
-  ratingDisplayLabel(rating: string): string {
-    const labels: Record<string, string> = {
-      strong_buy: 'Very Strong', buy: 'Strong', hold: 'Neutral',
-      sell: 'Weak', strong_sell: 'Very Weak', insufficient_data: 'No Data',
-    };
-    return labels[rating] ?? rating.replace(/_/g, ' ');
-  }
-
-  ratingColor(rating: string): string {
-    const map: Record<string, string> = {
-      strong_buy: '#2ebd70',
-      buy: '#8fc63d',
-      hold: '#e2a428',
-      sell: '#e5484d',
-      strong_sell: '#d03136',
-    };
-    return map[rating] ?? '#93a1af';
-  }
-
-  ratingBg(rating: string): string {
-    const map: Record<string, string> = {
-      strong_buy: 'rgba(46, 189, 112, 0.12)',
-      buy: 'rgba(143, 198, 61, 0.12)',
-      hold: 'rgba(226, 164, 40, 0.12)',
-      sell: 'rgba(229, 72, 77, 0.12)',
-      strong_sell: 'rgba(208, 49, 54, 0.12)',
-    };
-    return map[rating] ?? 'rgba(147, 161, 175, 0.12)';
-  }
-
-  private ratingOrder(rating: string): number {
-    const order: Record<string, number> = {
-      strong_buy: 5,
-      buy: 4,
-      hold: 3,
-      sell: 2,
-      strong_sell: 1,
-    };
-    return order[rating] ?? 0;
-  }
-
   private loadSector(key: string): void {
     this.loading.set(true);
-
-    // Load sector info and rankings in parallel
     forkJoin({
       sectors: this.api.listSectors(),
       items: this.api.screener({ sector: key }),

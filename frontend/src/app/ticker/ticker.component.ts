@@ -1,248 +1,292 @@
-import { Component, inject, signal, computed, OnInit, AfterViewInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Location } from '@angular/common';
 import { Title } from '@angular/platform-browser';
-import {
-  trigger,
-  transition,
-  style,
-  animate,
-  query,
-  stagger,
-} from '@angular/animations';
-import { NgxEchartsDirective } from 'ngx-echarts';
-import { EChartsCoreOption } from 'echarts/core';
-import { ApiService, TickerDetail, Company, Quote, Definition } from '../core/api.service';
+import { NgIcon } from '@ng-icons/core';
+import { lucideArrowLeft, lucideStar } from '@ng-icons/lucide';
+import { Subscription } from 'rxjs';
+import { ApiService, TickerDetail, Company, Quote, Definition, ScreenerItem, RatioResult } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
-import { ThemeService } from '../core/theme.service';
-import { RatioBarComponent } from '../shared/components/ratio-bar.component';
+import {
+  bandVar,
+  formatChangePct,
+  formatMarketCap,
+  formatPrice,
+  formatRatio,
+  ratingBand,
+  ratingLabel,
+  BAND_LABELS,
+  Band,
+} from '../core/bands';
+import { BandMeterComponent } from '../shared/components/band-meter.component';
+import { ScoreBadgeComponent } from '../shared/components/score-badge.component';
 import { InfoTooltipComponent } from '../shared/components/info-tooltip.component';
 import { TickerSearchComponent } from '../shared/components/ticker-search.component';
 
-interface SectorPeer {
-  symbol: string;
+interface LedgerRow {
+  key: string;
   name: string;
-  score: number;
+  description?: string;
+  value: string;
+  band: string;
+  bandLabel: string;
+  points: string;
+  max: string;
+  trackPct: number;
+  fillPct: number;
+  weighted: boolean;
+}
+
+// Dial geometry: a 220 degree sweep, measured clockwise from twelve o'clock
+const DIAL = { cx: 120, cy: 116, r: 96, start: -110, end: 110 };
+
+function polar(r: number, deg: number) {
+  const rad = (deg * Math.PI) / 180;
+  return { x: DIAL.cx + r * Math.sin(rad), y: DIAL.cy - r * Math.cos(rad) };
+}
+
+function trim(n: number): string {
+  return Number.isInteger(Math.round(n * 10) / 10) ? Math.round(n).toString() : n.toFixed(1);
 }
 
 @Component({
   selector: 'app-ticker',
   standalone: true,
-  imports: [RouterLink, RatioBarComponent, NgxEchartsDirective, InfoTooltipComponent, TickerSearchComponent],
-  animations: [
-    trigger('rowStagger', [
-      transition(':enter', [
-        query('.ratio-row', [
-          style({ opacity: 0, transform: 'translateY(8px)' }),
-          stagger('60ms', [
-            animate('250ms ease-out', style({ opacity: 1, transform: 'translateY(0)' })),
-          ]),
-        ], { optional: true, limit: 20 }),
-      ]),
-    ]),
-    trigger('fadeIn', [
-      transition(':enter', [
-        style({ opacity: 0, transform: 'translateY(12px)' }),
-        animate('300ms ease-out', style({ opacity: 1, transform: 'translateY(0)' })),
-      ]),
-    ]),
-  ],
+  imports: [RouterLink, NgIcon, BandMeterComponent, ScoreBadgeComponent, InfoTooltipComponent, TickerSearchComponent],
   template: `
     @if (loading()) {
-      <div class="loading-state">Loading...</div>
-    } @else if (detail()) {
-      <div class="ticker-page" @fadeIn>
-        <!-- Back link -->
-        <button class="back-link" (click)="goBack()">&larr; Back</button>
+      <div class="page" aria-busy="true">
+        <div class="sk sk-back"></div>
+        <div class="sk sk-title"></div>
+        <div class="sk sk-meta"></div>
+        <div class="grid">
+          <div class="card sk-card span-5"></div>
+          <div class="card sk-card span-7"></div>
+        </div>
+      </div>
+    } @else if (detail(); as d) {
+      <div class="page">
+        <button class="back" (click)="goBack()">
+          <ng-icon [svg]="icons.back" size="16" strokeWidth="1.5" />
+          {{ backLabel() }}
+        </button>
 
-        <!-- Top section: company info -->
-        <header class="company-header">
-          <div class="company-identity">
-            <h1 class="company-name">{{ detail()!.company.name }}</h1>
-            <span class="company-symbol">{{ detail()!.company.symbol }}</span>
-            @if (sectorName()) {
-              <span class="sector-pill">{{ sectorName() }}</span>
-            }
-            @if (auth.isLoggedIn()) {
-              <button
-                class="watchlist-btn"
-                [class.active]="inWatchlist()"
-                (click)="toggleWatchlist()"
-                [title]="inWatchlist() ? 'Remove from watchlist' : 'Add to watchlist'"
-              >
-                @if (inWatchlist()) {
-                  &#9733;
-                } @else {
-                  &#9734;
-                }
-              </button>
-            }
-          </div>
-        </header>
-
-        @if (quote()) {
-          <div class="price-block" @fadeIn>
-            <span class="price-big">{{ formatPrice(quote()!.price) }}</span>
-            <span class="price-change-lg" [class.positive]="quote()!.change >= 0" [class.negative]="quote()!.change < 0">
-              {{ quote()!.change >= 0 ? '+' : '' }}{{ formatPrice(quote()!.change) }}
-              ({{ quote()!.change >= 0 ? '+' : '' }}{{ quote()!.change_pct.toFixed(2) }}%)
-            </span>
-            <div class="price-meta">
-              <span>Vol: {{ formatVolume(quote()!.volume) }}</span>
-              <span>
-                Mkt Cap: {{ formatMarketCap(quote()!.market_cap) }}
-                @if (definitions()['market_cap']; as def) {
-                  <app-info-tooltip [description]="def.description" />
-                }
-              </span>
-              <span class="price-delayed">Updated hourly</span>
-            </div>
-          </div>
-        }
-
-        @if (detail()!.score) {
-          <!-- Score area -->
-          <section class="score-section">
-            <div class="score-card">
-              <div class="score-sub">
-                Composite score
-                @if (definitions()['composite_score']; as def) {
-                  <app-info-tooltip [description]="def.description" />
-                }
-              </div>
-              <div class="score-number-area">
-                <span class="score-big">{{ displayScore() }}</span>
-                <span
-                  class="rating-pill-large"
-                  [style.background]="ratingBg()"
-                  [style.color]="ratingColor()"
-                >{{ ratingLabel() }}</span>
-              </div>
-              @if (sectorRank() && sectorTotal()) {
-                <div class="rank-block">
-                  <div class="rank-line">
-                    Ranked <strong>#{{ sectorRank() }}</strong> of {{ sectorTotal() }} in {{ sectorName() }}
-                  </div>
-                  <div class="rank-track">
-                    <span class="rank-fill" [style.width.%]="sectorBeatPct()"></span>
-                  </div>
-                  <div class="rank-pct">Top {{ sectorPercentile() }}% of sector</div>
-                </div>
+        <header class="head">
+          <div class="identity">
+            <h1 class="page-heading name">{{ d.company.name }}</h1>
+            <div class="identity-meta">
+              <span class="symbol">{{ d.company.symbol }}</span>
+              @if (sectorName()) {
+                <span class="dot"></span>
+                <a class="sector-link" [routerLink]="['/sector', sectorKey()]">{{ sectorName() }}</a>
+              }
+              @if (auth.isLoggedIn()) {
+                <button
+                  class="ui-btn watch"
+                  [class.is-on]="inWatchlist()"
+                  [attr.aria-pressed]="inWatchlist()"
+                  (click)="toggleWatchlist()"
+                >
+                  <ng-icon [svg]="icons.star" size="16" strokeWidth="1.5" />
+                  {{ inWatchlist() ? 'Watching' : 'Watch' }}
+                </button>
+              } @else {
+                <a class="ui-btn watch" routerLink="/" fragment="signin" title="Sign in to keep a watchlist">
+                  <ng-icon [svg]="icons.star" size="16" strokeWidth="1.5" />
+                  Watch
+                </a>
               }
             </div>
-            <div class="radar-card">
-              <div class="score-sub">Ratio profile</div>
-              <div
-                echarts
-                [options]="radarOptions()"
-                class="radar-chart"
-              ></div>
-            </div>
-          </section>
+          </div>
 
-          <!-- Breakdown table -->
-          <section class="breakdown-section" @rowStagger>
-            <h2 class="breakdown-title">SCORE BREAKDOWN</h2>
-            <div class="breakdown-table">
-              <div class="breakdown-header">
-                <span class="bh-name">Ratio</span>
-                <span class="bh-value">Value</span>
-                <span class="bh-bucket">Range</span>
-                <span class="bh-bar">Bar</span>
-                <span class="bh-weight">Weight</span>
-                <span class="bh-contrib">Contribution</span>
+          @if (quote(); as q) {
+            <div class="price">
+              <div class="price-row">
+                <span class="price-big">{{ fmtPrice(q.price) }}</span>
+                <span class="price-chg" [class.up]="q.change > 0" [class.down]="q.change < 0">
+                  {{ q.change >= 0 ? '+' : '' }}{{ fmtPrice(q.change).replace('$-', '-$') }}
+                  &nbsp;{{ fmtChange(q.change_pct) }}
+                </span>
               </div>
-              @for (ratio of ratios(); track ratio.key) {
-                <div
-                  class="ratio-row"
-                  [class.expanded]="expandedRatio() === ratio.key"
-                  (mouseenter)="expandedRatio.set(ratio.key)"
-                  (mouseleave)="expandedRatio.set(null)"
-                >
-                  <div class="ratio-main">
-                    <span class="r-name">
-                      {{ ratio.name }}
-                      @if (ratio.description) {
-                        <app-info-tooltip [description]="ratio.description" />
+              <div class="price-meta">
+                <span>Volume <b>{{ formatVolume(q.volume) }}</b></span>
+                <span>
+                  Market cap <b>{{ fmtCap(q.market_cap) }}</b>
+                  @if (definitions()['market_cap']; as def) {
+                    <app-info-tooltip [description]="def.description" />
+                  }
+                </span>
+                <span>Prices update hourly</span>
+              </div>
+            </div>
+          }
+        </header>
+
+        @if (d.score; as score) {
+          <div class="grid">
+            <!-- Score dial -->
+            <section class="card span-5 score-card">
+              <div class="card-head">
+                <h2 class="card-title">
+                  Composite score
+                  @if (definitions()['composite_score']; as def) {
+                    <app-info-tooltip [description]="def.description" />
+                  }
+                </h2>
+              </div>
+
+              <div class="dial-wrap">
+                <svg class="dial" viewBox="0 0 240 176" role="img" [attr.aria-label]="'Score ' + score.composite_score.toFixed(0) + ' out of 100, ' + ratingText()">
+                  @for (t of dialTicks; track t.v) {
+                    <line [attr.x1]="t.x1" [attr.y1]="t.y1" [attr.x2]="t.x2" [attr.y2]="t.y2" [class.major]="t.major" />
+                  }
+                  <path class="track" [attr.d]="arcPath" />
+                  <path
+                    class="value"
+                    [attr.d]="arcPath"
+                    pathLength="100"
+                    stroke-dasharray="100"
+                    [attr.stroke-dashoffset]="100 - displayScore()"
+                    [style.stroke]="ratingColour()"
+                  />
+                  <circle class="tip" [attr.cx]="tip().x" [attr.cy]="tip().y" r="7" [style.stroke]="ratingColour()" />
+                  <text class="end-label" [attr.x]="labelStart.x" [attr.y]="labelStart.y + 22" text-anchor="middle">0</text>
+                  <text class="end-label" [attr.x]="labelEnd.x" [attr.y]="labelEnd.y + 22" text-anchor="middle">100</text>
+                </svg>
+                <div class="dial-centre">
+                  <span class="dial-num">{{ displayScore() }}</span>
+                  <span class="dial-rating">
+                    <app-band-meter [band]="ratingBandName()" size="md" />
+                    {{ ratingText() }}
+                  </span>
+                </div>
+              </div>
+
+              @if (sectorRank() && sectorTotal()) {
+                <div class="rank">
+                  <div class="rank-line">
+                    <span>Ranked <b>{{ sectorRank() }}</b> of {{ sectorTotal() }} in {{ sectorName() }}</span>
+                    <span class="rank-pct">Top {{ sectorPercentile() }}%</span>
+                  </div>
+                  <div class="strip" aria-hidden="true">
+                    @for (p of sectorStrip(); track p.symbol) {
+                      <a
+                        class="strip-cell"
+                        [class.is-self]="p.self"
+                        [style.background]="p.colour"
+                        [routerLink]="['/ticker', p.symbol]"
+                        [title]="p.symbol + ' ' + p.score"
+                        tabindex="-1"
+                      ></a>
+                    }
+                  </div>
+                </div>
+              }
+            </section>
+
+            <!-- Ledger -->
+            <section class="card span-7 ledger-card">
+              <div class="card-head">
+                <h2 class="card-title">How the score is built</h2>
+                <span class="card-note">Each ratio earns up to its weight in points</span>
+              </div>
+              <div class="ledger" role="table" aria-label="Score breakdown">
+                <div class="lg-row lg-head" role="row">
+                  <span role="columnheader">Ratio</span>
+                  <span role="columnheader" class="num">Value</span>
+                  <span role="columnheader">Band</span>
+                  <span role="columnheader" class="num">Points</span>
+                </div>
+                @for (row of ledger(); track row.key) {
+                  <div class="lg-row" role="row">
+                    <span class="lg-name" role="cell">
+                      {{ row.name }}
+                      @if (row.description) {
+                        <app-info-tooltip [description]="row.description" />
                       }
                     </span>
-                    <span class="r-value">{{ formatScoredRatio(ratio.value) }}</span>
-                    <span
-                      class="r-bucket"
-                      [style.color]="bucketColor(ratio.range_bucket)"
-                    >{{ ratio.range_bucket }}</span>
-                    <span class="r-bar">
-                      <app-ratio-bar [value]="ratio.value" [rangeBucket]="ratio.range_bucket" />
+                    <span class="lg-value num" role="cell">{{ row.value }}</span>
+                    <span class="lg-band" role="cell">
+                      <app-band-meter [band]="row.band" />
+                      <span>{{ row.bandLabel }}</span>
                     </span>
-                    <span class="r-weight">{{ (ratio.weight * 100).toFixed(0) }}%</span>
-                    <span class="r-contrib">{{ ratio.weighted_score.toFixed(2) }}</span>
+                    <span class="lg-points" role="cell">
+                      <span class="lg-bar">
+                        <span class="lg-track" [style.width.%]="row.trackPct">
+                          <b [style.width.%]="row.fillPct"></b>
+                        </span>
+                      </span>
+                      @if (row.weighted) {
+                        <span class="lg-pts"><i>{{ row.points }}</i> / {{ row.max }}</span>
+                      } @else {
+                        <span class="lg-pts">Not weighted</span>
+                      }
+                    </span>
                   </div>
-                  @if (expandedRatio() === ratio.key) {
-                    <div class="ratio-detail" @fadeIn>
-                      <div class="threshold-bar">
-                        <div class="threshold-segment poor">Poor</div>
-                        <div class="threshold-segment weak">Weak</div>
-                        <div class="threshold-segment neutral">Neutral</div>
-                        <div class="threshold-segment good">Good</div>
-                        <div class="threshold-segment strong">Strong</div>
-                      </div>
-                      <div class="current-marker">
-                        <span class="marker-label">Current: {{ ratio.range_bucket }}</span>
-                        <span class="marker-points">{{ ratio.points }}/5 pts</span>
-                      </div>
+                }
+                <div class="lg-row lg-total" role="row">
+                  <span role="cell">Composite</span>
+                  <span role="cell"></span>
+                  <span role="cell"></span>
+                  <span class="lg-pts" role="cell"><i>{{ score.composite_score.toFixed(0) }}</i> / 100</span>
+                </div>
+              </div>
+            </section>
+
+            <!-- Valuation -->
+            @if (contextRatios().length > 0) {
+              <section class="card span-5 value-card">
+                <div class="card-head">
+                  <h2 class="card-title">
+                    Valuation context
+                    @if (definitions()['valuation_context']; as def) {
+                      <app-info-tooltip [description]="def.description" />
+                    }
+                  </h2>
+                </div>
+                <div class="figures">
+                  @for (ctx of contextRatios(); track ctx.key) {
+                    <div class="figure">
+                      <span class="fig-label">{{ ctx.name }}</span>
+                      <span class="fig-value">{{ fmtRatio(ctx.value) }}</span>
                     </div>
                   }
                 </div>
-              }
-            </div>
-          </section>
+                <p class="note">Shown for reference only. Valuation never changes the score.</p>
+              </section>
+            }
 
-          <!-- Sector peers -->
-          @if (sectorPeers().length > 0) {
-            <section class="peers-section">
-              <h2 class="peers-title">Top of {{ sectorName() }}</h2>
-              <div class="peers-row">
-                @for (peer of sectorPeers(); track peer.symbol) {
-                  <a class="peer-card" [routerLink]="['/ticker', peer.symbol]">
-                    <span class="peer-symbol">{{ peer.symbol }}</span>
-                    <span class="peer-name">{{ peer.name }}</span>
-                    <span class="peer-score">{{ peer.score }}</span>
-                  </a>
-                }
-              </div>
-            </section>
-          }
-
-          <!-- Context ratios (display-only) -->
-          @if (contextRatios().length > 0) {
-            <section class="context-section">
-              <h2 class="context-title">
-                VALUATION CONTEXT
-                @if (definitions()['valuation_context']; as def) {
-                  <app-info-tooltip [description]="def.description" />
-                }
-              </h2>
-              <div class="context-grid">
-                @for (ctx of contextRatios(); track ctx.key) {
-                  <div class="context-card">
-                    <span class="ctx-label">{{ ctx.name }}</span>
-                    <span class="ctx-value">{{ formatRatio(ctx.value) }}</span>
-                  </div>
-                }
-              </div>
-              <p class="context-note">These valuation metrics are shown for reference only and do not affect the composite score.</p>
-            </section>
-          }
+            <!-- Peers -->
+            @if (sectorPeers().length > 0) {
+              <section class="card" [class.span-7]="contextRatios().length > 0" [class.span-12]="contextRatios().length === 0">
+                <div class="card-head">
+                  <h2 class="card-title">Top of {{ sectorName() }}</h2>
+                  <a class="ui-link" [routerLink]="['/sector', sectorKey()]">Full ranking</a>
+                </div>
+                <div class="peers">
+                  @for (peer of sectorPeers(); track peer.symbol) {
+                    <a class="peer" [class.is-self]="peer.self" [routerLink]="['/ticker', peer.symbol]">
+                      <span class="peer-rank">{{ peer.rank }}</span>
+                      <span class="peer-sym">{{ peer.symbol }}</span>
+                      <span class="peer-name">{{ peer.name }}</span>
+                      <app-score-badge [score]="peer.score" [rating]="peer.rating" />
+                    </a>
+                  }
+                </div>
+              </section>
+            }
+          </div>
         } @else {
-          <div class="no-score-state">
-            No score data available for this ticker yet.
+          <div class="card empty">
+            <span class="empty-title">No score yet</span>
+            <span class="empty-sub">This company hasn't been scored. It may be missing too many figures in its latest filings.</span>
           </div>
         }
       </div>
     } @else {
-      <div class="nf-state">
+      <div class="nf">
         <p class="nf-code">Not found</p>
-        <h1 class="nf-title">No ticker called {{ requestedSymbol() }}.</h1>
+        <h1 class="page-heading">No ticker called {{ requestedSymbol() }}</h1>
         <p class="nf-sub">
           It may not be in the ASX&nbsp;300, or the symbol was mistyped.
           Try a search, or browse the full screener.
@@ -250,596 +294,727 @@ interface SectorPeer {
         <div class="nf-search">
           <app-ticker-search placeholder="Search any ASX ticker or company" />
         </div>
-        <a routerLink="/screener" class="nf-screener-link">Open the screener</a>
+        <a routerLink="/screener" class="ui-link">Open the screener</a>
       </div>
     }
   `,
   styles: [`
-    .loading-state,
-    .error-state {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100%;
-      color: var(--text-muted);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.875rem;
+    :host {
+      display: block;
     }
 
-    .ticker-page {
-      max-width: 960px;
+    .page {
+      max-width: 1200px;
       margin: 0 auto;
-      padding: 2rem 1.5rem 4rem;
+      padding: 24px 32px 64px;
     }
 
-    .back-link {
-      display: inline-block;
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      text-decoration: none;
-      margin-bottom: 1.5rem;
-      transition: color 150ms ease;
-      background: none;
-      border: none;
-      padding: 0;
-      cursor: pointer;
-      font-family: inherit;
-    }
-
-    .back-link:hover {
-      color: var(--accent);
-    }
-
-    /* Not-found state */
-    .nf-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      min-height: 100%;
-      max-width: 440px;
-      margin: 0 auto;
-      padding: 4rem 1.5rem;
-    }
-
-    .nf-code {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.72rem;
-      font-weight: 600;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin: 0 0 0.5rem;
-    }
-
-    .nf-title {
-      font-family: 'Archivo', sans-serif;
-      font-stretch: 104%;
-      font-weight: 720;
-      font-size: 1.5rem;
-      letter-spacing: -0.02em;
-      color: var(--text-primary);
-      margin: 0 0 0.6rem;
-    }
-
-    .nf-sub {
-      font-size: 0.875rem;
-      line-height: 1.65;
-      color: var(--text-secondary);
-      margin: 0 0 1.5rem;
-    }
-
-    .nf-search {
-      width: 100%;
-      margin-bottom: 1.25rem;
-    }
-
-    .nf-screener-link {
-      font-size: 0.84rem;
-      color: var(--accent);
-      text-decoration: none;
-    }
-
-    .nf-screener-link:hover {
-      color: var(--accent-light);
-    }
-
-    /* Sector peers */
-    .peers-section {
-      margin-top: 2rem;
-    }
-
-    .peers-title {
-      font-size: 0.75rem;
-      font-weight: 600;
-      letter-spacing: 0.12em;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      margin: 0 0 0.75rem;
-    }
-
-    .peers-row {
-      display: flex;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-    }
-
-    .peer-card {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      padding: 0.65rem 0.9rem;
-      background: var(--bg-elevated);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      text-decoration: none;
-      min-width: 130px;
-      transition: border-color 150ms ease, transform 150ms ease;
-    }
-
-    .peer-card:hover {
-      border-color: var(--accent);
-      transform: translateY(-1px);
-    }
-
-    .peer-symbol {
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 700;
-      font-size: 0.8rem;
-      color: var(--text-primary);
-    }
-
-    .peer-name {
-      font-size: 0.7rem;
-      color: var(--text-muted);
-      max-width: 140px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .peer-score {
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 700;
-      font-size: 0.85rem;
-      color: var(--accent);
-      margin-top: 3px;
-    }
-
-    /* Company header */
-    .company-header {
-      margin-bottom: 2rem;
-    }
-
-    .company-identity {
-      display: flex;
-      align-items: baseline;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-    }
-
-    .company-name {
-      font-family: 'Archivo', sans-serif;
-      font-stretch: 104%;
-      font-weight: 720;
-      font-size: 1.75rem;
-      letter-spacing: -0.02em;
-      color: var(--text-primary);
-      margin: 0;
-      line-height: 1.2;
-    }
-
-    .company-symbol {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 1rem;
-      color: var(--text-secondary);
-      font-weight: 500;
-    }
-
-    .sector-pill {
-      font-size: 0.6875rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      padding: 2px 8px;
-      background: rgba(147, 161, 175, 0.12);
-      color: var(--text-secondary);
-      white-space: nowrap;
-    }
-
-    .watchlist-btn {
-      background: none;
-      border: 1px solid transparent;
-      color: var(--text-muted);
-      font-size: 1.25rem;
-      line-height: 1;
-      width: 32px;
-      height: 32px;
+    .back {
       display: inline-flex;
       align-items: center;
-      justify-content: center;
+      gap: 6px;
+      height: 32px;
+      margin: 0 0 16px -8px;
+      padding: 0 8px;
+      border: none;
+      border-radius: var(--radius);
+      background: none;
+      color: var(--text-secondary);
+      font-size: 13px;
       cursor: pointer;
-      transition: color 200ms ease, border-color 200ms ease, transform 150ms ease;
-      margin-left: 0.25rem;
+      transition: color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease);
     }
 
-    .watchlist-btn:hover {
-      color: var(--accent);
-      border-color: rgba(226, 164, 40, 0.3);
-      transform: scale(1.15);
+    .back:hover {
+      color: var(--text-primary);
+      background: var(--bg-hover);
     }
 
-    .watchlist-btn.active {
-      color: var(--accent);
+    // ── Header ──
+    .head {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 32px;
+      margin-bottom: 32px;
     }
 
-    /* Score section */
-    .score-section {
+    .name {
+      font-size: 32px;
+    }
+
+    .identity-meta {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .symbol {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--accent-ink);
+    }
+
+    .dot {
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: var(--text-muted);
+    }
+
+    .sector-link {
+      font-size: 14px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: color var(--dur-fast) var(--ease);
+    }
+
+    .sector-link:hover {
+      color: var(--text-primary);
+    }
+
+    .watch {
+      height: 32px;
+      padding: 0 12px;
+      margin-left: 4px;
+      color: var(--text-secondary);
+    }
+
+    .watch.is-on {
+      color: var(--accent-ink);
+      border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+      background: var(--accent-soft);
+    }
+
+    .watch.is-on ng-icon {
+      fill: currentColor;
+    }
+
+    .price {
+      text-align: right;
+    }
+
+    .price-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: flex-end;
+      gap: 12px;
+    }
+
+    .price-big {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 32px;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      color: var(--text-primary);
+    }
+
+    .price-chg {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .up { color: var(--up); }
+    .down { color: var(--down); }
+
+    .price-meta {
+      display: flex;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: 4px 16px;
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .price-meta b {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 400;
+      color: var(--text-secondary);
+    }
+
+    // ── Grid and cards ──
+    .grid {
       display: grid;
-      grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
-      gap: 1.25rem;
-      margin-bottom: 2rem;
-      align-items: stretch;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 16px;
     }
 
-    .score-card,
-    .radar-card {
-      background: var(--bg-elevated);
+    .span-5 { grid-column: span 5; }
+    .span-7 { grid-column: span 7; }
+    .span-12 { grid-column: span 12; }
+
+    .card {
+      padding: 24px;
+      background: var(--bg-surface);
       border: 1px solid var(--border);
       border-radius: var(--radius-lg);
-      padding: 1.25rem 1.4rem;
+      min-width: 0;
     }
 
+    .card-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .card-title {
+      display: flex;
+      align-items: center;
+      margin: 0;
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .card-note {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    // ── Dial ──
     .score-card {
       display: flex;
       flex-direction: column;
     }
 
-    .score-number-area {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      margin-top: 0.75rem;
+    .dial-wrap {
+      position: relative;
+      width: 100%;
+      max-width: 320px;
+      margin: 0 auto;
     }
 
-    .rank-block {
+    .dial {
+      display: block;
+      width: 100%;
+      overflow: visible;
+    }
+
+    .dial line {
+      stroke: var(--text-muted);
+      stroke-width: 1;
+      opacity: 0.5;
+    }
+
+    .dial line.major {
+      opacity: 1;
+    }
+
+    .dial .track,
+    .dial .value {
+      fill: none;
+      stroke-width: 10;
+    }
+
+    .dial .track {
+      stroke: var(--band-off);
+    }
+
+    .dial .tip {
+      fill: var(--bg-surface);
+      stroke-width: 3;
+    }
+
+    .end-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      fill: var(--text-muted);
+    }
+
+    .dial-centre {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      transform: translateY(-36%);
+    }
+
+    .dial-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 500;
+      font-size: 64px;
+      line-height: 1;
+      letter-spacing: -0.04em;
+      color: var(--text-primary);
+    }
+
+    .dial-rating {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .rank {
       margin-top: auto;
-      padding-top: 1.5rem;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
     }
 
     .rank-line {
-      font-size: 0.8125rem;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+      font-size: 13px;
       color: var(--text-secondary);
-      margin-bottom: 0.55rem;
     }
 
-    .rank-line strong {
-      color: var(--text-primary);
+    .rank-line b {
       font-family: 'JetBrains Mono', monospace;
-    }
-
-    .rank-track {
-      height: 5px;
-      border-radius: 3px;
-      background: var(--bg-surface);
-      overflow: hidden;
-      margin-bottom: 0.45rem;
-    }
-
-    .rank-fill {
-      display: block;
-      height: 100%;
-      border-radius: 3px;
-      background: linear-gradient(to right, var(--accent), var(--accent-light));
-      transition: width 600ms cubic-bezier(0.22, 1, 0.36, 1);
+      font-weight: 500;
+      color: var(--text-primary);
     }
 
     .rank-pct {
       font-family: 'JetBrains Mono', monospace;
-      font-size: 0.72rem;
-      font-weight: 600;
-      color: var(--accent);
-    }
-
-    .score-big {
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 900;
-      font-size: 4rem;
-      color: var(--accent);
-      letter-spacing: -0.03em;
-      line-height: 1;
-    }
-
-    .rating-pill-large {
-      font-size: 0.75rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      padding: 4px 12px;
-      border-radius: 999px;
+      font-size: 12px;
+      color: var(--accent-ink);
       white-space: nowrap;
-      align-self: center;
     }
 
-    .score-sub {
-      font-size: 0.66rem;
-      font-weight: 600;
-      letter-spacing: 0.12em;
+    .strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2px;
+    }
+
+    .strip-cell {
+      width: 8px;
+      height: 16px;
+      border-radius: 2px;
+      opacity: 0.55;
+      transition: opacity var(--dur-fast) var(--ease);
+    }
+
+    .strip-cell:hover {
+      opacity: 1;
+    }
+
+    .strip-cell.is-self {
+      opacity: 1;
+      box-shadow: 0 0 0 1.5px var(--bg-surface), 0 0 0 3px var(--text-primary);
+    }
+
+    // ── Ledger ──
+    .lg-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1.5fr) 72px minmax(0, 1fr) minmax(0, 1.4fr);
+      align-items: center;
+      gap: 16px;
+      min-height: 44px;
+      border-top: 1px solid var(--border);
+      font-size: 13px;
+    }
+
+    .lg-head {
+      min-height: 32px;
+      border-top: none;
+      font-size: 12px;
       color: var(--text-muted);
-      text-transform: uppercase;
     }
 
-    .radar-chart {
-      width: 100%;
-      height: 300px;
-      margin-top: 0.5rem;
+    .num {
+      text-align: right;
     }
 
-    @media (max-width: 768px) {
-      .score-section {
-        grid-template-columns: 1fr;
-      }
-
-      .radar-chart {
-        height: 260px;
-      }
+    .lg-name {
+      display: flex;
+      align-items: center;
+      color: var(--text-primary);
     }
 
-    /* Breakdown section */
-    .breakdown-section {
-      margin-top: 1rem;
+    .lg-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text-secondary);
     }
 
-    .breakdown-title {
-      font-size: 0.75rem;
-      font-weight: 600;
-      letter-spacing: 0.12em;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      margin: 0 0 0.75rem;
+    .lg-band {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text-secondary);
     }
 
-    .breakdown-table {
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
+    .lg-points {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 72px;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .lg-bar {
+      display: block;
+      min-width: 0;
+    }
+
+    .lg-track {
+      display: block;
+      height: 6px;
+      border-radius: 3px;
+      background: var(--band-off);
       overflow: hidden;
     }
 
-    .breakdown-header {
-      display: grid;
-      grid-template-columns: 2fr 1fr 1fr 80px 0.75fr 1fr;
-      gap: 0;
-      padding: 0.5rem 0.75rem;
-      background: var(--bg-surface);
-      font-size: 0.6875rem;
-      font-weight: 500;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
+    .lg-track b {
+      display: block;
+      height: 100%;
+      background: var(--accent);
+    }
+
+    .lg-pts {
+      text-align: right;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
       color: var(--text-muted);
-      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
     }
 
-    .ratio-row {
-      border-bottom: 1px solid var(--bg-surface);
-      transition: background 100ms ease;
-    }
-
-    .ratio-row:last-child {
-      border-bottom: none;
-    }
-
-    .ratio-row:hover {
-      background: var(--bg-surface);
-    }
-
-    .ratio-main {
-      display: grid;
-      grid-template-columns: 2fr 1fr 1fr 80px 0.75fr 1fr;
-      gap: 0;
-      padding: 0.5rem 0.75rem;
-      align-items: center;
-      font-size: 0.8125rem;
-    }
-
-    .r-name {
+    .lg-pts i {
+      font-style: normal;
       color: var(--text-primary);
+    }
+
+    .lg-total {
+      border-top: 1px solid var(--border-strong);
       font-weight: 500;
-    }
-
-    .r-value {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.8125rem;
-      color: var(--text-secondary);
-    }
-
-    .r-bucket {
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: capitalize;
-    }
-
-    .r-bar {
-      display: flex;
-      align-items: center;
-    }
-
-    .r-weight {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.75rem;
-      color: var(--text-muted);
-    }
-
-    .r-contrib {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.8125rem;
-      color: var(--accent);
-      font-weight: 600;
-    }
-
-    /* Expanded ratio detail */
-    .ratio-detail {
-      padding: 0.5rem 0.75rem 0.75rem;
-      background: var(--bg-surface);
-    }
-
-    .threshold-bar {
-      display: flex;
-      gap: 2px;
-      margin-bottom: 0.375rem;
-    }
-
-    .threshold-segment {
-      flex: 1;
-      height: 6px;
-      font-size: 0;
-      line-height: 0;
-    }
-
-    .threshold-segment.poor { background: #e5484d; }
-    .threshold-segment.weak { background: #f0883e; }
-    .threshold-segment.neutral { background: var(--accent); }
-    .threshold-segment.good { background: #8fc63d; }
-    .threshold-segment.strong { background: #2ebd70; }
-
-    .current-marker {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.6875rem;
-      color: var(--text-secondary);
-    }
-
-    .marker-label {
-      text-transform: capitalize;
-    }
-
-    .marker-points {
-      font-family: 'JetBrains Mono', monospace;
-      color: var(--accent);
-    }
-
-    .price-block {
-      margin-bottom: 2rem;
-      padding: 1rem 0;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .price-big {
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 900;
-      font-size: 2rem;
       color: var(--text-primary);
-      letter-spacing: -0.02em;
-      margin-right: 0.75rem;
     }
 
-    .price-change-lg {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 1rem;
-      font-weight: 600;
+    .lg-total .lg-pts {
+      grid-column: 4;
+      font-size: 13px;
     }
 
-    .price-change-lg.positive { color: #2ebd70; }
-    .price-change-lg.negative { color: #e5484d; }
-
-    .price-meta {
-      display: flex;
-      gap: 1.5rem;
-      margin-top: 0.5rem;
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      font-family: 'JetBrains Mono', monospace;
+    .lg-total .lg-pts i {
+      color: var(--accent-ink);
     }
 
-    .price-delayed {
-      font-style: italic;
-      opacity: 0.7;
+    // ── Valuation ──
+    .figures {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
     }
 
-    .context-section {
-      margin-top: 2rem;
-    }
-
-    .context-title {
-      font-size: 0.75rem;
-      font-weight: 600;
-      letter-spacing: 0.12em;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      margin: 0 0 0.75rem;
-    }
-
-    .context-grid {
-      display: flex;
-      gap: 1rem;
-      flex-wrap: wrap;
-    }
-
-    .context-card {
+    .figure {
       display: flex;
       flex-direction: column;
       gap: 4px;
-      padding: 0.75rem 1rem;
-      background: var(--bg-elevated);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      min-width: 120px;
     }
 
-    .ctx-label {
-      font-size: 0.6875rem;
-      font-weight: 500;
-      letter-spacing: 0.06em;
+    .fig-label {
+      font-size: 12px;
       color: var(--text-muted);
-      text-transform: uppercase;
     }
 
-    .ctx-value {
+    .fig-value {
       font-family: 'JetBrains Mono', monospace;
-      font-size: 1.125rem;
-      font-weight: 700;
+      font-size: 24px;
+      font-weight: 500;
       color: var(--text-primary);
     }
 
-    .context-note {
-      font-size: 0.6875rem;
-      color: var(--text-muted);
-      font-style: italic;
-      margin: 0.75rem 0 0;
+    .value-card {
+      display: flex;
+      flex-direction: column;
     }
 
-    .no-score-state {
-      text-align: center;
+    .value-card .note {
+      margin-top: auto;
+      padding-top: 20px;
+    }
+
+    .note {
+      margin: 20px 0 0;
+      font-size: 12px;
       color: var(--text-muted);
-      padding: 3rem 1rem;
-      font-size: 0.875rem;
+    }
+
+    // ── Peers ──
+    .peers {
+      display: flex;
+      flex-direction: column;
+      margin: -8px -12px;
+    }
+
+    .peer {
+      display: grid;
+      grid-template-columns: 24px 72px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 12px;
+      height: 40px;
+      padding: 0 12px;
+      border-radius: var(--radius);
+      text-decoration: none;
+      transition: background-color var(--dur-fast) var(--ease);
+    }
+
+    .peer:hover {
+      background: var(--bg-hover);
+    }
+
+    .peer.is-self {
+      background: var(--accent-soft);
+    }
+
+    .peer-rank {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text-muted);
+      text-align: right;
+    }
+
+    .peer-sym {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .peer-name {
+      font-size: 13px;
+      color: var(--text-secondary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    // ── States ──
+    .sk {
+      border-radius: var(--radius);
+      background: var(--band-off);
+    }
+
+    .sk-back { width: 64px; height: 16px; margin-bottom: 24px; }
+    .sk-title { width: 320px; max-width: 80%; height: 32px; margin-bottom: 12px; }
+    .sk-meta { width: 200px; height: 16px; margin-bottom: 32px; }
+
+    .sk-card {
+      height: 420px;
+      opacity: 0.6;
+    }
+
+    .empty {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 48px 24px;
+      text-align: center;
+    }
+
+    .empty-title {
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    .empty-sub {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .nf {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      min-height: 100%;
+      max-width: 440px;
+      margin: 0 auto;
+      padding: 96px 24px;
+      box-sizing: border-box;
+      text-align: center;
+    }
+
+    .nf-code {
+      margin: 0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--accent-ink);
+    }
+
+    .nf-sub {
+      margin: 0 0 12px;
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text-secondary);
+    }
+
+    .nf-search {
+      width: 100%;
+      margin-bottom: 8px;
+    }
+
+    @media (max-width: 1100px) {
+      .span-5,
+      .span-7 {
+        grid-column: span 12;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .page {
+        padding: 16px 16px 48px;
+      }
+
+      .head {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 20px;
+      }
+
+      .name {
+        font-size: 26px;
+      }
+
+      .price,
+      .price-row,
+      .price-meta {
+        text-align: left;
+        justify-content: flex-start;
+      }
+
+      .card {
+        padding: 20px 16px;
+      }
+
+      .card-note {
+        display: none;
+      }
+
+      .lg-head {
+        display: none;
+      }
+
+      .lg-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px 12px;
+        padding: 12px 0;
+      }
+
+      .lg-band {
+        grid-row: 2;
+      }
+
+      .lg-points {
+        grid-row: 2;
+      }
+
+      .lg-total {
+        grid-template-columns: 1fr auto;
+      }
+
+      .lg-total span:nth-child(2),
+      .lg-total span:nth-child(3) {
+        display: none;
+      }
+
+      .lg-total .lg-pts {
+        grid-column: 2;
+        grid-row: 1;
+      }
+
+      .lg-points {
+        grid-template-columns: 64px 72px;
+      }
+
+      .figures {
+        gap: 12px;
+      }
+
+      .fig-value {
+        font-size: 20px;
+      }
+
+      .peer {
+        grid-template-columns: 20px 56px minmax(0, 1fr) auto;
+        gap: 8px;
+      }
     }
   `],
 })
-export class TickerComponent implements OnInit, AfterViewInit {
+export class TickerComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private location = inject(Location);
   private titleService = inject(Title);
   private api = inject(ApiService);
   readonly auth = inject(AuthService);
-  private theme = inject(ThemeService);
+
+  readonly icons = { back: lucideArrowLeft, star: lucideStar };
 
   definitions = signal<Record<string, Definition>>({});
   detail = signal<TickerDetail | null>(null);
   loading = signal(true);
   displayScore = signal(0);
-  expandedRatio = signal<string | null>(null);
   inWatchlist = signal(false);
   quote = signal<Quote | null>(null);
-  private watchlistSymbols = signal<Set<string>>(new Set());
+  requestedSymbol = signal('');
 
   // Sector context
   sectorName = signal<string | null>(null);
-  sectorRank = signal<number | null>(null);
-  sectorTotal = signal<number | null>(null);
-  sectorPeers = signal<SectorPeer[]>([]);
-  requestedSymbol = signal('');
+  sectorKey = signal<string>('');
+  sectorItems = signal<ScreenerItem[]>([]);
+
+  fmtRatio = formatRatio;
+  fmtPrice = formatPrice;
+  fmtCap = formatMarketCap;
+  fmtChange = formatChangePct;
+
+  // ── Dial ──
+  readonly arcPath = (() => {
+    const a = polar(DIAL.r, DIAL.start);
+    const b = polar(DIAL.r, DIAL.end);
+    return `M ${a.x} ${a.y} A ${DIAL.r} ${DIAL.r} 0 1 1 ${b.x} ${b.y}`;
+  })();
+
+  readonly dialTicks = Array.from({ length: 21 }, (_, i) => {
+    const v = i * 5;
+    const major = v % 25 === 0;
+    const deg = DIAL.start + (v / 100) * (DIAL.end - DIAL.start);
+    const p1 = polar(DIAL.r + 12, deg);
+    const p2 = polar(DIAL.r + (major ? 20 : 16), deg);
+    return { v, major, x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y };
+  });
+
+  readonly labelStart = polar(DIAL.r, DIAL.start);
+  readonly labelEnd = polar(DIAL.r, DIAL.end);
+
+  tip = computed(() => polar(DIAL.r, DIAL.start + (this.displayScore() / 100) * (DIAL.end - DIAL.start)));
+
+  ratingBandName = computed(() => ratingBand(this.detail()?.score?.rating));
+  ratingText = computed(() => ratingLabel(this.detail()?.score?.rating));
+  ratingColour = computed(() => bandVar(this.ratingBandName()));
+
+  // ── Sector ──
+  private sortedSector = computed(() =>
+    [...this.sectorItems()]
+      .filter(i => i.rating !== 'insufficient_data')
+      .sort((a, b) => b.composite_score - a.composite_score),
+  );
+
+  sectorTotal = computed(() => this.sortedSector().length || null);
+
+  sectorRank = computed(() => {
+    const sym = this.requestedSymbol();
+    const i = this.sortedSector().findIndex(s => s.symbol.toUpperCase() === sym);
+    return i >= 0 ? i + 1 : null;
+  });
+
   // Rank 20 of 65 puts a company in the top 31% (20/65), not the top 71%
   sectorPercentile = computed(() => {
     const rank = this.sectorRank();
@@ -848,112 +1023,71 @@ export class TickerComponent implements OnInit, AfterViewInit {
     return Math.max(1, Math.round((rank / total) * 100));
   });
 
-  // Share of the sector this company ranks at or above; drives the bar fill
-  sectorBeatPct = computed(() => {
-    const rank = this.sectorRank();
-    const total = this.sectorTotal();
-    if (!rank || !total) return 0;
-    return Math.round(((total - rank + 1) / total) * 100);
+  sectorStrip = computed(() => {
+    const sym = this.requestedSymbol();
+    return this.sortedSector().map(i => ({
+      symbol: i.symbol,
+      score: Math.round(i.composite_score),
+      colour: bandVar(ratingBand(i.rating)),
+      self: i.symbol.toUpperCase() === sym,
+    }));
   });
 
-  ratios = computed(() => {
-    const d = this.detail();
-    if (!d?.score?.breakdown?.ratios) return [];
-    return d.score.breakdown.ratios;
+  // Top five, plus this company in place if it isn't one of them
+  sectorPeers = computed(() => {
+    const sym = this.requestedSymbol();
+    const list = this.sortedSector().map((i, idx) => ({
+      rank: idx + 1,
+      symbol: i.symbol,
+      name: i.company_name,
+      score: i.composite_score,
+      rating: i.rating,
+      self: i.symbol.toUpperCase() === sym,
+    }));
+    const top = list.slice(0, 5);
+    const self = list.find(p => p.self);
+    if (self && !top.includes(self)) top.push(self);
+    return top;
   });
 
-  contextRatios = computed(() => {
-    const d = this.detail();
-    if (!d?.score?.breakdown?.context_ratios) return [];
-    return d.score.breakdown.context_ratios;
+  contextRatios = computed(() => this.detail()?.score?.breakdown?.context_ratios ?? []);
+
+  ledger = computed<LedgerRow[]>(() => {
+    const ratios: RatioResult[] = this.detail()?.score?.breakdown?.ratios ?? [];
+    if (!ratios.length) return [];
+    const maxWeight = Math.max(...ratios.map(r => r.weight));
+    return [...ratios]
+      .sort((a, b) => b.weight - a.weight)
+      .map(r => {
+        const max = r.weight * 100;
+        const pts = r.weighted_score * 20;
+        return {
+          key: r.key,
+          name: r.name,
+          description: r.description,
+          value: formatRatio(r.value),
+          band: r.range_bucket,
+          bandLabel: BAND_LABELS[r.range_bucket as Band] ?? r.range_bucket,
+          points: trim(pts),
+          max: trim(max),
+          trackPct: maxWeight ? (r.weight / maxWeight) * 100 : 0,
+          fillPct: max ? Math.min(100, (pts / max) * 100) : 0,
+          weighted: r.weight > 0,
+        };
+      });
   });
 
-  ratingLabel = computed(() => {
-    const r = this.detail()?.score?.rating ?? '';
-    const labels: Record<string, string> = {
-      strong_buy: 'Very Strong', buy: 'Strong', hold: 'Neutral',
-      sell: 'Weak', strong_sell: 'Very Weak', insufficient_data: 'No Data',
-    };
-    return labels[r] ?? r.replace(/_/g, ' ');
+  backLabel = computed(() => {
+    const state = window.history.state as { navigationId?: number } | null;
+    return state?.navigationId && state.navigationId > 1 ? 'Back' : 'Screener';
   });
 
-  ratingColor = computed(() => {
-    const map: Record<string, string> = {
-      strong_buy: '#2ebd70',
-      buy: '#8fc63d',
-      hold: '#e2a428',
-      sell: '#e5484d',
-      strong_sell: '#d03136',
-    };
-    return map[this.detail()?.score?.rating ?? ''] ?? '#93a1af';
-  });
-
-  ratingBg = computed(() => {
-    const map: Record<string, string> = {
-      strong_buy: 'rgba(46, 189, 112, 0.12)',
-      buy: 'rgba(143, 198, 61, 0.12)',
-      hold: 'rgba(226, 164, 40, 0.12)',
-      sell: 'rgba(229, 72, 77, 0.12)',
-      strong_sell: 'rgba(208, 49, 54, 0.12)',
-    };
-    return map[this.detail()?.score?.rating ?? ''] ?? 'rgba(147, 161, 175, 0.12)';
-  });
-
-  radarOptions = computed<EChartsCoreOption>(() => {
-    const r = this.ratios();
-    if (!r.length) return {};
-    return {
-      radar: {
-        indicator: r.map(ratio => ({
-          name: ratio.name,
-          max: 5,
-        })),
-        radius: '55%',
-        shape: 'polygon' as const,
-        axisName: {
-          color: this.theme.theme() === 'dark' ? '#93a1af' : '#4a4a65',
-          fontSize: 11,
-        },
-        splitArea: {
-          areaStyle: {
-            color: this.theme.theme() === 'dark'
-              ? ['transparent', 'rgba(37, 37, 64, 0.3)']
-              : ['transparent', 'rgba(200, 200, 220, 0.25)'],
-          },
-        },
-        splitLine: {
-          lineStyle: {
-            color: this.theme.theme() === 'dark' ? '#243040' : '#d8d8e4',
-          },
-        },
-        axisLine: {
-          lineStyle: {
-            color: this.theme.theme() === 'dark' ? '#243040' : '#d8d8e4',
-          },
-        },
-      },
-      series: [{
-        type: 'radar',
-        data: [{
-          value: r.map(ratio => ratio.points),
-          areaStyle: {
-            color: 'rgba(226, 164, 40, 0.2)',
-          },
-          lineStyle: {
-            color: '#e2a428',
-            width: 2,
-          },
-          itemStyle: {
-            color: '#e2a428',
-          },
-        }],
-      }],
-    };
-  });
+  private paramSub?: Subscription;
+  private frame = 0;
 
   goBack(): void {
-    // Prefer real history so back returns to the exact screener/sector state;
-    // fall back to the screener for direct visits
+    // Prefer real history so back returns to the exact screener or sector
+    // state; fall back to the screener for direct visits
     const state = window.history.state as { navigationId?: number } | null;
     if (state?.navigationId && state.navigationId > 1) {
       this.location.back();
@@ -963,7 +1097,7 @@ export class TickerComponent implements OnInit, AfterViewInit {
   }
 
   ngOnInit(): void {
-    this.route.paramMap.subscribe(params => {
+    this.paramSub = this.route.paramMap.subscribe(params => {
       const symbol = params.get('symbol');
       if (symbol) {
         this.requestedSymbol.set(symbol.toUpperCase());
@@ -980,48 +1114,15 @@ export class TickerComponent implements OnInit, AfterViewInit {
     });
   }
 
-  ngAfterViewInit(): void {
-    // Score animation is triggered after data loads
-  }
-
-  bucketColor(bucket: string): string {
-    const map: Record<string, string> = {
-      strong: '#2ebd70',
-      good: '#8fc63d',
-      neutral: '#e2a428',
-      weak: '#f0883e',
-      poor: '#e5484d',
-    };
-    return map[bucket] ?? '#93a1af';
-  }
-
-  formatRatio(value: number): string {
-    if (Math.abs(value) >= 1000) return value.toFixed(0);
-    if (Math.abs(value) >= 100) return value.toFixed(1);
-    return value.toFixed(2);
-  }
-
-  // Scored ratios only: the backend marks debt-free interest coverage with a
-  // 999 sentinel that should read as a state, not a number
-  formatScoredRatio(value: number): string {
-    if (value >= 998) return 'No debt';
-    return this.formatRatio(value);
-  }
-
-  formatPrice(price: number): string {
-    return '$' + price.toFixed(2);
-  }
-
-  formatMarketCap(cap: number): string {
-    if (cap >= 1_000_000_000) return '$' + (cap / 1_000_000_000).toFixed(1) + 'B';
-    if (cap >= 1_000_000) return '$' + (cap / 1_000_000).toFixed(0) + 'M';
-    return '$' + cap.toLocaleString();
+  ngOnDestroy(): void {
+    this.paramSub?.unsubscribe();
+    cancelAnimationFrame(this.frame);
   }
 
   formatVolume(vol: number): string {
     if (vol >= 1_000_000) return (vol / 1_000_000).toFixed(1) + 'M';
     if (vol >= 1_000) return (vol / 1_000).toFixed(0) + 'K';
-    return vol.toLocaleString();
+    return vol.toLocaleString('en-AU');
   }
 
   toggleWatchlist(): void {
@@ -1029,26 +1130,19 @@ export class TickerComponent implements OnInit, AfterViewInit {
     if (!symbol) return;
 
     const wasInWatchlist = this.inWatchlist();
-    this.inWatchlist.set(!wasInWatchlist); // optimistic update
+    this.inWatchlist.set(!wasInWatchlist); // optimistic
 
-    if (wasInWatchlist) {
-      this.api.removeFromWatchlist(symbol).subscribe({
-        error: () => this.inWatchlist.set(true), // revert on failure
-      });
-    } else {
-      this.api.addToWatchlist(symbol).subscribe({
-        error: () => this.inWatchlist.set(false), // revert on failure
-      });
-    }
+    const req = wasInWatchlist
+      ? this.api.removeFromWatchlist(symbol)
+      : this.api.addToWatchlist(symbol);
+    req.subscribe({ error: () => this.inWatchlist.set(wasInWatchlist) });
   }
 
   private checkWatchlistStatus(symbol: string): void {
     if (!this.auth.isLoggedIn()) return;
     this.api.getWatchlist().subscribe({
       next: (companies: Company[]) => {
-        const symbols = new Set(companies.map(c => c.symbol));
-        this.watchlistSymbols.set(symbols);
-        this.inWatchlist.set(symbols.has(symbol.toUpperCase()));
+        this.inWatchlist.set(companies.some(c => c.symbol === symbol.toUpperCase()));
       },
       error: () => {},
     });
@@ -1056,6 +1150,9 @@ export class TickerComponent implements OnInit, AfterViewInit {
 
   private loadTicker(symbol: string): void {
     this.loading.set(true);
+    this.quote.set(null);
+    this.sectorItems.set([]);
+    this.sectorName.set(null);
     this.api.getTickerDetail(symbol).subscribe({
       next: (data) => {
         this.detail.set(data);
@@ -1065,13 +1162,8 @@ export class TickerComponent implements OnInit, AfterViewInit {
           next: (q) => this.quote.set(q),
           error: () => this.quote.set(null),
         });
-        if (data.score) {
-          this.animateScore(data.score.composite_score);
-        }
-        // Load sector context (name + rank)
-        if (data.company.sector_id) {
-          this.loadSectorContext(data.company.sector_id, symbol);
-        }
+        if (data.score) this.animateScore(data.score.composite_score);
+        if (data.company.sector_id) this.loadSectorContext(data.company.sector_id);
       },
       error: () => {
         this.detail.set(null);
@@ -1081,48 +1173,34 @@ export class TickerComponent implements OnInit, AfterViewInit {
     });
   }
 
-  private loadSectorContext(sectorId: string, symbol: string): void {
+  private loadSectorContext(sectorId: string): void {
     this.api.listSectors().subscribe({
       next: (sectors) => {
         const sector = sectors.find(s => s.id === sectorId);
         if (!sector) return;
         this.sectorName.set(sector.display_name);
-
-        // Load sector screener to find rank + peers
+        this.sectorKey.set(sector.key);
         this.api.screener({ sector: sector.key }).subscribe({
-          next: (items) => {
-            const sorted = [...items].sort((a, b) => b.composite_score - a.composite_score);
-            const rank = sorted.findIndex(i => i.symbol.toUpperCase() === symbol.toUpperCase()) + 1;
-            this.sectorTotal.set(sorted.length);
-            this.sectorRank.set(rank > 0 ? rank : null);
-            this.sectorPeers.set(
-              sorted
-                .filter(i => i.symbol.toUpperCase() !== symbol.toUpperCase() && i.rating !== 'insufficient_data')
-                .slice(0, 5)
-                .map(i => ({
-                  symbol: i.symbol,
-                  name: i.company_name,
-                  score: Math.round(i.composite_score),
-                })),
-            );
-          },
+          next: (items) => this.sectorItems.set(items),
         });
       },
     });
   }
 
   private animateScore(target: number): void {
-    const duration = 800;
+    cancelAnimationFrame(this.frame);
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      this.displayScore.set(Math.round(target));
+      return;
+    }
+    const duration = 900;
     const start = performance.now();
-    const animate = (now: number) => {
-      const elapsed = now - start;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+    const step = (now: number) => {
+      const progress = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
       this.displayScore.set(Math.round(target * eased));
-      if (progress < 1) {
-        requestAnimationFrame(animate);
-      }
+      if (progress < 1) this.frame = requestAnimationFrame(step);
     };
-    requestAnimationFrame(animate);
+    this.frame = requestAnimationFrame(step);
   }
 }

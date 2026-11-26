@@ -21,12 +21,14 @@ import { ApiService, Company } from '../../core/api.service';
   imports: [FormsModule, NgIcon],
   template: `
     <div class="search-wrap">
-      <ng-icon [svg]="searchIcon" class="search-icon" size="15" />
+      <ng-icon [svg]="searchIcon" class="search-icon" size="16" />
       <input
         #inputEl
         type="text"
         class="search-input"
         data-ticker-search
+        autocomplete="off"
+        [attr.aria-label]="placeholder()"
         [placeholder]="placeholder()"
         [ngModel]="query()"
         (ngModelChange)="onQuery($event)"
@@ -61,7 +63,7 @@ import { ApiService, Company } from '../../core/api.service';
 
     .search-icon {
       position: absolute;
-      left: 11px;
+      left: 12px;
       top: 50%;
       transform: translateY(-50%);
       color: var(--text-muted);
@@ -71,14 +73,15 @@ import { ApiService, Company } from '../../core/api.service';
 
     .search-input {
       width: 100%;
+      height: 36px;
       background: var(--bg-surface);
-      border: 1px solid var(--border);
+      border: 1px solid var(--border-strong);
       border-radius: var(--radius);
       color: var(--text-primary);
-      font-size: 0.85rem;
-      padding: 0.5rem 2.2rem 0.5rem 2rem;
+      font-size: 13px;
+      padding: 0 36px 0 36px;
       outline: none;
-      transition: border-color 160ms ease, box-shadow 160ms ease;
+      transition: border-color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease);
       box-sizing: border-box;
     }
 
@@ -86,23 +89,33 @@ import { ApiService, Company } from '../../core/api.service';
       color: var(--text-muted);
     }
 
+    .search-input:hover {
+      background: var(--bg-hover);
+    }
+
     .search-input:focus {
       border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--accent-soft);
+      background: var(--bg-surface);
     }
 
     .search-kbd {
       position: absolute;
-      right: 9px;
+      right: 8px;
       top: 50%;
       transform: translateY(-50%);
+      min-width: 20px;
+      height: 20px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       font-family: 'JetBrains Mono', monospace;
-      font-size: 0.66rem;
+      font-size: 11px;
       color: var(--text-muted);
       background: var(--bg-base);
-      border: 1px solid var(--border);
+      border: 1px solid var(--border-strong);
+      border-bottom-width: 2px;
       border-radius: 4px;
-      padding: 1px 6px;
+      box-sizing: border-box;
       pointer-events: none;
     }
 
@@ -112,40 +125,52 @@ import { ApiService, Company } from '../../core/api.service';
 
     .search-dropdown {
       position: absolute;
-      top: calc(100% + 4px);
+      top: calc(100% + 6px);
       left: 0;
       right: 0;
+      padding: 4px;
       background: var(--bg-elevated);
       border: 1px solid var(--border-strong);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow-card);
+      border-radius: 12px;
+      box-shadow: var(--shadow-pop);
       z-index: 30;
-      max-height: 300px;
+      max-height: 320px;
       overflow-y: auto;
+      animation: dropIn var(--dur-fast) var(--ease);
+    }
+
+    @keyframes dropIn {
+      from { opacity: 0; transform: translateY(-4px); }
     }
 
     .search-result {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
-      padding: 0.55rem 0.75rem;
+      gap: 12px;
+      height: 36px;
+      padding: 0 8px;
+      border-radius: 8px;
       cursor: pointer;
     }
 
     .search-result.highlighted {
-      background: var(--bg-surface);
+      background: var(--bg-hover);
     }
 
     .sr-symbol {
       font-family: 'JetBrains Mono', monospace;
-      font-weight: 700;
-      font-size: 0.8rem;
+      font-weight: 500;
+      font-size: 12px;
       color: var(--text-primary);
-      min-width: 70px;
+      min-width: 64px;
+    }
+
+    .search-result.highlighted .sr-symbol {
+      color: var(--accent-ink);
     }
 
     .sr-name {
-      font-size: 0.8rem;
+      font-size: 13px;
       color: var(--text-secondary);
       overflow: hidden;
       text-overflow: ellipsis;
@@ -182,12 +207,29 @@ export class TickerSearchComponent {
     this.searchTimeout = setTimeout(() => {
       this.api.searchTickers(query).subscribe({
         next: (results) => {
-          this.results.set(results.slice(0, 8));
+          this.results.set(this.rank(results, query).slice(0, 8));
           this.highlight.set(0);
         },
         error: () => this.results.set([]),
       });
     }, 250);
+  }
+
+  // Exact ticker first, then tickers starting with the query, then the rest
+  // in the order the API returned them
+  private rank(results: Company[], query: string): Company[] {
+    const q = query.trim().toUpperCase();
+    const score = (c: Company) => {
+      const sym = c.symbol.toUpperCase().replace(/\.AX$/, '');
+      if (sym === q) return 0;
+      if (sym.startsWith(q)) return 1;
+      if (c.name.toUpperCase().startsWith(q)) return 2;
+      return 3;
+    };
+    return results
+      .map((c, i) => ({ c, i, s: score(c) }))
+      .sort((a, b) => a.s - b.s || a.i - b.i)
+      .map(x => x.c);
   }
 
   onKeydown(event: KeyboardEvent): void {

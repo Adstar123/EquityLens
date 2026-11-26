@@ -1,12 +1,12 @@
-// Fix mobile viewport height — 100vh includes browser chrome on mobile,
-// pushing bottom content (pagination) off-screen.
+// 100vh includes browser chrome on mobile and pushes bottom content
+// (pagination) off-screen
 @supports (height: 100dvh) {
   :host > div {
     height: 100dvh;
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1023px) {
   .app-shell.has-chrome .app-main {
     padding-top: 56px;
   }

@@ -1,9 +1,10 @@
-import { Component, inject, signal } from '@angular/core';
-import { RouterLink, RouterLinkActive, Router } from '@angular/router';
+import { Component, HostListener, inject, signal } from '@angular/core';
+import { RouterLink, RouterLinkActive, Router, NavigationEnd } from '@angular/router';
+import { NgTemplateOutlet } from '@angular/common';
 import { NgIcon } from '@ng-icons/core';
 import {
-  lucideBarChart3,
-  lucideLayers,
+  lucideChartColumn,
+  lucideLayoutDashboard,
   lucideStar,
   lucideSettings,
   lucideSun,
@@ -13,6 +14,7 @@ import {
   lucideMenu,
   lucideX,
 } from '@ng-icons/lucide';
+import { filter } from 'rxjs';
 import { AuthService } from '../../core/auth.service';
 import { ThemeService } from '../../core/theme.service';
 import { ApiService, Sector } from '../../core/api.service';
@@ -21,187 +23,131 @@ import { LogoMarkComponent } from '../components/logo-mark.component';
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [RouterLink, RouterLinkActive, NgIcon, LogoMarkComponent],
+  imports: [RouterLink, RouterLinkActive, NgIcon, NgTemplateOutlet, LogoMarkComponent],
   template: `
-    <!-- ── Desktop rail ── -->
-    <nav
-      class="sidebar"
-      (mouseenter)="expanded.set(true)"
-      (mouseleave)="expanded.set(false); sectorsOpen.set(false)"
-    >
-      <div class="logo-area">
-        <a routerLink="/" class="logo-link">
-          <app-logo-mark [size]="24" />
-          @if (expanded()) {
-            <span class="logo-word">EQUITY<em>LENS</em></span>
-          }
-        </a>
-      </div>
-
-      <div class="nav-items">
+    <ng-template #navBody>
+      <div class="group">
         <a routerLink="/screener" routerLinkActive="active" class="nav-item">
-          <ng-icon [svg]="icons.barChart3" class="nav-icon" size="19" />
-          @if (expanded()) {
-            <span class="nav-label">Screener</span>
-          }
+          <ng-icon [svg]="icons.chart" size="18" strokeWidth="1.5" class="nav-icon" />
+          <span>Screener</span>
         </a>
-
-        <button class="nav-item" (click)="sectorsOpen.set(!sectorsOpen())">
-          <ng-icon [svg]="icons.layers" class="nav-icon" size="19" />
-          @if (expanded()) {
-            <span class="nav-label">Sectors</span>
-            <span class="nav-caret" [class.open]="sectorsOpen()">&rsaquo;</span>
-          }
-        </button>
-        @if (expanded() && sectorsOpen()) {
-          <div class="sector-sub">
-            @for (sector of sectors(); track sector.key) {
-              <a [routerLink]="['/sector', sector.key]" routerLinkActive="active" class="nav-sub-item">
-                {{ sector.display_name }}
-              </a>
-            }
-            @if (sectors().length === 0) {
-              <span class="nav-sub-item is-muted">Loading&hellip;</span>
-            }
-          </div>
-        }
-
         @if (auth.isLoggedIn()) {
+          <a routerLink="/dashboard" routerLinkActive="active" class="nav-item">
+            <ng-icon [svg]="icons.dashboard" size="18" strokeWidth="1.5" class="nav-icon" />
+            <span>Dashboard</span>
+          </a>
           <a routerLink="/watchlist" routerLinkActive="active" class="nav-item">
-            <ng-icon [svg]="icons.star" class="nav-icon" size="19" />
-            @if (expanded()) {
-              <span class="nav-label">Watchlist</span>
-            }
+            <ng-icon [svg]="icons.star" size="18" strokeWidth="1.5" class="nav-icon" />
+            <span>Watchlist</span>
           </a>
         }
-
         @if (auth.isLoggedIn() && auth.isSuperAdmin()) {
           <a routerLink="/admin" routerLinkActive="active" class="nav-item">
-            <ng-icon [svg]="icons.settings" class="nav-icon" size="19" />
-            @if (expanded()) {
-              <span class="nav-label">Admin</span>
-            }
+            <ng-icon [svg]="icons.settings" size="18" strokeWidth="1.5" class="nav-icon" />
+            <span>Scoring models</span>
           </a>
         }
       </div>
 
-      <div class="sidebar-bottom">
-        <button class="nav-item" (click)="theme.toggle()">
-          <ng-icon [svg]="theme.theme() === 'dark' ? icons.sun : icons.moon" class="nav-icon" size="19" />
-          @if (expanded()) {
-            <span class="nav-label">{{ theme.theme() === 'dark' ? 'Light mode' : 'Dark mode' }}</span>
-          }
-        </button>
-        <div class="user-area">
-          <div class="user-avatar">{{ userInitial() }}</div>
-          @if (expanded()) {
-            <div class="user-info">
-              <span class="user-name">{{ auth.isLoggedIn() ? (auth.user()?.name || 'User') : 'Guest' }}</span>
-              <span class="user-email">{{ auth.isLoggedIn() ? auth.user()?.email : 'Not signed in' }}</span>
-            </div>
-          }
-        </div>
-        @if (auth.isLoggedIn()) {
-          <button class="nav-item" (click)="logout()">
-            <ng-icon [svg]="icons.logOut" class="nav-icon" size="19" />
-            @if (expanded()) {
-              <span class="nav-label">Sign out</span>
-            }
-          </button>
-        } @else {
-          <a routerLink="/" class="nav-item">
-            <ng-icon [svg]="icons.logIn" class="nav-icon" size="19" />
-            @if (expanded()) {
-              <span class="nav-label">Sign in</span>
-            }
+      <div class="group">
+        <span class="group-label">Sectors</span>
+        @for (sector of sectors(); track sector.key) {
+          <a [routerLink]="['/sector', sector.key]" routerLinkActive="active" class="nav-item is-sub">
+            <span class="sub-dot"></span>
+            <span class="nav-text">{{ sector.display_name }}</span>
           </a>
+        } @empty {
+          @for (i of [0, 1, 2, 3, 4, 5]; track i) {
+            <span class="nav-item is-sub is-loading"><span class="sk"></span></span>
+          }
         }
+      </div>
+    </ng-template>
+
+    <ng-template #footBody>
+      <button class="nav-item" (click)="theme.toggle()">
+        <ng-icon [svg]="theme.theme() === 'dark' ? icons.sun : icons.moon" size="18" strokeWidth="1.5" class="nav-icon" />
+        <span>{{ theme.theme() === 'dark' ? 'Light theme' : 'Dark theme' }}</span>
+      </button>
+      @if (auth.isLoggedIn()) {
+        <div class="user">
+          <span class="avatar">{{ userInitial() }}</span>
+          <span class="user-info">
+            <span class="user-name">{{ auth.user()?.name || 'Signed in' }}</span>
+            <span class="user-email">{{ auth.user()?.email }}</span>
+          </span>
+          <button class="icon-btn" (click)="logout()" aria-label="Sign out" title="Sign out">
+            <ng-icon [svg]="icons.logOut" size="16" strokeWidth="1.5" />
+          </button>
+        </div>
+      } @else {
+        <a routerLink="/" fragment="signin" class="nav-item">
+          <ng-icon [svg]="icons.logIn" size="18" strokeWidth="1.5" class="nav-icon" />
+          <span>Sign in</span>
+        </a>
+      }
+    </ng-template>
+
+    <!-- Desktop sidebar -->
+    <nav class="sidebar" aria-label="Main">
+      <a routerLink="/" class="brand" aria-label="EquityLens home">
+        <app-logo-mark [size]="22" />
+        <span class="wordmark">EQUITY<em>LENS</em></span>
+      </a>
+      <div class="scroll">
+        <ng-container [ngTemplateOutlet]="navBody" />
+      </div>
+      <div class="foot">
+        <ng-container [ngTemplateOutlet]="footBody" />
       </div>
     </nav>
 
-    <!-- ── Mobile top bar ── -->
+    <!-- Mobile top bar -->
     <header class="mobile-bar">
-      <button class="mb-menu" (click)="drawerOpen.set(true)" aria-label="Open menu">
-        <ng-icon [svg]="icons.menu" size="22" />
+      <button class="icon-btn" (click)="drawerOpen.set(true)" aria-label="Open menu">
+        <ng-icon [svg]="icons.menu" size="20" strokeWidth="1.5" />
       </button>
-      <a routerLink="/" class="mb-brand">
-        <app-logo-mark [size]="24" />
-        <span class="logo-word">EQUITY<em>LENS</em></span>
+      <a routerLink="/" class="brand is-bar" aria-label="EquityLens home">
+        <app-logo-mark [size]="22" />
+        <span class="wordmark">EQUITY<em>LENS</em></span>
       </a>
-      <button class="mb-theme" (click)="theme.toggle()" aria-label="Toggle theme">
-        <ng-icon [svg]="theme.theme() === 'dark' ? icons.sun : icons.moon" size="20" />
+      <button class="icon-btn" (click)="theme.toggle()" aria-label="Toggle theme">
+        <ng-icon [svg]="theme.theme() === 'dark' ? icons.sun : icons.moon" size="18" strokeWidth="1.5" />
       </button>
     </header>
 
-    <!-- ── Mobile drawer ── -->
+    <!-- Mobile drawer -->
     @if (drawerOpen()) {
-      <div class="drawer-backdrop" (click)="drawerOpen.set(false)"></div>
-      <nav class="drawer">
+      <div class="backdrop" (click)="drawerOpen.set(false)"></div>
+      <nav class="drawer" aria-label="Main">
         <div class="drawer-head">
-          <span class="logo-word">EQUITY<em>LENS</em></span>
-          <button class="mb-menu" (click)="drawerOpen.set(false)" aria-label="Close menu">
-            <ng-icon [svg]="icons.x" size="22" />
+          <a routerLink="/" class="brand is-bar" aria-label="EquityLens home">
+            <app-logo-mark [size]="22" />
+            <span class="wordmark">EQUITY<em>LENS</em></span>
+          </a>
+          <button class="icon-btn" (click)="drawerOpen.set(false)" aria-label="Close menu">
+            <ng-icon [svg]="icons.x" size="20" strokeWidth="1.5" />
           </button>
         </div>
-
-        <div class="drawer-items">
-          <a routerLink="/screener" routerLinkActive="active" class="nav-item" (click)="drawerOpen.set(false)">
-            <ng-icon [svg]="icons.barChart3" class="nav-icon" size="19" />
-            <span class="nav-label">Screener</span>
-          </a>
-
-          @if (auth.isLoggedIn()) {
-            <a routerLink="/watchlist" routerLinkActive="active" class="nav-item" (click)="drawerOpen.set(false)">
-              <ng-icon [svg]="icons.star" class="nav-icon" size="19" />
-              <span class="nav-label">Watchlist</span>
-            </a>
-          }
-
-          @if (auth.isLoggedIn() && auth.isSuperAdmin()) {
-            <a routerLink="/admin" routerLinkActive="active" class="nav-item" (click)="drawerOpen.set(false)">
-              <ng-icon [svg]="icons.settings" class="nav-icon" size="19" />
-              <span class="nav-label">Admin</span>
-            </a>
-          }
-
-          <div class="drawer-section">Sectors</div>
-          @for (sector of sectors(); track sector.key) {
-            <a [routerLink]="['/sector', sector.key]" routerLinkActive="active" class="nav-sub-item" (click)="drawerOpen.set(false)">
-              {{ sector.display_name }}
-            </a>
-          }
+        <div class="scroll">
+          <ng-container [ngTemplateOutlet]="navBody" />
         </div>
-
-        <div class="drawer-bottom">
-          <div class="user-area">
-            <div class="user-avatar">{{ userInitial() }}</div>
-            <div class="user-info">
-              <span class="user-name">{{ auth.isLoggedIn() ? (auth.user()?.name || 'User') : 'Guest' }}</span>
-              <span class="user-email">{{ auth.isLoggedIn() ? auth.user()?.email : 'Not signed in' }}</span>
-            </div>
-          </div>
-          @if (auth.isLoggedIn()) {
-            <button class="nav-item" (click)="logout(); drawerOpen.set(false)">
-              <ng-icon [svg]="icons.logOut" class="nav-icon" size="19" />
-              <span class="nav-label">Sign out</span>
-            </button>
-          } @else {
-            <a routerLink="/" class="nav-item" (click)="drawerOpen.set(false)">
-              <ng-icon [svg]="icons.logIn" class="nav-icon" size="19" />
-              <span class="nav-label">Sign in</span>
-            </a>
-          }
+        <div class="foot">
+          <ng-container [ngTemplateOutlet]="footBody" />
         </div>
       </nav>
     }
   `,
   styles: [`
-    // ── Shared brand ──
-    .logo-word {
+    :host {
+      display: contents;
+    }
+
+    .wordmark {
       font-family: 'Archivo', sans-serif;
       font-stretch: 115%;
       font-weight: 800;
-      font-size: 0.92rem;
+      font-size: 14px;
       letter-spacing: 0.03em;
       color: var(--text-primary);
       white-space: nowrap;
@@ -212,236 +158,229 @@ import { LogoMarkComponent } from '../components/logo-mark.component';
       }
     }
 
-    // ── Desktop rail ──
-    .sidebar {
-      width: 60px;
-      min-width: 60px;
-      height: 100vh;
-      height: 100dvh;
-      background: var(--bg-deep);
-      border-right: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      transition: width 200ms ease, min-width 200ms ease;
-      overflow: hidden;
-      position: relative;
-      z-index: 50;
-    }
-
-    .sidebar:hover {
-      width: 236px;
-      min-width: 236px;
-    }
-
-    .logo-area {
-      padding: 0 1.05rem;
-      border-bottom: 1px solid var(--border);
-      height: 56px;
-      display: flex;
-      align-items: center;
-      flex-shrink: 0;
-    }
-
-    .logo-link {
+    .brand {
       display: flex;
       align-items: center;
       gap: 10px;
+      height: 64px;
+      padding: 0 20px;
+      flex-shrink: 0;
       text-decoration: none;
-      white-space: nowrap;
     }
 
-    .nav-items {
-      padding: 0.5rem 0;
+    .brand.is-bar {
+      height: auto;
+      padding: 0;
+    }
+
+    // ── Desktop ──
+    .sidebar {
+      width: 240px;
+      flex-shrink: 0;
+      height: 100vh;
+      height: 100dvh;
       display: flex;
       flex-direction: column;
+      background: var(--bg-deep);
+      border-right: 1px solid var(--border);
+    }
+
+    .scroll {
       flex: 1;
+      overflow-y: auto;
+      padding: 4px 12px 16px;
+    }
+
+    .group {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .group + .group {
+      margin-top: 24px;
+    }
+
+    .group-label {
+      padding: 0 12px 8px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
     }
 
     .nav-item {
-      position: relative;
       display: flex;
       align-items: center;
-      gap: 0.75rem;
-      padding: 0.6rem 1.05rem;
+      gap: 10px;
+      height: 36px;
+      padding: 0 12px;
+      border: none;
+      border-radius: var(--radius);
+      background: none;
       color: var(--text-secondary);
+      font-size: 14px;
       text-decoration: none;
+      text-align: left;
       cursor: pointer;
       white-space: nowrap;
-      transition: color 150ms ease, background 150ms ease;
-      font-size: 0.865rem;
-      font-weight: 500;
-      background: none;
-      border: none;
-      width: 100%;
-      text-align: left;
-      font-family: inherit;
+      transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
     }
 
     .nav-item:hover {
       color: var(--text-primary);
-      background: var(--bg-surface);
+      background: var(--bg-hover);
     }
 
     .nav-item.active {
-      color: var(--accent);
-      background: var(--accent-soft);
-    }
-
-    .nav-item.active::before {
-      content: '';
-      position: absolute;
-      left: 0;
-      top: 6px;
-      bottom: 6px;
-      width: 2px;
-      border-radius: 0 2px 2px 0;
-      background: var(--accent);
+      color: var(--text-primary);
+      background: var(--bg-hover);
+      box-shadow: inset 0 0 0 1px var(--border);
     }
 
     .nav-icon {
       flex-shrink: 0;
-      width: 20px;
       display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-left: 2px;
-    }
-
-    .nav-caret {
-      margin-left: auto;
-      font-size: 1rem;
+      width: 18px;
       color: var(--text-muted);
-      transition: transform 150ms ease;
+      transition: color var(--dur-fast) var(--ease);
     }
 
-    .nav-caret.open {
-      transform: rotate(90deg);
+    .nav-item:hover .nav-icon {
+      color: var(--text-secondary);
     }
 
-    .sector-sub {
+    .nav-item.active .nav-icon {
+      color: var(--accent);
+    }
+
+    .nav-item.is-sub {
+      height: 32px;
+      font-size: 13px;
+    }
+
+    .nav-text {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .sub-dot {
+      flex-shrink: 0;
+      width: 18px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .sub-dot::before {
+      content: '';
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      opacity: 0.6;
+      transition: background-color var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease);
+    }
+
+    .nav-item.active .sub-dot::before {
+      background: var(--accent);
+      opacity: 1;
+    }
+
+    .is-loading .sk {
+      display: block;
+      width: 112px;
+      height: 8px;
+      margin-left: 28px;
+      border-radius: 4px;
+      background: var(--band-off);
+    }
+
+    .foot {
       display: flex;
       flex-direction: column;
-      padding: 2px 0 6px 2.45rem;
-    }
-
-    .nav-sub-item {
-      display: block;
-      padding: 0.34rem 1rem 0.34rem 0.6rem;
-      color: var(--text-secondary);
-      text-decoration: none;
-      font-size: 0.8rem;
-      white-space: nowrap;
-      border-left: 1px solid var(--border);
-      transition: color 150ms ease, border-color 150ms ease;
-    }
-
-    .nav-sub-item:hover {
-      color: var(--text-primary);
-    }
-
-    .nav-sub-item.active {
-      color: var(--accent);
-      border-left-color: var(--accent);
-    }
-
-    .nav-sub-item.is-muted {
-      color: var(--text-muted);
-      font-size: 0.75rem;
-    }
-
-    .sidebar-bottom {
-      margin-top: auto;
+      gap: 2px;
+      padding: 12px;
       border-top: 1px solid var(--border);
-      padding: 0.5rem 0;
     }
 
-    .user-area {
+    .user {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
-      padding: 0.6rem 1.05rem;
-      white-space: nowrap;
-      overflow: hidden;
+      gap: 10px;
+      height: 48px;
+      padding: 0 4px 0 12px;
     }
 
-    .user-avatar {
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      background: var(--accent);
-      color: #14100a;
-      font-weight: 700;
-      font-size: 0.62rem;
+    .avatar {
+      width: 24px;
+      height: 24px;
+      flex-shrink: 0;
       display: flex;
       align-items: center;
       justify-content: center;
-      flex-shrink: 0;
-      margin-left: 1px;
+      margin-left: -3px;
+      border-radius: 50%;
+      background: var(--accent-soft);
+      color: var(--accent-ink);
+      font-size: 11px;
+      font-weight: 600;
     }
 
     .user-info {
       display: flex;
       flex-direction: column;
       min-width: 0;
+      flex: 1;
+      line-height: 1.3;
     }
 
     .user-name {
-      font-size: 0.8rem;
-      font-weight: 600;
+      font-size: 13px;
+      font-weight: 500;
       color: var(--text-primary);
       overflow: hidden;
       text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .user-email {
-      font-size: 0.68rem;
+      font-size: 12px;
       color: var(--text-muted);
       overflow: hidden;
       text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
-    // ── Mobile bar ──
+    .icon-btn {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border: none;
+      border-radius: var(--radius);
+      background: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+    }
+
+    .icon-btn:hover {
+      color: var(--text-primary);
+      background: var(--bg-hover);
+    }
+
+    // ── Mobile ──
     .mobile-bar {
       display: none;
     }
 
-    .mb-menu,
-    .mb-theme {
-      background: none;
-      border: none;
-      color: var(--text-secondary);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 40px;
-      height: 40px;
-      border-radius: 8px;
-      transition: color 150ms ease, background 150ms ease;
-    }
-
-    .mb-menu:hover,
-    .mb-theme:hover {
-      color: var(--text-primary);
-      background: var(--bg-surface);
-    }
-
-    .mb-brand {
-      display: flex;
-      align-items: center;
-      gap: 9px;
-      text-decoration: none;
-      margin-right: auto;
-    }
-
-    // ── Drawer ──
-    .drawer-backdrop {
+    .backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(4, 6, 9, 0.6);
-      backdrop-filter: blur(2px);
       z-index: 200;
-      animation: fadeIn 180ms ease;
+      background: rgba(4, 6, 9, 0.6);
+      animation: fadeIn var(--dur) var(--ease);
     }
 
     .drawer {
@@ -449,14 +388,26 @@ import { LogoMarkComponent } from '../components/logo-mark.component';
       top: 0;
       left: 0;
       bottom: 0;
-      width: min(300px, 84vw);
-      background: var(--bg-deep);
-      border-right: 1px solid var(--border);
       z-index: 201;
+      width: min(296px, 86vw);
       display: flex;
       flex-direction: column;
-      animation: slideIn 220ms cubic-bezier(0.32, 0.72, 0.28, 1);
-      overflow-y: auto;
+      background: var(--bg-deep);
+      border-right: 1px solid var(--border);
+      animation: slideIn var(--dur) var(--ease);
+    }
+
+    .drawer .foot {
+      padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .drawer-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+      padding: 0 8px 0 20px;
+      flex-shrink: 0;
     }
 
     @keyframes fadeIn {
@@ -467,67 +418,35 @@ import { LogoMarkComponent } from '../components/logo-mark.component';
       from { transform: translateX(-100%); }
     }
 
-    .drawer-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0.6rem 0.75rem 0.6rem 1.05rem;
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-
-    .drawer-items {
-      padding: 0.5rem 0;
-      flex: 1;
-    }
-
-    .drawer-section {
-      font-size: 0.66rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: var(--text-muted);
-      padding: 1.1rem 1.05rem 0.4rem;
-    }
-
-    .drawer .nav-sub-item {
-      border-left: none;
-      padding: 0.5rem 1.05rem;
-      font-size: 0.85rem;
-    }
-
-    .drawer-bottom {
-      border-top: 1px solid var(--border);
-      padding: 0.5rem 0;
-      padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
-      flex-shrink: 0;
-    }
-
-    @media (min-width: 769px) {
-      .drawer,
-      .drawer-backdrop {
-        display: none;
-      }
-    }
-
-    @media (max-width: 768px) {
+    @media (max-width: 1023px) {
       .sidebar {
         display: none;
       }
 
       .mobile-bar {
-        display: flex;
-        align-items: center;
-        gap: 0.6rem;
         position: fixed;
         top: 0;
         left: 0;
         right: 0;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        gap: 8px;
         height: 56px;
-        padding: 0 0.6rem;
+        padding: 0 8px;
         background: var(--bg-deep);
         border-bottom: 1px solid var(--border);
-        z-index: 100;
+      }
+
+      .mobile-bar .brand {
+        margin-right: auto;
+      }
+    }
+
+    @media (min-width: 1024px) {
+      .drawer,
+      .backdrop {
+        display: none;
       }
     }
   `],
@@ -538,20 +457,17 @@ export class SidebarComponent {
   private api = inject(ApiService);
   private router = inject(Router);
 
-  expanded = signal(false);
-  sectorsOpen = signal(false);
   drawerOpen = signal(false);
   sectors = signal<Sector[]>([]);
 
   userInitial = () => {
-    if (!this.auth.isLoggedIn()) return 'G';
     const name = this.auth.user()?.name;
     return name ? name.charAt(0).toUpperCase() : '?';
   };
 
   icons = {
-    barChart3: lucideBarChart3,
-    layers: lucideLayers,
+    chart: lucideChartColumn,
+    dashboard: lucideLayoutDashboard,
     star: lucideStar,
     settings: lucideSettings,
     sun: lucideSun,
@@ -567,6 +483,15 @@ export class SidebarComponent {
       next: (sectors) => this.sectors.set(sectors),
       error: () => this.sectors.set([]),
     });
+    // Any navigation closes the drawer
+    this.router.events
+      .pipe(filter(e => e instanceof NavigationEnd))
+      .subscribe(() => this.drawerOpen.set(false));
+  }
+
+  @HostListener('document:keydown.escape')
+  closeDrawer(): void {
+    this.drawerOpen.set(false);
   }
 
   logout(): void {

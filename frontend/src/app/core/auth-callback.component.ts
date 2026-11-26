@@ -5,7 +5,18 @@ import { AuthService } from './auth.service';
 @Component({
   selector: 'app-auth-callback',
   standalone: true,
-  template: `<div class="p-8 text-text-secondary">Authenticating...</div>`,
+  template: `<div class="signing-in" role="status">Signing you in</div>`,
+  styles: [`
+    .signing-in {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      min-height: 50vh;
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+  `],
 })
 export class AuthCallbackComponent implements OnInit {
   private route = inject(ActivatedRoute);

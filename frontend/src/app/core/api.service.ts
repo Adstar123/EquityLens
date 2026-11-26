@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
-import { shareReplay, tap } from 'rxjs/operators';
+import { Observable, of } from 'rxjs';
+import { catchError, map, shareReplay, tap } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 
 export interface Company {
@@ -155,6 +155,8 @@ export interface PreviewScore {
   rating: string;
 }
 
+const SNAPSHOT_KEY = 'equitylens_market_v1';
+
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private http = inject(HttpClient);
@@ -201,6 +203,44 @@ export class ApiService {
     return this.http.get<ScreenerItem[]>(`${this.baseUrl}/screener`, { params }).pipe(
       tap(data => this.screenerCache.set(key, { data, ts: Date.now() }))
     );
+  }
+
+  // Instant, possibly stale market data for first paint: the last live
+  // result this browser saw, or the snapshot shipped with the build. Scores
+  // only move when companies report, so a stale field is still honest, and
+  // the live screener replaces it a moment later.
+  marketSnapshot(): Observable<ScreenerItem[]> {
+    try {
+      const raw = localStorage.getItem(SNAPSHOT_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as ScreenerItem[];
+        if (Array.isArray(parsed) && parsed.length) return of(parsed);
+      }
+    } catch {
+      // Blocked or corrupt storage falls through to the shipped snapshot
+    }
+    return this.http.get<ScreenerItem[]>('market-snapshot.json').pipe(
+      map(items => items.map(i => ({ ...i, breakdown: { ratios: [] }, scored_at: '' }))),
+      catchError(() => of([])),
+    );
+  }
+
+  rememberMarket(items: ScreenerItem[]): void {
+    try {
+      const slim = items.map(i => ({
+        symbol: i.symbol,
+        company_name: i.company_name,
+        sector_key: i.sector_key,
+        sector_name: i.sector_name,
+        composite_score: i.composite_score,
+        rating: i.rating,
+        breakdown: { ratios: [] },
+        scored_at: '',
+      }));
+      localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(slim));
+    } catch {
+      // Storage full or blocked; the shipped snapshot still covers first paint
+    }
   }
 
   // Quotes (live prices)

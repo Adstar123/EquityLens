@@ -2,73 +2,102 @@
 
 @layer tailwind.theme {
   @theme {
-    --color-bg-primary: #0b0f14;
-    --color-bg-secondary: #121821;
-    --color-bg-tertiary: #1e2833;
-
     --color-accent: #e2a428;
-    --color-accent-light: #f2c14e;
-    --color-accent-dim: #8a6510;
-
-    --color-text-primary: #e8edf2;
-    --color-text-secondary: #93a1af;
-    --color-text-muted: #5c6b79;
-
-    --color-rating-strong-buy: #2ebd70;
-    --color-rating-buy: #8fc63d;
-    --color-rating-hold: #e2a428;
-    --color-rating-sell: #e5484d;
-    --color-rating-strong-sell: #d03136;
-
-    --font-sans: 'Inter', system-ui, sans-serif;
-    --font-mono: 'JetBrains Mono', monospace;
-    --font-display: 'Archivo', 'Inter', system-ui, sans-serif;
+    --font-sans: 'Archivo', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
   }
 }
 
-// Theme variables
+// ─────────────────────────────────────────────────────────────
+// Tokens
+// Steel-ink neutrals, one brass accent. Band colours run from a
+// toned red through steel to brass: weak books read cool and
+// muted, strong books read warm and bright.
+// ─────────────────────────────────────────────────────────────
 :root, [data-theme="dark"] {
+  color-scheme: dark;
+
   --bg-base: #0b0f14;
-  --bg-deep: #070a0e;
-  --bg-surface: #121821;
-  --bg-elevated: #151c26;
-  --border: #1e2833;
-  --border-strong: #2a3644;
+  --bg-deep: #080b0f;
+  --bg-surface: #10151c;
+  --bg-elevated: #141a22;
+  --bg-hover: #18202a;
+  --border: rgba(214, 226, 238, 0.08);
+  --border-strong: rgba(214, 226, 238, 0.14);
+
   --text-primary: #e8edf2;
-  --text-secondary: #93a1af;
-  --text-muted: #5c6b79;
+  --text-secondary: #9aa7b4;
+  --text-muted: #6a7885;
+
   --accent: #e2a428;
-  --accent-light: #f2c14e;
+  --accent-light: #f0bb4f;
+  --accent-ink: #e9b04a;
   --accent-soft: rgba(226, 164, 40, 0.1);
-  --up: #2ebd70;
-  --down: #e5484d;
-  --up-soft: rgba(46, 189, 112, 0.12);
-  --down-soft: rgba(229, 72, 77, 0.12);
-  --radius: 6px;
-  --radius-lg: 10px;
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+  --on-accent: #17120a;
+
+  --up: #3cbf7a;
+  --down: #e5595d;
+  --up-soft: rgba(60, 191, 122, 0.1);
+  --down-soft: rgba(229, 89, 93, 0.1);
+
+  --band-poor: #d65a5e;
+  --band-weak: #a8726c;
+  --band-neutral: #6e7c8a;
+  --band-good: #c4933c;
+  --band-strong: #f0b23e;
+  --band-off: rgba(214, 226, 238, 0.1);
+
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 14px;
+  --radius-xl: 16px;
+
+  --shadow-pop: 0 12px 32px -8px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.3);
+
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --dur-fast: 140ms;
+  --dur: 240ms;
 }
 
 [data-theme="light"] {
-  --bg-base: #f3f5f7;
-  --bg-deep: #e9ecef;
+  color-scheme: light;
+
+  --bg-base: #f4f5f7;
+  --bg-deep: #eceef1;
   --bg-surface: #ffffff;
-  --bg-elevated: #fbfcfd;
-  --border: #dce2e8;
-  --border-strong: #c3cdd6;
-  --text-primary: #17222c;
-  --text-secondary: #46586a;
-  --text-muted: #7c8b99;
-  --accent: #b57f10;
-  --accent-light: #d69a1d;
-  --accent-soft: rgba(181, 127, 16, 0.1);
-  --up: #1a9b57;
-  --down: #d0353a;
-  --up-soft: rgba(26, 155, 87, 0.1);
-  --down-soft: rgba(208, 53, 58, 0.1);
-  --shadow-card: 0 1px 2px rgba(23, 34, 44, 0.06), 0 8px 24px -12px rgba(23, 34, 44, 0.12);
+  --bg-elevated: #ffffff;
+  --bg-hover: #f0f2f5;
+  --border: rgba(20, 32, 44, 0.09);
+  --border-strong: rgba(20, 32, 44, 0.16);
+
+  --text-primary: #141d26;
+  --text-secondary: #4b5a69;
+  --text-muted: #77848f;
+
+  --accent: #d0961c;
+  --accent-light: #dca63a;
+  --accent-ink: #94650a;
+  --accent-soft: rgba(208, 150, 28, 0.12);
+  --on-accent: #17120a;
+
+  --up: #18884c;
+  --down: #c8383d;
+  --up-soft: rgba(24, 136, 76, 0.08);
+  --down-soft: rgba(200, 56, 61, 0.08);
+
+  --band-poor: #c8383d;
+  --band-weak: #b37c76;
+  --band-neutral: #95a1ac;
+  --band-good: #d4a556;
+  --band-strong: #b07508;
+  --band-off: rgba(20, 32, 44, 0.1);
+
+  --shadow-pop: 0 12px 32px -12px rgba(20, 32, 44, 0.22), 0 2px 6px rgba(20, 32, 44, 0.06);
 }
 
+// ─────────────────────────────────────────────────────────────
+// Base
+// ─────────────────────────────────────────────────────────────
 html {
   scroll-behavior: smooth;
 }
@@ -76,19 +105,23 @@ html {
 body {
   background-color: var(--bg-base);
   color: var(--text-primary);
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Archivo', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'tnum' 1;
   margin: 0;
   padding: 0;
 }
 
 button, input, select, textarea {
   font-family: inherit;
+  font-size: inherit;
 }
 
 ::selection {
-  background: rgba(226, 164, 40, 0.25);
+  background: rgba(226, 164, 40, 0.28);
 }
 
 :focus-visible {
@@ -96,50 +129,114 @@ button, input, select, textarea {
   outline-offset: 2px;
 }
 
-// Score typography
-.score-value {
-  font-family: 'JetBrains Mono', monospace;
-  font-weight: 700;
-  color: var(--accent);
-  letter-spacing: -0.02em;
+.mono {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
 }
 
-// Dense table defaults
-table {
-  width: 100%;
-  border-collapse: collapse;
+// Shared page title used across app pages
+.page-heading {
+  font-family: 'Archivo', sans-serif;
+  font-stretch: 104%;
+  font-weight: 600;
+  font-size: 28px;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin: 0;
+}
 
-  th, td {
-    padding: 0.5rem 0.75rem;
-    text-align: left;
-    font-size: 0.875rem;
-    border-bottom: 1px solid var(--border);
+.section-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+// Buttons shared by app pages
+.ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+
+  &:hover {
+    background: var(--bg-hover);
   }
 
-  th {
-    color: var(--text-muted);
-    font-weight: 500;
-    text-transform: uppercase;
-    font-size: 0.75rem;
-    letter-spacing: 0.05em;
+  &:active {
+    transform: scale(0.98);
   }
 
-  tr:hover td {
-    background-color: var(--bg-surface);
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  &.is-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--on-accent);
+
+    &:hover {
+      background: var(--accent-light);
+      border-color: var(--accent-light);
+    }
+  }
+
+  &.is-quiet {
+    background: transparent;
+    border-color: transparent;
+    color: var(--text-secondary);
+
+    &:hover {
+      color: var(--text-primary);
+      background: var(--bg-hover);
+    }
+  }
+}
+
+// Text link with an arrow, used for "see more" style actions
+.ui-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent-ink);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: color var(--dur-fast) var(--ease);
+
+  &:hover {
+    color: var(--text-primary);
   }
 }
 
 // Scrollbar styling
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
   background: var(--border-strong);
-  border-radius: 4px;
+  border-radius: 8px;
+  border: 2px solid var(--bg-base);
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);

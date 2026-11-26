@@ -6,23 +6,21 @@ import {
   ViewChild,
   ElementRef,
   NgZone,
+  computed,
   inject,
   signal,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { environment } from '../../environments/environment';
 import { AuthService } from '../core/auth.service';
-import { ApiService } from '../core/api.service';
-import {
-  loadMoverRows,
-  computeDivergence,
-  topGainers,
-  DivergenceBoard,
-  MoverRow,
-} from '../core/movers';
+import { ApiService, ScreenerItem } from '../core/api.service';
+import { loadMoverRows, computeDivergence, DivergenceBoard } from '../core/movers';
+import { BANDS, Band, ratingBand, shortName } from '../core/bands';
 import { LogoMarkComponent } from '../shared/components/logo-mark.component';
+import { MarketFieldComponent } from '../shared/components/market-field.component';
+import { BandMeterComponent } from '../shared/components/band-meter.component';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -38,22 +36,20 @@ interface SectorChip {
   name: string;
 }
 
-// Shown until (or in place of) live data
-const FALLBACK_HERO_GAINERS: MoverRow[] = [
-  { symbol: '4DX.AX', name: '4DMedical', price: '$3.63', change: '+13.08%', changePct: 13.08, score: 60, rating: 'hold' },
-  { symbol: 'CU6.AX', name: 'Clarity Pharma', price: '$2.37', change: '+12.86%', changePct: 12.86, score: 50, rating: 'hold' },
-  { symbol: 'MP1.AX', name: 'Megaport', price: '$18.10', change: '+11.52%', changePct: 11.52, score: 45, rating: 'hold' },
-  { symbol: 'SLX.AX', name: 'Silex Systems', price: '$4.61', change: '+10.29%', changePct: 10.29, score: 56, rating: 'hold' },
-  { symbol: 'EOS.AX', name: 'Electro Optic', price: '$6.69', change: '+9.67%', changePct: 9.67, score: 69, rating: 'buy' },
-];
+interface SectorRow extends SectorChip {
+  count: number;
+  avg: number;
+  mix: { band: Band; share: number }[];
+}
 
+// Shown if live quotes can't be loaded
 const FALLBACK_BOARD: DivergenceBoard = {
   strongFallers: [
-    { symbol: 'REA.AX', name: 'REA Group', price: '$160.71', change: '-2.68%', changePct: -2.68, score: 100, rating: 'strong_buy' },
-    { symbol: 'HLI.AX', name: 'Helia Group', price: '$5.02', change: '-2.33%', changePct: -2.33, score: 100, rating: 'strong_buy' },
-    { symbol: 'CYL.AX', name: 'Catalyst Metals', price: '$5.40', change: '-1.82%', changePct: -1.82, score: 100, rating: 'strong_buy' },
-    { symbol: 'RMD.AX', name: 'ResMed', price: '$29.79', change: '-1.52%', changePct: -1.52, score: 100, rating: 'strong_buy' },
-    { symbol: 'FPH.AX', name: 'Fisher & Paykel', price: '$34.02', change: '-0.64%', changePct: -0.64, score: 100, rating: 'strong_buy' },
+    { symbol: 'REA.AX', name: 'REA Group', price: '$160.71', change: '-2.68%', changePct: -2.68, score: 94, rating: 'strong_buy' },
+    { symbol: 'HLI.AX', name: 'Helia Group', price: '$5.02', change: '-2.33%', changePct: -2.33, score: 98, rating: 'strong_buy' },
+    { symbol: 'CYL.AX', name: 'Catalyst Metals', price: '$5.40', change: '-1.82%', changePct: -1.82, score: 92, rating: 'strong_buy' },
+    { symbol: 'RMD.AX', name: 'ResMed', price: '$29.79', change: '-1.52%', changePct: -1.52, score: 96, rating: 'strong_buy' },
+    { symbol: 'FPH.AX', name: 'Fisher & Paykel', price: '$34.02', change: '-0.64%', changePct: -0.64, score: 96, rating: 'strong_buy' },
   ],
   weakRallies: [
     { symbol: 'SGR.AX', name: 'Star Entertainment', price: '$0.14', change: '+3.70%', changePct: 3.7, score: 27, rating: 'strong_sell' },
@@ -81,10 +77,6 @@ const FALLBACK_TAPE: TapeItem[] = [
   { symbol: 'TLS.AX', price: '$4.12', change: '+0.49%', up: true },
   { symbol: 'RIO.AX', price: '$118.64', change: '+2.31%', up: true },
   { symbol: 'FMG.AX', price: '$19.02', change: '-0.68%', up: false },
-  { symbol: 'GMG.AX', price: '$34.77', change: '+0.90%', up: true },
-  { symbol: 'WDS.AX', price: '$24.19', change: '-0.33%', up: false },
-  { symbol: 'STO.AX', price: '$6.85', change: '+0.74%', up: true },
-  { symbol: 'REA.AX', price: '$160.71', change: '-2.68%', up: false },
 ];
 
 const FALLBACK_SECTORS: SectorChip[] = [
@@ -96,66 +88,115 @@ const FALLBACK_SECTORS: SectorChip[] = [
 @Component({
   selector: 'app-landing',
   standalone: true,
-  imports: [RouterLink, LogoMarkComponent],
+  imports: [RouterLink, LogoMarkComponent, MarketFieldComponent, BandMeterComponent],
   templateUrl: './landing.component.html',
   styleUrl: './landing.component.scss',
 })
 export class LandingComponent implements OnInit, AfterViewInit, OnDestroy {
   private zone = inject(NgZone);
   private api = inject(ApiService);
+  private route = inject(ActivatedRoute);
 
   @ViewChild('landingContainer') landingContainer!: ElementRef<HTMLDivElement>;
   @ViewChild('topnav') topnav!: ElementRef<HTMLElement>;
   @ViewChild('heroCopy') heroCopy!: ElementRef<HTMLDivElement>;
   @ViewChild('heroVisual') heroVisual!: ElementRef<HTMLDivElement>;
-  @ViewChild('pvBoard') pvBoard!: ElementRef<HTMLDivElement>;
-  @ViewChild('pvDetail') pvDetail!: ElementRef<HTMLDivElement>;
   @ViewChild('statsStrip') statsStrip!: ElementRef<HTMLElement>;
   @ViewChild('statCompanies') statCompanies!: ElementRef<HTMLSpanElement>;
   @ViewChild('statSectors') statSectors!: ElementRef<HTMLSpanElement>;
   @ViewChild('statRatios') statRatios!: ElementRef<HTMLSpanElement>;
-  @ViewChild('methodThread') methodThread!: ElementRef<HTMLDivElement>;
 
   auth = inject(AuthService);
   googleAuthUrl = `${environment.apiUrl}/auth/google/login`;
   githubAuthUrl = `${environment.apiUrl}/auth/github/login`;
-  lastProvider = localStorage.getItem('equitylens_last_provider') as 'google' | 'github' | null;
+  lastProvider = this.readLastProvider();
 
-  heroGainers = signal<MoverRow[]>(FALLBACK_HERO_GAINERS);
+  fieldItems = signal<ScreenerItem[] | null>(null);
   board = signal<DivergenceBoard>(FALLBACK_BOARD);
   boardLoading = signal(true);
   liveData = signal(false);
   tapeItems = signal<TapeItem[]>(FALLBACK_TAPE);
   sectorChips = signal<SectorChip[]>(FALLBACK_SECTORS);
-  companiesCount = signal(298);
   readonly skeletonRows = [0, 1, 2, 3, 4];
+
+  companiesCount = computed(() => {
+    const items = this.fieldItems();
+    return items ? items.filter(i => i.rating !== 'insufficient_data').length : 297;
+  });
+
+  // Sector list with size, average and the share of companies in each band
+  sectorRows = computed<SectorRow[]>(() => {
+    const items = this.fieldItems() ?? [];
+    const rows = this.sectorChips().map(chip => {
+      const list = items.filter(i =>
+        (chip.key ? i.sector_key === chip.key : i.sector_name === chip.name) &&
+        i.rating !== 'insufficient_data');
+      const counts = new Map<Band, number>();
+      for (const i of list) {
+        const b = ratingBand(i.rating);
+        if (b) counts.set(b, (counts.get(b) ?? 0) + 1);
+      }
+      const avg = list.length
+        ? Math.round(list.reduce((s, i) => s + i.composite_score, 0) / list.length)
+        : 0;
+      return {
+        ...chip,
+        count: list.length,
+        avg,
+        // Strongest first so every bar starts from the bright end
+        mix: [...BANDS].reverse().map(band => ({ band, share: counts.get(band) ?? 0 })),
+      };
+    });
+    return items.length ? rows.sort((a, b) => b.avg - a.avg) : rows;
+  });
 
   private gsapCtx: gsap.Context | null = null;
   private scrollListener: (() => void) | null = null;
-  private scrollerEl: HTMLElement | Window = window;
+  private scrollerEl: HTMLElement | null = null;
   private reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  bandFor(rating: string) {
+    return ratingBand(rating);
+  }
+
   onOAuthClick(provider: 'google' | 'github'): void {
-    localStorage.setItem('equitylens_last_provider', provider);
+    try {
+      localStorage.setItem('equitylens_last_provider', provider);
+    } catch {
+      // Storage can be blocked; remembering the provider is only a nicety
+    }
   }
 
   ngOnInit(): void {
     this.loadLiveData();
   }
 
+  private readLastProvider(): 'google' | 'github' | null {
+    try {
+      return localStorage.getItem('equitylens_last_provider') as 'google' | 'github' | null;
+    } catch {
+      return null;
+    }
+  }
+
   private loadLiveData(): void {
+    // Paint the field straight away from the last known scores
+    this.api.marketSnapshot().subscribe(items => {
+      if (items.length && !this.fieldItems()) this.fieldItems.set(items);
+    });
+
     this.api.screener({}).subscribe({
       next: (items) => {
         if (!items.length) {
           this.boardLoading.set(false);
           return;
         }
-        this.companiesCount.set(items.length);
+        this.fieldItems.set(items);
+        this.api.rememberMarket(items);
         loadMoverRows(this.api, items).subscribe({
           next: (rows) => {
             if (rows.length) {
-              const short = rows.map(r => ({ ...r, name: this.shortName(r.name) }));
-              this.heroGainers.set(topGainers(short, 5));
+              const short = rows.map(r => ({ ...r, name: shortName(r.name) }));
               this.board.set(computeDivergence(short, 5));
               this.liveData.set(true);
             }
@@ -174,7 +215,7 @@ export class LandingComponent implements OnInit, AfterViewInit, OnDestroy {
           const q = quotes[sym];
           if (!q) continue;
           items.push({
-            symbol: sym,
+            symbol: sym.replace('.AX', ''),
             price: '$' + q.price.toFixed(2),
             change: (q.change >= 0 ? '+' : '') + q.change_pct.toFixed(2) + '%',
             up: q.change >= 0,
@@ -195,12 +236,6 @@ export class LandingComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  private shortName(name: string): string {
-    return name
-      .replace(/\s+(Limited|Ltd\.?|Inc\.?|Corporation|Group|Holdings)\s*$/i, '')
-      .trim();
-  }
-
   // ── Navigation ──
 
   scrollToSection(id: string): void {
@@ -211,22 +246,14 @@ export class LandingComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   scrollTop(): void {
-    if (this.scrollerEl instanceof Window) {
-      this.scrollerEl.scrollTo({ top: 0, behavior: 'smooth' });
-    } else {
-      this.scrollerEl.scrollTo({ top: 0, behavior: this.reducedMotion ? 'auto' : 'smooth' });
-    }
+    this.scrollerEl?.scrollTo({ top: 0, behavior: this.reducedMotion ? 'auto' : 'smooth' });
   }
 
   private getScroller(): HTMLElement {
-    const el = this.landingContainer.nativeElement;
-    let parent = el.parentElement;
+    let parent = this.landingContainer.nativeElement.parentElement;
     while (parent) {
       const style = window.getComputedStyle(parent);
-      if (style.overflow === 'auto' || style.overflowY === 'auto' ||
-          style.overflow === 'scroll' || style.overflowY === 'scroll') {
-        return parent;
-      }
+      if (/(auto|scroll)/.test(style.overflowY)) return parent;
       parent = parent.parentElement;
     }
     return document.documentElement;
@@ -239,17 +266,17 @@ export class LandingComponent implements OnInit, AfterViewInit, OnDestroy {
     this.scrollerEl = scroller;
 
     this.zone.runOutsideAngular(() => {
-      // Nav backdrop on scroll
       const nav = this.topnav.nativeElement;
-      const onScroll = () => {
-        nav.classList.toggle('scrolled', scroller.scrollTop > 12);
-      };
+      const onScroll = () => nav.classList.toggle('scrolled', scroller.scrollTop > 8);
       scroller.addEventListener('scroll', onScroll, { passive: true });
       this.scrollListener = () => scroller.removeEventListener('scroll', onScroll);
       onScroll();
 
-      if (this.reducedMotion) return;
+      // Deep links such as /#signin from the app sidebar
+      const fragment = this.route.snapshot.fragment;
+      if (fragment) setTimeout(() => document.getElementById(fragment)?.scrollIntoView({ block: 'start' }), 60);
 
+      if (this.reducedMotion) return;
       requestAnimationFrame(() => this.initAnimations(scroller));
     });
   }
@@ -258,62 +285,38 @@ export class LandingComponent implements OnInit, AfterViewInit, OnDestroy {
     this.gsapCtx = gsap.context(() => {
       ScrollTrigger.defaults({ scroller });
 
-      // ── Hero entrance ──
-      const copyEls = Array.from(this.heroCopy.nativeElement.children);
-      gsap.set(copyEls, { y: 28, opacity: 0 });
-      gsap.set(this.pvBoard.nativeElement, { y: 40, opacity: 0 });
-      gsap.set(this.pvDetail.nativeElement, { y: 56, opacity: 0 });
+      // One entrance: the copy, then the market panel
+      const copyEls = this.heroCopy.nativeElement.querySelectorAll('.kicker, .hero-headline, .hero-sub, .hero-ctas');
+      gsap.from(copyEls, { y: 16, opacity: 0, duration: 0.7, stagger: 0.06, ease: 'power3.out', delay: 0.05 });
+      gsap.from(this.heroVisual.nativeElement, { y: 24, opacity: 0, duration: 0.8, ease: 'power3.out', delay: 0.25 });
 
-      const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
-      tl.to(copyEls, { y: 0, opacity: 1, duration: 0.9, stagger: 0.09 }, 0.05)
-        .to(this.pvBoard.nativeElement, { y: 0, opacity: 1, duration: 1 }, 0.35)
-        .to(this.pvDetail.nativeElement, { y: 0, opacity: 1, duration: 1 }, 0.5);
-
-      // Gentle idle float on the hero cards
-      gsap.to(this.pvDetail.nativeElement, {
-        y: -10, duration: 3.4, yoyo: true, repeat: -1, ease: 'sine.inOut', delay: 1.6,
-      });
-      gsap.to(this.pvBoard.nativeElement, {
-        y: -5, duration: 4.2, yoyo: true, repeat: -1, ease: 'sine.inOut', delay: 1.9,
-      });
-
-      // ── Section reveals ──
-      const reveals = this.landingContainer.nativeElement.querySelectorAll('.reveal');
-      reveals.forEach((el) => {
-        gsap.fromTo(el,
-          { y: 32, opacity: 0 },
-          {
-            y: 0, opacity: 1, duration: 0.8, ease: 'power3.out',
-            scrollTrigger: { trigger: el, start: 'top 86%', once: true },
-          });
-      });
-
-      // ── Stat count-ups ──
-      const countUp = (el: HTMLElement, target: number) => {
-        const obj = { val: 0 };
-        gsap.to(obj, {
-          val: target, duration: 1.4, ease: 'power2.out',
-          scrollTrigger: { trigger: this.statsStrip.nativeElement, start: 'top 88%', once: true },
-          onUpdate: () => { el.textContent = Math.round(obj.val).toString(); },
+      // Sections rise in once as they arrive
+      this.landingContainer.nativeElement.querySelectorAll('.reveal').forEach((el) => {
+        gsap.from(el, {
+          y: 20, opacity: 0, duration: 0.7, ease: 'power3.out',
+          scrollTrigger: { trigger: el, start: 'top 88%', once: true },
         });
-      };
-      countUp(this.statCompanies.nativeElement, this.companiesCount());
-      countUp(this.statSectors.nativeElement, this.sectorChips().length);
-      countUp(this.statRatios.nativeElement, 7);
+      });
 
-      // ── Methodology thread draw (desktop only; the thread runs
-      //    vertically on narrow layouts and stays static there) ──
-      if (window.innerWidth > 1024) gsap.fromTo(this.methodThread.nativeElement,
-        { scaleX: 0 },
-        {
-          scaleX: 1, ease: 'none',
-          scrollTrigger: {
-            trigger: this.methodThread.nativeElement.parentElement,
-            start: 'top 75%',
-            end: 'bottom 60%',
-            scrub: 0.6,
-          },
-        });
+      // Figures count up the first time the strip is seen, using whatever
+      // live values have loaded by then
+      ScrollTrigger.create({
+        trigger: this.statsStrip.nativeElement,
+        start: 'top 90%',
+        once: true,
+        onEnter: () => {
+          const countUp = (el: HTMLElement, target: number) => {
+            const obj = { val: 0 };
+            gsap.to(obj, {
+              val: target, duration: 1.2, ease: 'power2.out',
+              onUpdate: () => { el.textContent = Math.round(obj.val).toString(); },
+            });
+          };
+          countUp(this.statCompanies.nativeElement, this.companiesCount());
+          countUp(this.statSectors.nativeElement, this.sectorChips().length);
+          countUp(this.statRatios.nativeElement, 7);
+        },
+      });
     });
   }
 

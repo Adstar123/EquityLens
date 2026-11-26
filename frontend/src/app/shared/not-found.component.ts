@@ -11,7 +11,7 @@ import { TickerSearchComponent } from './components/ticker-search.component';
     <div class="nf-page">
       <app-logo-mark [size]="44" />
       <p class="nf-code">404</p>
-      <h1 class="nf-title">Nothing listed at this address.</h1>
+      <h1 class="page-heading nf-title">Nothing listed at this address</h1>
       <p class="nf-sub">
         The page you're after doesn't exist, or the ticker was mistyped.
         Try a search, or head back to the screener.
@@ -20,84 +20,64 @@ import { TickerSearchComponent } from './components/ticker-search.component';
         <app-ticker-search placeholder="Search any ASX ticker or company" />
       </div>
       <div class="nf-links">
-        <a routerLink="/screener" class="nf-btn">Open the screener</a>
+        <a routerLink="/screener" class="ui-btn is-primary">Open the screener</a>
         <a routerLink="/" class="nf-link">Back to home</a>
       </div>
     </div>
   `,
   styles: [`
+    :host {
+      display: block;
+      height: 100%;
+    }
+
     .nf-page {
       min-height: 100%;
+      box-sizing: border-box;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       text-align: center;
-      padding: 4rem 1.5rem;
-      max-width: 460px;
+      padding: 64px 24px;
+      max-width: 440px;
       margin: 0 auto;
     }
 
     .nf-code {
       font-family: 'JetBrains Mono', monospace;
-      font-size: 0.78rem;
-      font-weight: 600;
-      letter-spacing: 0.18em;
-      color: var(--accent);
-      margin: 1.25rem 0 0.4rem;
+      font-size: 13px;
+      color: var(--accent-ink);
+      margin: 24px 0 8px;
     }
 
     .nf-title {
-      font-family: 'Archivo', sans-serif;
-      font-stretch: 104%;
-      font-weight: 720;
-      font-size: 1.6rem;
-      letter-spacing: -0.02em;
-      color: var(--text-primary);
-      margin: 0 0 0.6rem;
+      margin-bottom: 12px;
     }
 
     .nf-sub {
-      font-size: 0.9rem;
-      line-height: 1.65;
+      font-size: 14px;
+      line-height: 1.6;
       color: var(--text-secondary);
-      margin: 0 0 1.75rem;
+      margin: 0 0 24px;
     }
 
     .nf-search {
       width: 100%;
-      margin-bottom: 1.5rem;
+      margin-bottom: 24px;
     }
 
     .nf-links {
       display: flex;
       align-items: center;
-      gap: 1.25rem;
-    }
-
-    .nf-btn {
-      display: inline-flex;
-      align-items: center;
-      padding: 9px 18px;
-      background: var(--accent);
-      color: #14100a;
-      font-size: 0.84rem;
-      font-weight: 600;
-      border-radius: var(--radius);
-      text-decoration: none;
-      transition: background 0.18s ease, transform 0.18s ease;
-    }
-
-    .nf-btn:hover {
-      background: var(--accent-light);
-      transform: translateY(-1px);
+      gap: 16px;
     }
 
     .nf-link {
-      font-size: 0.84rem;
+      font-size: 13px;
       color: var(--text-secondary);
       text-decoration: none;
-      transition: color 0.15s ease;
+      transition: color var(--dur-fast) var(--ease);
     }
 
     .nf-link:hover {

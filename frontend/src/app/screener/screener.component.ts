@@ -1,202 +1,216 @@
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
-import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { NgIcon } from '@ng-icons/core';
+import { lucideArrowDown, lucideArrowUp, lucideChevronDown, lucideChevronLeft, lucideChevronRight } from '@ng-icons/lucide';
 import { ApiService, ScreenerItem, Sector, Quote, Definition } from '../core/api.service';
+import { formatChangePct, formatMarketCap, formatPrice, formatRatio } from '../core/bands';
 import { ScoreBadgeComponent } from '../shared/components/score-badge.component';
-import { RatioBarComponent } from '../shared/components/ratio-bar.component';
+import { BandMeterComponent } from '../shared/components/band-meter.component';
 import { InfoTooltipComponent } from '../shared/components/info-tooltip.component';
 import { TickerSearchComponent } from '../shared/components/ticker-search.component';
 
-type SortKey = 'score' | 'symbol' | 'price' | 'mcap' | 'sector';
+type SortKey = 'score' | 'symbol' | 'price' | 'change' | 'mcap' | 'sector';
+
+const SORT_LABELS: Record<SortKey, [string, string]> = {
+  score: ['Score, low to high', 'Score, high to low'],
+  symbol: ['Symbol, A to Z', 'Symbol, Z to A'],
+  price: ['Price, low to high', 'Price, high to low'],
+  change: ['Day change, worst first', 'Day change, best first'],
+  mcap: ['Market cap, smallest first', 'Market cap, largest first'],
+  sector: ['Sector, A to Z', 'Sector, Z to A'],
+};
 
 @Component({
   selector: 'app-screener',
   standalone: true,
-  imports: [FormsModule, RouterLink, ScoreBadgeComponent, RatioBarComponent, InfoTooltipComponent, TickerSearchComponent],
+  imports: [RouterLink, NgIcon, ScoreBadgeComponent, BandMeterComponent, InfoTooltipComponent, TickerSearchComponent],
   template: `
-    <div class="screener-container">
-      <!-- Toolbar -->
+    <div class="page">
       <header class="toolbar">
         <div class="toolbar-row">
-          <div class="page-title-wrap">
-            <h1 class="page-title">Screener</h1>
-            <span class="page-count">{{ filteredItems().length }} of {{ items().length }}</span>
+          <div class="title-wrap">
+            <h1 class="page-heading">Screener</h1>
+            <span class="count">
+              @if (loading()) {
+                Loading
+              } @else if (filteredItems().length === items().length) {
+                {{ items().length }} companies
+              } @else {
+                {{ filteredItems().length }} of {{ items().length }} companies
+              }
+            </span>
           </div>
-
           <div class="search-slot">
             <app-ticker-search />
           </div>
         </div>
 
-        <div class="toolbar-row filters-row">
-          <div class="filter-group">
-            <label class="filter-label" for="sector-filter">Sector</label>
+        <div class="toolbar-row filters">
+          <label class="select-wrap">
+            <span class="sr-only">Sector</span>
             <select
-              id="sector-filter"
-              class="filter-select"
-              [ngModel]="selectedSector()"
-              (ngModelChange)="onSectorChange($event)"
+              class="select"
+              [value]="selectedSector()"
+              (change)="onSectorChange($any($event.target).value)"
             >
               <option value="">All sectors</option>
               @for (sector of sectors(); track sector.key) {
-                <option [value]="sector.key">{{ sector.display_name }}</option>
+                <option [value]="sector.key" [selected]="sector.key === selectedSector()">{{ sector.display_name }}</option>
               }
             </select>
+            <ng-icon [svg]="icons.chevronDown" size="16" strokeWidth="1.5" class="select-chevron" />
+          </label>
+
+          <div class="segmented" role="group" aria-label="Minimum score">
+            <span class="seg-label">Min score</span>
+            @for (opt of scoreOptions; track opt) {
+              <button
+                class="seg"
+                [class.active]="minScore() === opt"
+                [attr.aria-pressed]="minScore() === opt"
+                (click)="onMinScoreChange(opt)"
+              >{{ opt === 0 ? 'Any' : opt + '+' }}</button>
+            }
           </div>
 
-          <div class="filter-group">
-            <label class="filter-label" for="min-score">Min score</label>
-            <input
-              id="min-score"
-              type="number"
-              class="filter-input"
-              [ngModel]="minScore()"
-              (ngModelChange)="onMinScoreChange($event)"
-              min="0"
-              max="100"
-              step="5"
-              placeholder="0"
-            />
-          </div>
-
-          <span class="sort-hint">Click a column header to sort</span>
+          <span class="sort-note">Sorted by {{ sortLabel() }}</span>
         </div>
       </header>
 
-      <!-- Table -->
-      @if (loading()) {
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th class="col-symbol">Symbol</th>
-                <th>Company</th>
-                <th>Price</th>
-                <th>Mkt cap</th>
-                <th>Sector</th>
-                <th>Score</th>
-              </tr>
-            </thead>
-            <tbody>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="col-symbol">
+                <button class="th-btn" (click)="setSort('symbol')" [class.is-sorted]="sortBy() === 'symbol'">
+                  Symbol @if (arrowFor('symbol'); as a) { <ng-icon [svg]="a" size="12" strokeWidth="2" class="th-arrow" /> }
+                </button>
+              </th>
+              <th class="col-name">Company</th>
+              <th class="col-score">
+                <button class="th-btn" (click)="setSort('score')" [class.is-sorted]="sortBy() === 'score'">
+                  Score @if (arrowFor('score'); as a) { <ng-icon [svg]="a" size="12" strokeWidth="2" class="th-arrow" /> }
+                </button>
+                @if (definitions()['composite_score']; as def) {
+                  <app-info-tooltip [description]="def.description" />
+                }
+              </th>
+              <th class="col-sector">
+                <button class="th-btn" (click)="setSort('sector')" [class.is-sorted]="sortBy() === 'sector'">
+                  Sector @if (arrowFor('sector'); as a) { <ng-icon [svg]="a" size="12" strokeWidth="2" class="th-arrow" /> }
+                </button>
+              </th>
+              <th class="num">
+                <button class="th-btn" (click)="setSort('price')" [class.is-sorted]="sortBy() === 'price'">
+                  Price @if (arrowFor('price'); as a) { <ng-icon [svg]="a" size="12" strokeWidth="2" class="th-arrow" /> }
+                </button>
+              </th>
+              <th class="num">
+                <button class="th-btn" (click)="setSort('change')" [class.is-sorted]="sortBy() === 'change'">
+                  Day @if (arrowFor('change'); as a) { <ng-icon [svg]="a" size="12" strokeWidth="2" class="th-arrow" /> }
+                </button>
+              </th>
+              <th class="num">
+                <button class="th-btn" (click)="setSort('mcap')" [class.is-sorted]="sortBy() === 'mcap'">
+                  Market cap @if (arrowFor('mcap'); as a) { <ng-icon [svg]="a" size="12" strokeWidth="2" class="th-arrow" /> }
+                </button>
+                @if (definitions()['market_cap']; as def) {
+                  <app-info-tooltip [description]="def.description" />
+                }
+              </th>
+              @for (col of ratioHeaders(); track col.key) {
+                <th class="col-ratio">
+                  <span class="th-text">{{ col.name }}</span>
+                  @if (col.description) {
+                    <app-info-tooltip [description]="col.description" />
+                  }
+                </th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @if (loading()) {
               @for (i of skeletonRows; track i) {
                 <tr class="sk-row">
-                  <td><span class="sk" style="width: 52px"></span></td>
-                  <td><span class="sk" style="width: 140px"></span></td>
-                  <td><span class="sk" style="width: 72px"></span></td>
-                  <td><span class="sk" style="width: 48px"></span></td>
-                  <td><span class="sk" style="width: 90px"></span></td>
+                  <td class="col-symbol"><span class="sk" style="width: 48px"></span></td>
+                  <td><span class="sk" style="width: 160px"></span></td>
+                  <td><span class="sk" style="width: 120px"></span></td>
                   <td><span class="sk" style="width: 96px"></span></td>
+                  <td class="num"><span class="sk" style="width: 56px"></span></td>
+                  <td class="num"><span class="sk" style="width: 48px"></span></td>
+                  <td class="num"><span class="sk" style="width: 48px"></span></td>
                 </tr>
               }
-            </tbody>
-          </table>
-        </div>
-      } @else {
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th class="col-symbol sortable" (click)="setSort('symbol')">
-                  Symbol <span class="sort-arrow">{{ arrowFor('symbol') }}</span>
-                </th>
-                <th class="col-name">Company</th>
-                <th class="sortable" (click)="setSort('price')">
-                  Price <span class="sort-arrow">{{ arrowFor('price') }}</span>
-                </th>
-                <th class="sortable" (click)="setSort('mcap')">
-                  Mkt cap
-                  @if (definitions()['market_cap']; as def) {
-                    <app-info-tooltip [description]="def.description" />
-                  }
-                  <span class="sort-arrow">{{ arrowFor('mcap') }}</span>
-                </th>
-                <th class="sortable" (click)="setSort('sector')">
-                  Sector <span class="sort-arrow">{{ arrowFor('sector') }}</span>
-                </th>
-                <th class="sortable" (click)="setSort('score')">
-                  Score
-                  @if (definitions()['composite_score']; as def) {
-                    <app-info-tooltip [description]="def.description" />
-                  }
-                  <span class="sort-arrow">{{ arrowFor('score') }}</span>
-                </th>
-                @for (col of ratioHeadersWithDesc(); track col.key) {
-                  <th class="col-ratio">
-                    {{ col.name }}
-                    @if (col.description) {
-                      <app-info-tooltip [description]="col.description" />
-                    }
-                  </th>
-                }
-              </tr>
-            </thead>
-            <tbody>
+            } @else {
               @for (item of pagedItems(); track item.symbol) {
-                <tr class="table-row" (click)="goToTicker(item.symbol)">
-                  <td class="cell-symbol">
+                <tr class="row" (click)="goToTicker(item.symbol)">
+                  <td class="col-symbol">
                     <a class="symbol-link" [routerLink]="['/ticker', item.symbol]" (click)="$event.stopPropagation()">{{ item.symbol }}</a>
                   </td>
                   <td class="cell-name">{{ item.company_name }}</td>
-                  <td class="cell-price">
-                    @if (quotes()[item.symbol]; as q) {
-                      <span class="price-value">{{ formatPrice(q.price) }}</span>
-                      <span class="price-change" [class.positive]="q.change >= 0" [class.negative]="q.change < 0">
-                        {{ q.change >= 0 ? '+' : '' }}{{ q.change_pct.toFixed(2) }}%
-                      </span>
-                    } @else {
-                      <span class="price-placeholder">--</span>
-                    }
-                  </td>
-                  <td class="cell-mcap">
-                    @if (quotes()[item.symbol]; as q) {
-                      {{ formatMarketCap(q.market_cap) }}
-                    } @else {
-                      <span class="price-placeholder">--</span>
-                    }
+                  <td>
+                    <app-score-badge [score]="item.composite_score" [rating]="item.rating" [showLabel]="true" />
                   </td>
                   <td class="cell-sector">{{ item.sector_name }}</td>
-                  <td class="cell-score">
-                    <app-score-badge [score]="item.composite_score" [rating]="item.rating" />
-                  </td>
-                  @for (col of ratioHeadersWithDesc(); track col.key) {
-                    <td class="cell-ratio">
+                  @if (quotes()[item.symbol]; as q) {
+                    <td class="num mono">{{ fmtPrice(q.price) }}</td>
+                    <td class="num mono" [class.up]="q.change_pct > 0" [class.down]="q.change_pct < 0">{{ fmtChange(q.change_pct) }}</td>
+                    <td class="num mono is-muted">{{ fmtCap(q.market_cap) }}</td>
+                  } @else {
+                    <td class="num is-empty">&ndash;</td>
+                    <td class="num is-empty">&ndash;</td>
+                    <td class="num is-empty">&ndash;</td>
+                  }
+                  @for (col of ratioHeaders(); track col.key) {
+                    <td class="col-ratio">
                       @if (ratioFor(item, col.key); as ratio) {
-                        <div class="ratio-cell">
-                          <span class="ratio-value">{{ formatRatio(ratio.value) }}</span>
-                          <app-ratio-bar [value]="ratio.value" [rangeBucket]="ratio.range_bucket" />
-                        </div>
+                        <span class="ratio">
+                          <span class="ratio-value">{{ fmtRatio(ratio.value) }}</span>
+                          <app-band-meter [band]="ratio.range_bucket" />
+                        </span>
                       } @else {
-                        <span class="ratio-empty">&ndash;</span>
+                        <span class="is-empty">&ndash;</span>
                       }
                     </td>
                   }
                 </tr>
               } @empty {
                 <tr>
-                  <td [attr.colspan]="6 + maxRatioCols()" class="empty-state">
-                    @if (selectedSector()) {
-                      No scored stocks in this sector match the filters.
-                    } @else {
-                      No stocks match the filters. Try lowering the minimum score.
+                  <td [attr.colspan]="7 + ratioHeaders().length" class="empty">
+                    <span class="empty-title">No companies match</span>
+                    <span class="empty-sub">
+                      @if (minScore() > 0) {
+                        Try a lower minimum score
+                      } @else {
+                        Try another sector
+                      }
+                    </span>
+                    @if (minScore() > 0 || selectedSector()) {
+                      <button class="ui-btn" (click)="clearFilters()">Clear filters</button>
                     }
                   </td>
                 </tr>
               }
-            </tbody>
-          </table>
-        </div>
+            }
+          </tbody>
+        </table>
+      </div>
 
-        <!-- Pagination -->
-        @if (totalPages() > 1) {
-          <div class="pagination">
-            <span class="page-range">{{ pageRangeLabel() }}</span>
-            <div class="page-controls">
-              <button class="page-btn" [disabled]="currentPage() === 1" (click)="prevPage()">&larr; Prev</button>
-              <span class="page-info">{{ currentPage() }} / {{ totalPages() }}</span>
-              <button class="page-btn" [disabled]="currentPage() === totalPages()" (click)="nextPage()">Next &rarr;</button>
-            </div>
+      @if (!loading() && totalPages() > 1) {
+        <footer class="pagination">
+          <span class="page-range">{{ pageRangeLabel() }}</span>
+          <div class="page-controls">
+            <button class="ui-btn" [disabled]="currentPage() === 1" (click)="goToPage(currentPage() - 1)">
+              <ng-icon [svg]="icons.chevronLeft" size="16" strokeWidth="1.5" />
+              Previous
+            </button>
+            <span class="page-info">{{ currentPage() }} of {{ totalPages() }}</span>
+            <button class="ui-btn" [disabled]="currentPage() === totalPages()" (click)="goToPage(currentPage() + 1)">
+              Next
+              <ng-icon [svg]="icons.chevronRight" size="16" strokeWidth="1.5" />
+            </button>
           </div>
-        }
+        </footer>
       }
     </div>
   `,
@@ -206,113 +220,140 @@ type SortKey = 'score' | 'symbol' | 'price' | 'mcap' | 'sector';
       height: 100%;
     }
 
-    .screener-container {
+    .page {
       height: 100%;
       display: flex;
       flex-direction: column;
-      background: var(--bg-base);
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
     }
 
     // ── Toolbar ──
     .toolbar {
       flex-shrink: 0;
-      border-bottom: 1px solid var(--border);
-      padding: 1rem 1.5rem 0.85rem;
       display: flex;
       flex-direction: column;
-      gap: 0.85rem;
+      gap: 20px;
+      padding: 24px 32px 20px;
+      border-bottom: 1px solid var(--border);
     }
 
     .toolbar-row {
       display: flex;
       align-items: center;
-      gap: 1.25rem;
+      gap: 16px;
     }
 
-    .page-title-wrap {
+    .title-wrap {
       display: flex;
       align-items: baseline;
-      gap: 10px;
-      flex-shrink: 0;
+      gap: 12px;
     }
 
-    .page-title {
-      font-family: 'Archivo', sans-serif;
-      font-stretch: 104%;
-      font-weight: 720;
-      font-size: 1.25rem;
-      letter-spacing: -0.015em;
-      color: var(--text-primary);
-      margin: 0;
-    }
-
-    .page-count {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.72rem;
+    .count {
+      font-size: 13px;
       color: var(--text-muted);
     }
 
     .search-slot {
       flex: 1;
-      max-width: 420px;
+      max-width: 360px;
       margin-left: auto;
     }
 
-    .filters-row {
-      gap: 1rem;
-      flex-wrap: wrap;
+    .select-wrap {
+      position: relative;
+      display: inline-flex;
     }
 
-    .filter-group {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .filter-label {
-      font-size: 0.7rem;
-      font-weight: 600;
-      letter-spacing: 0.07em;
-      color: var(--text-muted);
-      text-transform: uppercase;
-    }
-
-    .filter-select,
-    .filter-input {
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
+    .select {
+      appearance: none;
+      height: 36px;
+      min-width: 200px;
+      padding: 0 36px 0 12px;
+      border: 1px solid var(--border-strong);
       border-radius: var(--radius);
+      background: var(--bg-surface);
       color: var(--text-primary);
-      font-size: 0.82rem;
-      padding: 0.4rem 0.6rem;
-      outline: none;
-      min-width: 150px;
-      transition: border-color 160ms ease;
+      font-size: 13px;
       cursor: pointer;
+      transition: border-color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease);
     }
 
-    .filter-input {
-      min-width: 70px;
-      max-width: 84px;
+    .select:hover {
+      background: var(--bg-hover);
+    }
+
+    .select option {
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+    }
+
+    .select-chevron {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    .segmented {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      height: 36px;
+      padding: 0 3px 0 12px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius);
+      background: var(--bg-surface);
+      box-sizing: border-box;
+    }
+
+    .seg-label {
+      margin-right: 8px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .seg {
+      height: 28px;
+      padding: 0 10px;
+      border: none;
+      border-radius: 6px;
+      background: none;
+      color: var(--text-secondary);
       font-family: 'JetBrains Mono', monospace;
-      cursor: text;
-      -moz-appearance: textfield;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
     }
 
-    .filter-input::-webkit-outer-spin-button,
-    .filter-input::-webkit-inner-spin-button {
-      -webkit-appearance: none;
-      margin: 0;
+    .seg:first-of-type {
+      font-family: inherit;
+      font-size: 13px;
     }
 
-    .filter-select:focus,
-    .filter-input:focus {
-      border-color: var(--accent);
+    .seg:hover {
+      color: var(--text-primary);
     }
 
-    .sort-hint {
+    .seg.active {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+      box-shadow: inset 0 0 0 1px var(--border-strong);
+    }
+
+    .sort-note {
       margin-left: auto;
-      font-size: 0.72rem;
+      font-size: 13px;
       color: var(--text-muted);
     }
 
@@ -324,297 +365,276 @@ type SortKey = 'score' | 'symbol' | 'price' | 'mcap' | 'sector';
 
     table {
       width: 100%;
-      border-collapse: collapse;
+      border-collapse: separate;
+      border-spacing: 0;
     }
 
     th {
       position: sticky;
       top: 0;
-      background: var(--bg-base);
       z-index: 10;
-      padding: 0.55rem 0.75rem;
-      text-align: left;
-      font-size: 0.67rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.07em;
-      color: var(--text-muted);
+      height: 40px;
+      padding: 0 16px;
+      background: var(--bg-base);
       border-bottom: 1px solid var(--border-strong);
+      text-align: left;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
       white-space: nowrap;
-      user-select: none;
     }
 
-    th.sortable {
+    th.num {
+      text-align: right;
+    }
+
+    .th-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      height: 28px;
+      margin: 0 -6px;
+      padding: 0 6px;
+      border: none;
+      border-radius: 6px;
+      background: none;
+      color: inherit;
+      font: inherit;
       cursor: pointer;
-      transition: color 120ms ease;
+      transition: color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease);
     }
 
-    th.sortable:hover {
+    .th-btn:hover {
+      color: var(--text-primary);
+      background: var(--bg-hover);
+    }
+
+    .th-btn.is-sorted {
       color: var(--text-primary);
     }
 
-    .sort-arrow {
-      display: inline-block;
-      width: 0.8em;
+    .th-arrow {
+      display: flex;
+      width: 12px;
       color: var(--accent);
-      font-size: 0.8rem;
     }
 
-    tbody tr.table-row {
-      cursor: pointer;
-      transition: background 100ms ease;
-    }
-
-    tbody tr.table-row:hover td {
-      background: var(--bg-surface);
-    }
-
-    tbody tr.table-row:hover .cell-symbol {
-      color: var(--accent);
+    .th-text {
+      vertical-align: middle;
     }
 
     td {
-      padding: 0.44rem 0.75rem;
-      font-size: 0.8125rem;
-      color: var(--text-primary);
+      height: 44px;
+      padding: 0 16px;
       border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      color: var(--text-primary);
       white-space: nowrap;
+      background: var(--bg-base);
+      transition: background-color var(--dur-fast) var(--ease);
     }
 
-    th.col-symbol {
-      left: 0;
-      z-index: 12;
-      border-right: 1px solid var(--border);
+    td.num {
+      text-align: right;
     }
 
-    .cell-symbol {
+    .mono {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+    }
+
+    .up { color: var(--up); }
+    .down { color: var(--down); }
+
+    .is-muted {
+      color: var(--text-secondary);
+    }
+
+    .is-empty {
+      color: var(--text-muted);
+    }
+
+    tr.row {
+      cursor: pointer;
+    }
+
+    tr.row:hover td {
+      background: var(--bg-hover);
+    }
+
+    .col-symbol {
       position: sticky;
       left: 0;
       z-index: 5;
-      background: var(--bg-base);
-      border-right: 1px solid var(--border);
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 700;
-      color: var(--text-primary);
-      letter-spacing: 0.02em;
-      transition: color 100ms ease;
+      padding-left: 32px;
+      box-shadow: inset -1px 0 0 var(--border);
     }
 
-    tbody tr.table-row:hover .cell-symbol {
-      background: var(--bg-surface);
+    th.col-symbol {
+      z-index: 12;
     }
 
     .symbol-link {
-      color: inherit;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
       text-decoration: none;
+      border-radius: 4px;
+      transition: color var(--dur-fast) var(--ease);
     }
 
-    .symbol-link:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 2px;
-      border-radius: 3px;
+    tr.row:hover .symbol-link {
+      color: var(--accent-ink);
     }
 
     .cell-name {
-      color: var(--text-secondary);
-      max-width: 200px;
+      max-width: 240px;
       overflow: hidden;
       text-overflow: ellipsis;
+      color: var(--text-secondary);
     }
 
     .cell-sector {
-      color: var(--text-muted);
-      font-size: 0.75rem;
-    }
-
-    .cell-score {
-      white-space: nowrap;
-    }
-
-    .cell-ratio {
-      padding: 0.44rem 0.5rem;
-    }
-
-    .ratio-cell {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 2px;
-    }
-
-    .ratio-value {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.75rem;
       color: var(--text-secondary);
     }
 
-    .ratio-empty {
-      color: var(--text-muted);
-      opacity: 0.5;
+    .col-ratio {
+      padding: 0 12px;
     }
 
-    .empty-state {
+    .ratio {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .ratio-value {
+      min-width: 52px;
+      text-align: right;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .empty {
+      height: auto;
+      padding: 64px 16px;
       text-align: center;
+      white-space: normal;
+    }
+
+    .empty-title,
+    .empty-sub {
+      display: block;
+    }
+
+    .empty-title {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .empty-sub {
+      margin: 4px 0 16px;
+      font-size: 13px;
       color: var(--text-muted);
-      padding: 3rem 1rem !important;
-      font-size: 0.875rem;
     }
 
     // ── Skeleton ──
-    .sk-row td {
-      padding-top: 0.62rem;
-      padding-bottom: 0.62rem;
-    }
-
     .sk {
       display: inline-block;
-      height: 11px;
+      height: 8px;
       border-radius: 4px;
-      background: linear-gradient(100deg, var(--bg-surface) 40%, var(--border) 50%, var(--bg-surface) 60%);
-      background-size: 200% 100%;
-      animation: skShimmer 1.4s ease infinite;
-    }
-
-    @keyframes skShimmer {
-      from { background-position: 120% 0; }
-      to { background-position: -80% 0; }
+      background: var(--band-off);
     }
 
     // ── Pagination ──
     .pagination {
+      flex-shrink: 0;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 1rem;
-      padding: 0.65rem 1.5rem;
+      gap: 16px;
+      padding: 12px 32px;
       border-top: 1px solid var(--border);
-      flex-shrink: 0;
     }
 
-    .page-range {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.72rem;
+    .page-range,
+    .page-info {
+      font-size: 13px;
       color: var(--text-muted);
     }
 
     .page-controls {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
+      gap: 12px;
     }
 
-    .page-btn {
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      color: var(--text-primary);
-      font-size: 0.78rem;
-      font-weight: 500;
-      padding: 0.4rem 0.85rem;
-      cursor: pointer;
-      transition: border-color 150ms, background 150ms;
+    .page-controls .ui-btn {
+      padding: 0 12px;
     }
 
-    .page-btn:hover:not(:disabled) {
-      border-color: var(--accent);
+    @media (max-width: 1280px) {
+      .sort-note {
+        display: none;
+      }
     }
 
-    .page-btn:disabled {
-      opacity: 0.35;
-      cursor: not-allowed;
-    }
-
-    .page-info {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.75rem;
-      color: var(--text-secondary);
-    }
-
-    .cell-price {
-      white-space: nowrap;
-    }
-
-    .price-value {
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 600;
-      font-size: 0.8125rem;
-      margin-right: 0.375rem;
-    }
-
-    .price-change {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.6875rem;
-      font-weight: 600;
-    }
-
-    .price-change.positive { color: var(--up); }
-    .price-change.negative { color: var(--down); }
-
-    .price-placeholder {
-      color: var(--text-muted);
-      font-size: 0.75rem;
-    }
-
-    .cell-mcap {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.75rem;
-      color: var(--text-secondary);
-      white-space: nowrap;
-    }
-
-    // ── Mobile ──
     @media (max-width: 768px) {
       .toolbar {
-        padding: 0.75rem 0.85rem 0.65rem;
-        gap: 0.65rem;
+        padding: 16px;
+        gap: 12px;
       }
 
       .toolbar-row {
         flex-wrap: wrap;
-        gap: 0.65rem;
+        gap: 12px;
       }
 
       .search-slot {
         flex-basis: 100%;
         max-width: none;
         margin-left: 0;
-        order: 2;
       }
 
-      .filter-group {
+      .select-wrap,
+      .select {
         flex: 1;
-      }
-
-      .filter-select {
         min-width: 0;
-        flex: 1;
+        width: 100%;
       }
 
-      .sort-hint {
-        display: none;
+      .segmented {
+        width: 100%;
+        justify-content: space-between;
       }
 
-      td, th {
-        padding: 0.42rem 0.5rem;
-        font-size: 0.75rem;
+      th, td {
+        padding: 0 12px;
+      }
+
+      .col-symbol {
+        padding-left: 16px;
       }
 
       .cell-name {
-        max-width: 110px;
+        max-width: 140px;
       }
 
       .pagination {
-        padding: 0.65rem 0.85rem;
-        padding-bottom: calc(0.65rem + env(safe-area-inset-bottom, 0px));
-      }
-
-      .page-btn {
-        padding: 0.55rem 1rem;
-        min-height: 42px;
+        padding: 12px 16px;
+        padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
       }
 
       .page-range {
         display: none;
+      }
+
+      .page-controls {
+        width: 100%;
+        justify-content: space-between;
       }
     }
   `],
@@ -622,53 +642,69 @@ type SortKey = 'score' | 'symbol' | 'price' | 'mcap' | 'sector';
 export class ScreenerComponent implements OnInit {
   private api = inject(ApiService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
+
+  readonly icons = {
+    chevronDown: lucideChevronDown,
+    chevronLeft: lucideChevronLeft,
+    chevronRight: lucideChevronRight,
+  };
+  readonly scoreOptions = [0, 50, 60, 70, 80];
+  readonly pageSize = 50;
+  readonly skeletonRows = Array.from({ length: 14 }, (_, i) => i);
 
   sectors = signal<Sector[]>([]);
   items = signal<ScreenerItem[]>([]);
-  loading = signal(false);
+  loading = signal(true);
   quotes = signal<Record<string, Quote>>({});
   definitions = signal<Record<string, Definition>>({});
-  quotesLoading = signal(false);
 
   selectedSector = signal('');
   minScore = signal(0);
   sortBy = signal<SortKey>('score');
   sortDir = signal<'asc' | 'desc'>('desc');
   currentPage = signal(1);
-  readonly pageSize = 50;
-  readonly skeletonRows = Array.from({ length: 14 }, (_, i) => i);
+
+  fmtRatio = formatRatio;
+  fmtPrice = formatPrice;
+  fmtCap = formatMarketCap;
+  fmtChange = formatChangePct;
+
+  sortLabel = computed(() => {
+    const label = SORT_LABELS[this.sortBy()][this.sortDir() === 'asc' ? 0 : 1];
+    return label.charAt(0).toLowerCase() + label.slice(1);
+  });
 
   filteredItems = computed(() => {
     let list = [...this.items()];
 
     const min = this.minScore();
-    if (min > 0) {
-      list = list.filter(item => item.composite_score >= min);
-    }
+    if (min > 0) list = list.filter(item => item.composite_score >= min);
 
     const sort = this.sortBy();
     const dir = this.sortDir() === 'asc' ? 1 : -1;
     const q = this.quotes();
+    const num = (v: number | undefined) => v ?? -Infinity;
     if (sort === 'symbol') {
       list.sort((a, b) => dir * a.symbol.localeCompare(b.symbol));
     } else if (sort === 'price') {
-      list.sort((a, b) => dir * ((q[a.symbol]?.price ?? 0) - (q[b.symbol]?.price ?? 0)));
+      list.sort((a, b) => dir * (num(q[a.symbol]?.price) - num(q[b.symbol]?.price)));
+    } else if (sort === 'change') {
+      list.sort((a, b) => dir * (num(q[a.symbol]?.change_pct) - num(q[b.symbol]?.change_pct)));
     } else if (sort === 'mcap') {
-      list.sort((a, b) => dir * ((q[a.symbol]?.market_cap ?? 0) - (q[b.symbol]?.market_cap ?? 0)));
+      list.sort((a, b) => dir * (num(q[a.symbol]?.market_cap) - num(q[b.symbol]?.market_cap)));
     } else if (sort === 'sector') {
-      list.sort((a, b) => dir * a.sector_name.localeCompare(b.sector_name));
+      list.sort((a, b) => dir * a.sector_name.localeCompare(b.sector_name) || b.composite_score - a.composite_score);
     } else {
       list.sort((a, b) => dir * (a.composite_score - b.composite_score));
     }
-
     return list;
   });
 
   totalPages = computed(() => Math.max(1, Math.ceil(this.filteredItems().length / this.pageSize)));
 
   pagedItems = computed(() => {
-    const page = this.currentPage();
-    const start = (page - 1) * this.pageSize;
+    const start = (this.currentPage() - 1) * this.pageSize;
     return this.filteredItems().slice(start, start + this.pageSize);
   });
 
@@ -677,22 +713,13 @@ export class ScreenerComponent implements OnInit {
     if (!total) return '';
     const start = (this.currentPage() - 1) * this.pageSize + 1;
     const end = Math.min(this.currentPage() * this.pageSize, total);
-    return `${start}-${end} of ${total}`;
-  });
-
-  maxRatioCols = computed(() => {
-    let max = 0;
-    for (const item of this.items()) {
-      const len = item.breakdown?.ratios?.length ?? 0;
-      if (len > max) max = len;
-    }
-    return max || 1;
+    return `Showing ${start} to ${end} of ${total}`;
   });
 
   // Headers are the union of ratios across all rows (ordered by first
   // appearance) so a ratio the top-ranked company happens to be missing,
   // like interest coverage, still gets its column. Cells are matched by key.
-  ratioHeadersWithDesc = computed(() => {
+  ratioHeaders = computed(() => {
     const seen = new Map<string, { key: string; name: string; description: string }>();
     for (const item of this.filteredItems()) {
       for (const r of item.breakdown?.ratios ?? []) {
@@ -709,6 +736,17 @@ export class ScreenerComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    // Filters live in the URL so Back from a ticker restores the same view
+    const qp = this.route.snapshot.queryParamMap;
+    const sort = qp.get('sort') as SortKey | null;
+    if (sort && sort in SORT_LABELS) this.sortBy.set(sort);
+    if (qp.get('dir') === 'asc' || qp.get('dir') === 'desc') this.sortDir.set(qp.get('dir') as 'asc' | 'desc');
+    const min = Number(qp.get('min'));
+    if (this.scoreOptions.includes(min)) this.minScore.set(min);
+    this.selectedSector.set(qp.get('sector') ?? '');
+    const page = Number(qp.get('page'));
+    if (page > 1) this.currentPage.set(page);
+
     this.api.listSectors().subscribe({
       next: (sectors) => this.sectors.set(sectors),
       error: () => this.sectors.set([]),
@@ -722,7 +760,12 @@ export class ScreenerComponent implements OnInit {
       },
     });
 
-    this.loadData();
+    this.loadData(false);
+  }
+
+  arrowFor(key: SortKey): string {
+    if (this.sortBy() !== key) return '';
+    return this.sortDir() === 'asc' ? lucideArrowUp : lucideArrowDown;
   }
 
   setSort(key: SortKey): void {
@@ -734,70 +777,73 @@ export class ScreenerComponent implements OnInit {
       this.sortDir.set(key === 'symbol' || key === 'sector' ? 'asc' : 'desc');
     }
     this.currentPage.set(1);
-    this.loadQuotesForPage();
-  }
-
-  arrowFor(key: SortKey): string {
-    if (this.sortBy() !== key) return '';
-    return this.sortDir() === 'asc' ? '↑' : '↓';
+    // Price based sorts need every quote, not just this page's
+    if (key === 'price' || key === 'change' || key === 'mcap') this.loadAllQuotes();
+    else this.loadQuotesForPage();
+    this.syncUrl();
   }
 
   onSectorChange(sector: string): void {
     this.selectedSector.set(sector);
     this.currentPage.set(1);
-    this.loadData();
+    this.loadData(true);
   }
 
   onMinScoreChange(val: number): void {
-    this.minScore.set(val ?? 0);
+    this.minScore.set(val);
     this.currentPage.set(1);
+    this.loadQuotesForPage();
+    this.syncUrl();
   }
 
-  nextPage(): void {
-    if (this.currentPage() < this.totalPages()) {
-      this.currentPage.update(p => p + 1);
-      this.loadQuotesForPage();
+  clearFilters(): void {
+    this.minScore.set(0);
+    if (this.selectedSector()) {
+      this.onSectorChange('');
+    } else {
+      this.currentPage.set(1);
+      this.syncUrl();
     }
   }
 
-  prevPage(): void {
-    if (this.currentPage() > 1) {
-      this.currentPage.update(p => p - 1);
-      this.loadQuotesForPage();
-    }
+  goToPage(page: number): void {
+    if (page < 1 || page > this.totalPages()) return;
+    this.currentPage.set(page);
+    this.loadQuotesForPage();
+    this.syncUrl();
+    document.querySelector('.table-wrap')?.scrollTo({ top: 0 });
   }
 
   goToTicker(symbol: string): void {
     this.router.navigate(['/ticker', symbol]);
   }
 
-  formatRatio(value: number): string {
-    // Backend sentinel for debt-free interest coverage
-    if (value >= 998) {
-      return 'No debt';
-    }
-    if (Math.abs(value) >= 1000) {
-      return value.toFixed(0);
-    }
-    if (Math.abs(value) >= 100) {
-      return value.toFixed(1);
-    }
-    return value.toFixed(2);
+  private syncUrl(): void {
+    const params: Record<string, string | number | null> = {
+      sector: this.selectedSector() || null,
+      min: this.minScore() || null,
+      sort: this.sortBy() === 'score' ? null : this.sortBy(),
+      dir: this.sortDir() === 'desc' ? null : this.sortDir(),
+      page: this.currentPage() > 1 ? this.currentPage() : null,
+    };
+    this.router.navigate([], { relativeTo: this.route, queryParams: params, replaceUrl: true });
   }
 
-  private loadData(): void {
+  private loadData(sync: boolean): void {
     this.loading.set(true);
     const params: Record<string, string> = {};
     const sector = this.selectedSector();
-    if (sector) {
-      params['sector'] = sector;
-    }
+    if (sector) params['sector'] = sector;
 
     this.api.screener(params).subscribe({
       next: (items) => {
         this.items.set(items);
         this.loading.set(false);
-        this.loadQuotesForPage();
+        if (this.currentPage() > this.totalPages()) this.currentPage.set(1);
+        const sort = this.sortBy();
+        if (sort === 'price' || sort === 'change' || sort === 'mcap') this.loadAllQuotes();
+        else this.loadQuotesForPage();
+        if (sync) this.syncUrl();
       },
       error: () => {
         this.items.set([]);
@@ -806,26 +852,21 @@ export class ScreenerComponent implements OnInit {
     });
   }
 
-  formatPrice(price: number): string {
-    return '$' + price.toFixed(2);
-  }
-
-  formatMarketCap(cap: number): string {
-    if (cap >= 1_000_000_000) return '$' + (cap / 1_000_000_000).toFixed(1) + 'B';
-    if (cap >= 1_000_000) return '$' + (cap / 1_000_000).toFixed(0) + 'M';
-    return '$' + cap.toLocaleString();
-  }
-
   private loadQuotesForPage(): void {
-    const symbols = this.pagedItems().map(i => i.symbol);
+    const symbols = this.pagedItems().map(i => i.symbol).filter(s => !this.quotes()[s]);
+    this.fetchQuotes(symbols);
+  }
+
+  private loadAllQuotes(): void {
+    const symbols = this.items().map(i => i.symbol).filter(s => !this.quotes()[s]);
+    for (let i = 0; i < symbols.length; i += 60) this.fetchQuotes(symbols.slice(i, i + 60));
+  }
+
+  private fetchQuotes(symbols: string[]): void {
     if (!symbols.length) return;
-    this.quotesLoading.set(true);
     this.api.getQuotes(symbols).subscribe({
-      next: (q) => {
-        this.quotes.update(prev => ({ ...prev, ...q }));
-        this.quotesLoading.set(false);
-      },
-      error: () => this.quotesLoading.set(false),
+      next: (q) => this.quotes.update(prev => ({ ...prev, ...q })),
+      error: () => {},
     });
   }
 }
