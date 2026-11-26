@@ -477,3 +477,48 @@ func TestScoreCompany_WeightRedistributionMath(t *testing.T) {
 		t.Errorf("rating = %q, want %q", result.Rating, "strong_buy")
 	}
 }
+
+func TestScoreCompany_NegativeDebtToEquityIsPoor(t *testing.T) {
+	config := buildMiningConfig()
+	// Even with a floor clamp that would otherwise lift it to 0 (top band).
+	config.Ratios[1].MinClamp = fp(0)
+	financials := map[string]float64{
+		"pe_ratio":       10,
+		"debt_to_equity": -5.09,
+		"fcf_yield":      10,
+		"roe":            25,
+		"ev_ebitda":      3,
+	}
+	result, err := ScoreCompany(config, financials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, rr := range result.Breakdown.Ratios {
+		if rr.Key == "debt_to_equity" {
+			if rr.RangeBucket != "poor" || rr.Points != 1 {
+				t.Errorf("negative D/E: bucket %q points %d, want poor/1", rr.RangeBucket, rr.Points)
+			}
+			if rr.Value != -5.09 {
+				t.Errorf("negative D/E value = %v, want raw -5.09 kept for display", rr.Value)
+			}
+		}
+	}
+	// 4 strong ratios at 0.80 weight + poor at 0.20 = 4.2 -> 84
+	if got := result.CompositeScore; got < 83.99 || got > 84.01 {
+		t.Errorf("composite = %v, want 84", got)
+	}
+}
+
+func TestScoreCompany_ZeroDebtToEquityIsStrong(t *testing.T) {
+	result, err := ScoreCompany(buildMiningConfig(), map[string]float64{
+		"pe_ratio": 10, "debt_to_equity": 0, "fcf_yield": 10, "roe": 25, "ev_ebitda": 3,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, rr := range result.Breakdown.Ratios {
+		if rr.Key == "debt_to_equity" && rr.RangeBucket != "strong" {
+			t.Errorf("zero D/E bucket = %q, want strong", rr.RangeBucket)
+		}
+	}
+}

@@ -32,7 +32,8 @@ const DebtFreeInterestCoverage = 999.0
 //   - ctx_ev_ebitda = defaultKeyStatistics.enterpriseToEbitda
 //   - ctx_fcf_yield = (financialData.freeCashflow / price.marketCap) * 100
 //
-// Zero or missing values are omitted so the scoring engine's missing-data
+// Zero or missing values are omitted (except a reported zero debt, see
+// debt_to_equity) so the scoring engine's missing-data
 // handling can kick in.
 func NormalizeFinancials(data *QuoteSummaryResult, ts *TimeseriesFundamentals) map[string]float64 {
 	m := make(map[string]float64)
@@ -73,13 +74,16 @@ func NormalizeFinancials(data *QuoteSummaryResult, ts *TimeseriesFundamentals) m
 	// Debt-to-Equity (Yahoo %-style -> ratio)
 	// Primary: financialData.debtToEquity (Yahoo reports as %, so / 100)
 	// Fallback: totalDebt / (bookValue * sharesOutstanding)
-	if v := data.FinancialData.DebtToEquity.Raw; v != 0 {
-		m["debt_to_equity"] = v / 100
+	// Debt-free companies come back with debtToEquity empty but totalDebt
+	// explicitly 0, so a reported zero debt counts (D/E 0), unlike a missing one.
+	if v := data.FinancialData.DebtToEquity; v.Set {
+		m["debt_to_equity"] = v.Raw / 100
 	} else {
-		totalDebt := data.FinancialData.TotalDebt.Raw
+		debt := data.FinancialData.TotalDebt
+		totalDebt := debt.Raw
 		bookValue := data.DefaultKeyStatistics.BookValue.Raw
 		shares := data.DefaultKeyStatistics.SharesOutstanding.Raw
-		if totalDebt != 0 && bookValue != 0 && shares != 0 {
+		if debt.Set && bookValue != 0 && shares != 0 {
 			totalEquity := bookValue * shares
 			m["debt_to_equity"] = totalDebt / totalEquity
 		}
@@ -113,7 +117,8 @@ func NormalizeFinancials(data *QuoteSummaryResult, ts *TimeseriesFundamentals) m
 		// debt-free has no interest burden, so coverage is top band. A
 		// company that carries debt but reports no interest expense stays
 		// missing rather than being guessed at.
-		if de, ok := m["debt_to_equity"]; ok && de < DebtFreeDERatio {
+		// Negative D/E means negative equity, not low debt, so it never qualifies.
+		if de, ok := m["debt_to_equity"]; ok && de >= 0 && de < DebtFreeDERatio {
 			m["interest_coverage"] = DebtFreeInterestCoverage
 		}
 	}

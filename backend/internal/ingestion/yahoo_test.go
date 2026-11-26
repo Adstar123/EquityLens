@@ -1,6 +1,7 @@
 package ingestion
 
 import (
+	"encoding/json"
 	"context"
 	"math"
 	"net/http"
@@ -36,7 +37,7 @@ func TestNormalizeFinancials(t *testing.T) {
 		},
 		FinancialData: FinancialData{
 			FreeCashflow:  YahooValue{Raw: 8500000000},
-			DebtToEquity:  YahooValue{Raw: 42.5},
+			DebtToEquity:  YahooValue{Raw: 42.5, Set: true},
 			ProfitMargins: YahooValue{Raw: 0.15},
 			CurrentRatio:  YahooValue{Raw: 1.8},
 			QuickRatio:    YahooValue{Raw: 1.2},
@@ -127,7 +128,7 @@ func TestNormalizeFinancials_Timeseries(t *testing.T) {
 	// via the fundamentals-timeseries endpoint instead.
 	data := &QuoteSummaryResult{
 		FinancialData: FinancialData{
-			DebtToEquity: YahooValue{Raw: 42.5},
+			DebtToEquity: YahooValue{Raw: 42.5, Set: true},
 			TotalRevenue: YahooValue{Raw: 48000000000}, // overridden by ts revenue
 		},
 	}
@@ -153,7 +154,7 @@ func TestNormalizeFinancials_DebtFreeInterestCoverage(t *testing.T) {
 	// coverage is top band, not missing.
 	debtFree := &QuoteSummaryResult{
 		FinancialData: FinancialData{
-			DebtToEquity: YahooValue{Raw: 2}, // Yahoo %-style -> 0.02
+			DebtToEquity: YahooValue{Raw: 2, Set: true}, // Yahoo %-style -> 0.02
 		},
 	}
 	m := NormalizeFinancials(debtFree, &TimeseriesFundamentals{EBIT: 150000000})
@@ -164,7 +165,7 @@ func TestNormalizeFinancials_DebtFreeInterestCoverage(t *testing.T) {
 	// Carries debt (D/E 0.5) but no interest expense reported: stays missing.
 	indebted := &QuoteSummaryResult{
 		FinancialData: FinancialData{
-			DebtToEquity: YahooValue{Raw: 50},
+			DebtToEquity: YahooValue{Raw: 50, Set: true},
 		},
 	}
 	m = NormalizeFinancials(indebted, &TimeseriesFundamentals{EBIT: 150000000})
@@ -285,5 +286,68 @@ func TestFetchFinancials(t *testing.T) {
 	}
 	if de, ok := fin["debt_to_equity"]; !ok || !almostEqual(de, 0.425, 0.001) {
 		t.Errorf("debt_to_equity = %v, want 0.425", de)
+	}
+}
+
+func TestYahooValue_SetDistinguishesZeroFromEmpty(t *testing.T) {
+	var zero, empty YahooValue
+	if err := json.Unmarshal([]byte(`{"raw":0,"fmt":null,"longFmt":"0"}`), &zero); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal([]byte(`{}`), &empty); err != nil {
+		t.Fatal(err)
+	}
+	if !zero.Set || zero.Raw != 0 {
+		t.Errorf("reported zero: got %+v, want Set with Raw 0", zero)
+	}
+	if empty.Set {
+		t.Errorf("empty object: got %+v, want not Set", empty)
+	}
+}
+
+func TestNormalizeFinancials_ZeroDebt(t *testing.T) {
+	// Shape Yahoo returns for a debt-free company (e.g. AFI.AX): debtToEquity
+	// is {}, totalDebt is an explicit 0.
+	var data QuoteSummaryResult
+	raw := `{
+		"financialData": {"debtToEquity": {}, "totalDebt": {"raw": 0, "fmt": null}},
+		"defaultKeyStatistics": {"bookValue": {"raw": 6.665}, "sharesOutstanding": {"raw": 1227033856}}
+	}`
+	if err := json.Unmarshal([]byte(raw), &data); err != nil {
+		t.Fatal(err)
+	}
+	m := NormalizeFinancials(&data, &TimeseriesFundamentals{EBIT: 1000000})
+	if got, ok := m["debt_to_equity"]; !ok || got != 0 {
+		t.Errorf("debt_to_equity = %v (present %v), want 0", got, ok)
+	}
+	if got := m["interest_coverage"]; got != DebtFreeInterestCoverage {
+		t.Errorf("interest_coverage = %v, want debt-free sentinel %v", got, DebtFreeInterestCoverage)
+	}
+
+	// totalDebt absent entirely: debt is unknown, so both stay missing.
+	var unknown QuoteSummaryResult
+	_ = json.Unmarshal([]byte(`{"financialData": {"debtToEquity": {}, "totalDebt": {}},
+		"defaultKeyStatistics": {"bookValue": {"raw": 6.665}, "sharesOutstanding": {"raw": 1227033856}}}`), &unknown)
+	m = NormalizeFinancials(&unknown, &TimeseriesFundamentals{EBIT: 1000000})
+	if _, ok := m["debt_to_equity"]; ok {
+		t.Error("debt_to_equity should be missing when totalDebt is not reported")
+	}
+	if _, ok := m["interest_coverage"]; ok {
+		t.Error("interest_coverage should be missing when debt is unknown")
+	}
+}
+
+func TestNormalizeFinancials_NegativeEquityNotDebtFree(t *testing.T) {
+	// VGN.AX shape: real debt, negative book value -> negative D/E. Must not
+	// be mistaken for "debt-free" when interest expense is missing.
+	var data QuoteSummaryResult
+	_ = json.Unmarshal([]byte(`{"financialData": {"debtToEquity": {}, "totalDebt": {"raw": 2997600000}},
+		"defaultKeyStatistics": {"bookValue": {"raw": -0.295}, "sharesOutstanding": {"raw": 784231845}}}`), &data)
+	m := NormalizeFinancials(&data, &TimeseriesFundamentals{EBIT: 1000000})
+	if de := m["debt_to_equity"]; de >= 0 {
+		t.Errorf("debt_to_equity = %v, want negative", de)
+	}
+	if _, ok := m["interest_coverage"]; ok {
+		t.Error("negative equity must not earn the debt-free interest coverage sentinel")
 	}
 }

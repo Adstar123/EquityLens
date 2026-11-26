@@ -62,6 +62,9 @@ type CompanyProfile struct {
 // so we use a custom unmarshaler to handle both.
 type YahooValue struct {
 	Raw float64
+	// Set is true when Yahoo sent a real number, so a reported zero (e.g.
+	// totalDebt: 0 for a debt-free company) can be told apart from an empty {}.
+	Set bool
 }
 
 func (v *YahooValue) UnmarshalJSON(data []byte) error {
@@ -82,6 +85,7 @@ func (v *YahooValue) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 	v.Raw = f
+	v.Set = true
 	return nil
 }
 

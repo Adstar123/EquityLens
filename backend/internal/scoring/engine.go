@@ -35,6 +35,14 @@ func ScoreCompany(config models.SectorConfig, financials map[string]float64) (*S
 			continue
 		}
 
+		// Negative debt to equity only happens when shareholder equity is
+		// negative, which is balance-sheet distress, not low gearing. Score it
+		// as poor before any clamp can lift it into the top band.
+		if rc.Key == "debt_to_equity" && value < 0 {
+			results = append(results, scored{ratioConfig: rc, value: value, bucket: "poor", points: 1})
+			continue
+		}
+
 		// Clamp outliers if bounds are configured.
 		if rc.MinClamp != nil && value < *rc.MinClamp {
 			value = *rc.MinClamp
