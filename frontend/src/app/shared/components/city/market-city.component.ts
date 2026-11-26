@@ -664,27 +664,41 @@ export class MarketCityComponent implements AfterViewInit, OnDestroy {
     const labels = this.labelsRef?.nativeElement;
     if (!scene || !labels) return;
     this.stageRef?.nativeElement.classList.toggle('is-settled', !scene.introRunning);
-    // Place every label, then nudge any that would overlap one already
-    // placed: down for labels under the front street, up for the rest
-    const placed: { x: number; y: number; w: number; h: number }[] = [];
+    // Place every label, slide neighbours on the same street sideways so
+    // they stay on their line, and only stack vertically as a last resort
+    const GAP = 6;
+    const stageW = this.stageRef?.nativeElement.clientWidth ?? 0;
     const items = [...labels.querySelectorAll<HTMLElement>('.d-label')]
       .map(el => ({ el, p: scene.projectDistrict(Number(el.dataset['d'])) }))
       .filter((it): it is { el: HTMLElement; p: { x: number; y: number; below: boolean } } => !!it.p)
-      .sort((a, b) => a.p.x - b.p.x);
-    for (const { el, p } of items) {
-      const w = el.offsetWidth;
-      const h = el.offsetHeight;
-      const maxX = (this.stageRef?.nativeElement.clientWidth ?? 0) - w - 4;
-      const x = Math.max(4, Math.min(maxX, p.x - w / 2));
-      let y = p.below ? p.y + 4 : p.y - h;
-      const step = (h + 4) * (p.below ? 1 : -1);
-      for (let guard = 0; guard < 4; guard++) {
-        const hit = placed.some(r => x < r.x + r.w + 4 && x + w + 4 > r.x && y < r.y + r.h && y + h > r.y);
-        if (!hit) break;
-        y += step;
+      .map(({ el, p }) => {
+        const w = el.offsetWidth;
+        const h = el.offsetHeight;
+        return { el, below: p.below, w, h, x: p.x - w / 2, y: p.below ? p.y + 4 : p.y - h };
+      })
+      .sort((a, b) => a.x - b.x);
+    const clash = (a: typeof items[0], b: typeof items[0]) =>
+      a.x < b.x + b.w + GAP && a.x + a.w + GAP > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+    for (const below of [true, false]) {
+      const row = items.filter(it => it.below === below);
+      // Push right past any overlap, then pull back inside the right edge
+      for (let i = 1; i < row.length; i++) {
+        const prev = row[i - 1];
+        if (clash(row[i], prev)) row[i].x = prev.x + prev.w + GAP;
       }
-      placed.push({ x, y, w, h });
-      el.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+      const last = row[row.length - 1];
+      if (last) last.x = Math.min(last.x, stageW - 4 - last.w);
+      for (let i = row.length - 2; i >= 0; i--) {
+        if (clash(row[i], row[i + 1])) row[i].x = Math.min(row[i].x, stageW - 4 - row[i].w, row[i + 1].x - GAP - row[i].w);
+      }
+      for (const it of row) it.x = Math.max(4, it.x);
+    }
+    const placed: typeof items = [];
+    for (const it of items) {
+      const step = (it.h + 4) * (it.below ? 1 : -1);
+      for (let guard = 0; guard < 4 && placed.some(r => clash(it, r)); guard++) it.y += step;
+      placed.push(it);
+      it.el.style.transform = `translate(${Math.round(it.x)}px, ${Math.round(it.y)}px)`;
     }
     if (this.activeIndex() >= 0) this.placeCard(this.activeIndex(), false);
   }
