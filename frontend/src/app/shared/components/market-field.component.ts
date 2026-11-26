@@ -7,33 +7,26 @@ import {
   OnDestroy,
   ViewChild,
   computed,
-  effect,
   inject,
   input,
   signal,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { ScreenerItem } from '../../core/api.service';
-import {
-  bandVar,
-  ratingBand,
-  ratingLabel,
-  ratingLevel,
-  shortName,
-  shortSymbol,
-} from '../../core/bands';
+import { bandVar, ratingBand, ratingLabel, shortName } from '../../core/bands';
 import { BandMeterComponent } from './band-meter.component';
 
 interface FieldCell {
   symbol: string;
-  short: string;
   name: string;
   sector: string;
   score: number;
   rating: string;
   colour: string;
-  level: number;
   index: number;
+  row: number;
+  rank: number;
+  of: number;
 }
 
 interface FieldRow {
@@ -43,91 +36,71 @@ interface FieldRow {
   cells: FieldCell[];
 }
 
-interface CellBox {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
 const SKELETON_COUNTS = [66, 61, 30, 27, 24, 22, 19, 17, 14, 10, 7];
+const CARD_WIDTH = 232;
 
-// The whole market under one lens. Every company is a tile in its sector's
-// row, coloured by band and sorted strongest first. A loupe follows the
-// pointer (or arrow keys) and magnifies the tiles into readable tickers.
+// The whole market at a glance. Every company is a tile in its sector's row,
+// coloured by band and sorted strongest first. Pointing at a tile brings its
+// sector into focus (the rest of the field dims) and opens a small card
+// above the tile; the readout underneath keeps the last company you looked at.
 //
-// The lens moves with direct transforms outside Angular so tracking the
-// pointer never runs change detection; only the focused company does.
+// Card placement is written straight to the DOM outside Angular so moving
+// across tiles never re-renders the field.
 @Component({
   selector: 'app-market-field',
   standalone: true,
   imports: [RouterLink, BandMeterComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="field" [class.is-grouped]="grouped()" [class.is-ready]="ready()">
+    <div class="field" [class.is-ready]="ready()">
       <div
         class="stage"
         #stage
+        [class.has-active]="active() !== null"
         [attr.tabindex]="ready() ? 0 : -1"
         role="application"
         [attr.aria-label]="ariaLabel()"
         (keydown)="onKey($event)"
+        (blur)="clearActive()"
       >
         @for (row of displayRows(); track row.key; let r = $index) {
-          <div class="row" [style.--r]="r">
-            @if (grouped()) {
-              @if (row.key && !row.key.startsWith('sk')) {
-                <a class="row-label" [routerLink]="['/sector', row.key]">
-                  <span class="row-name">{{ row.name }}</span>
-                  <span class="row-count">{{ row.cells.length }}</span>
-                </a>
-              } @else {
-                <span class="row-label is-skeleton"><span class="sk-bar"></span></span>
-              }
+          <div class="row" [class.is-active-row]="active()?.row === r">
+            @if (row.key && !row.key.startsWith('sk')) {
+              <a class="row-label" [routerLink]="['/sector', row.key]">
+                <span class="row-name">{{ row.name }}</span>
+                <span class="row-count">{{ row.cells.length }}</span>
+              </a>
+            } @else {
+              <span class="row-label"><span class="sk-bar"></span></span>
             }
             <div class="cells">
               @for (cell of row.cells; track cell.symbol; let c = $index) {
                 <span
                   class="cell"
-                  [class.is-focus]="cell.index === focusIndex()"
+                  [attr.data-i]="cell.index"
+                  [class.is-hot]="cell.index === active()?.index"
                   [style.--c]="cell.colour"
                   [style.--d]="(r * 50 + c * 6) + 'ms'"
                 ></span>
               }
             </div>
-            @if (grouped()) {
-              <span class="row-avg">{{ row.cells.length && ready() ? row.avg : '' }}</span>
-            }
+            <span class="row-avg">{{ row.cells.length && ready() ? row.avg : '' }}</span>
           </div>
         }
 
-        <div class="lens" #lens [class.is-hidden]="!ready() || (touch && !touched())" aria-hidden="true">
-          <div class="lens-clip">
-          <div class="lens-view" #lensView>
-            @for (cell of cells(); track cell.symbol) {
-              @if (boxes()[cell.index]; as b) {
-                <span
-                  class="lcell"
-                  [class.is-focus]="cell.index === focusIndex()"
-                  [style.left.px]="b.x * zoom"
-                  [style.top.px]="b.y * zoom"
-                  [style.width.px]="b.w * zoom"
-                  [style.height.px]="b.h * zoom"
-                  [style.--c]="cell.colour"
-                >
-                  <b>{{ cell.short }}</b>
-                  <i>{{ cell.score }}</i>
-                </span>
-              }
-            }
-          </div>
-          </div>
-          <svg class="reticle" viewBox="0 0 200 200">
-            <circle cx="100" cy="100" r="99" />
-            @for (t of ticks; track t) {
-              <line x1="100" y1="1" x2="100" [attr.y2]="t % 90 === 0 ? 11 : 6" [attr.transform]="'rotate(' + t + ' 100 100)'" />
-            }
-          </svg>
+        <div class="card" #card [class.is-on]="active() !== null" aria-hidden="true">
+          @if (active() ?? focused(); as a) {
+            <div class="card-top">
+              <span class="card-sym">{{ a.symbol }}</span>
+              <span class="card-rank">Rank {{ a.rank }} of {{ a.of }}</span>
+            </div>
+            <div class="card-name">{{ a.name }}</div>
+            <div class="card-score">
+              <span class="card-num">{{ a.score }}</span>
+              <app-band-meter [band]="bandOf(a)" size="md" />
+              <span class="card-label">{{ labelOf(a) }}</span>
+            </div>
+          }
         </div>
       </div>
 
@@ -136,9 +109,7 @@ const SKELETON_COUNTS = [66, 61, 30, 27, 24, 22, 19, 17, 14, 10, 7];
           <div class="ro-main">
             <span class="ro-sym">{{ f.symbol }}</span>
             <span class="ro-name">{{ f.name }}</span>
-            @if (grouped()) {
-              <span class="ro-sector">{{ f.sector }}</span>
-            }
+            <span class="ro-sector">{{ f.sector }}</span>
           </div>
           <div class="ro-score">
             <span class="ro-num">{{ f.score }}</span>
@@ -175,13 +146,9 @@ const SKELETON_COUNTS = [66, 61, 30, 27, 24, 22, 19, 17, 14, 10, 7];
 
     .row {
       display: grid;
-      grid-template-columns: 1fr;
-      align-items: center;
-    }
-
-    .is-grouped .row {
       grid-template-columns: 156px minmax(0, 1fr) 36px;
       column-gap: 16px;
+      align-items: center;
     }
 
     .row-label {
@@ -193,10 +160,10 @@ const SKELETON_COUNTS = [66, 61, 30, 27, 24, 22, 19, 17, 14, 10, 7];
       font-size: 13px;
       color: var(--text-secondary);
       text-decoration: none;
-      transition: color var(--dur-fast) var(--ease);
+      transition: color var(--dur-fast) var(--ease), opacity var(--dur) var(--ease);
     }
 
-    .row-label:hover {
+    a.row-label:hover {
       color: var(--text-primary);
     }
 
@@ -217,6 +184,7 @@ const SKELETON_COUNTS = [66, 61, 30, 27, 24, 22, 19, 17, 14, 10, 7];
       font-size: 12px;
       color: var(--text-secondary);
       text-align: right;
+      transition: color var(--dur-fast) var(--ease), opacity var(--dur) var(--ease);
     }
 
     .sk-bar {
@@ -233,130 +201,136 @@ const SKELETON_COUNTS = [66, 61, 30, 27, 24, 22, 19, 17, 14, 10, 7];
       gap: 2px;
     }
 
-    .is-ready .cells {
-      cursor: none;
-    }
-
     .cell {
+      position: relative;
       width: 12px;
       height: 12px;
       border-radius: 2px;
       background: var(--band-off);
+      transition: opacity var(--dur) var(--ease), transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
     }
 
     .is-ready .cell {
       background: var(--c);
+      cursor: pointer;
       animation: cellIn 420ms var(--ease) both;
       animation-delay: var(--d);
-    }
-
-    .is-ready .cell.is-focus {
-      box-shadow: 0 0 0 1.5px var(--bg-surface), 0 0 0 3px var(--text-primary);
     }
 
     @keyframes cellIn {
       from { opacity: 0; transform: scale(0.4); }
     }
 
-    // ── Lens ──
-    .lens {
+    // Focus: the active sector stays lit, everything else steps back
+    .has-active .row:not(.is-active-row) .cell {
+      opacity: 0.28;
+    }
+
+    .has-active .row:not(.is-active-row) .row-label,
+    .has-active .row:not(.is-active-row) .row-avg {
+      opacity: 0.45;
+    }
+
+    .is-active-row .row-label,
+    .is-active-row .row-avg {
+      color: var(--text-primary);
+    }
+
+    .cell.is-hot {
+      z-index: 2;
+      transform: scale(1.5);
+      box-shadow: 0 0 0 1px var(--bg-surface), 0 0 0 2px var(--text-primary);
+    }
+
+    // ── Hover card ──
+    .card {
       position: absolute;
       left: 0;
       top: 0;
-      width: 168px;
-      height: 168px;
-      margin: -84px 0 0 -84px;
-      border-radius: 50%;
-      pointer-events: none;
       z-index: 5;
-      will-change: transform;
-      transition: opacity var(--dur) var(--ease);
-    }
-
-    .lens.is-hidden {
+      width: ${CARD_WIDTH}px;
+      box-sizing: border-box;
+      padding: 12px 14px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-strong);
+      border-radius: 12px;
+      box-shadow: var(--shadow-pop);
+      pointer-events: none;
       opacity: 0;
+      will-change: transform;
+      transition: opacity var(--dur-fast) var(--ease);
     }
 
-    .lens.glide,
-    .lens.glide .lens-view {
-      transition: transform 420ms var(--ease), opacity var(--dur) var(--ease);
+    .card.is-on {
+      opacity: 1;
     }
 
-    .lens::before {
+    // Pointer down to the tile, following it when the card is clamped
+    .card::after {
       content: '';
       position: absolute;
-      inset: 0;
-      border-radius: 50%;
-      background: var(--bg-deep);
-      box-shadow: var(--shadow-pop);
+      left: var(--ax, 50%);
+      bottom: -6px;
+      width: 10px;
+      height: 10px;
+      margin-left: -5px;
+      background: var(--bg-elevated);
+      border-right: 1px solid var(--border-strong);
+      border-bottom: 1px solid var(--border-strong);
+      transform: rotate(45deg);
     }
 
-    .lens-clip {
-      position: absolute;
-      inset: 0;
-      border-radius: 50%;
-      overflow: hidden;
-      clip-path: circle(50%);
+    .card.is-moving {
+      transition: opacity var(--dur-fast) var(--ease), transform 120ms var(--ease);
     }
 
-    .lens-view {
-      position: absolute;
-      left: 0;
-      top: 0;
-      will-change: transform;
-    }
-
-    .lcell {
-      position: absolute;
-      box-sizing: border-box;
+    .card-top {
       display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 1px;
-      border-radius: 6px;
-      background: var(--c);
-      color: var(--on-accent);
-      line-height: 1;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
     }
 
-    .lcell b {
+    .card-sym {
       font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
       font-weight: 500;
-      font-size: 10px;
-      letter-spacing: 0;
+      color: var(--accent-ink);
     }
 
-    .lcell i {
+    .card-rank {
       font-family: 'JetBrains Mono', monospace;
-      font-style: normal;
-      font-size: 9px;
-      opacity: 0.72;
+      font-size: 11px;
+      color: var(--text-muted);
     }
 
-    .lcell.is-focus {
-      outline: 2px solid var(--text-primary);
-      outline-offset: 2px;
+    .card-name {
+      margin: 4px 0 10px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-primary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
-    .reticle {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      overflow: visible;
+    .card-score {
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
 
-    .reticle circle {
-      fill: none;
-      stroke: var(--accent);
-      stroke-width: 1.5;
+    .card-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 18px;
+      font-weight: 500;
+      line-height: 1;
+      color: var(--text-primary);
     }
 
-    .reticle line {
-      stroke: var(--accent);
-      stroke-width: 1.5;
-      stroke-linecap: round;
+    .card-label {
+      font-size: 12px;
+      color: var(--text-secondary);
     }
 
     // ── Readout ──
@@ -366,7 +340,7 @@ const SKELETON_COUNTS = [66, 61, 30, 27, 24, 22, 19, 17, 14, 10, 7];
       gap: 24px;
       min-height: 56px;
       margin-top: 24px;
-      padding: 0 16px 0 20px;
+      padding: 0 12px 0 20px;
       border: 1px solid var(--border);
       border-radius: 12px;
       background: var(--bg-base);
@@ -427,21 +401,24 @@ const SKELETON_COUNTS = [66, 61, 30, 27, 24, 22, 19, 17, 14, 10, 7];
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      height: 32px;
-      padding: 0 12px;
+      height: 36px;
+      padding: 0 14px;
       border-radius: var(--radius);
       font-size: 13px;
       font-weight: 500;
-      color: var(--text-primary);
+      color: var(--on-accent);
       text-decoration: none;
-      background: var(--bg-hover);
+      background: var(--accent);
       white-space: nowrap;
-      transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+      transition: background-color var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
     }
 
     .ro-link:hover {
-      background: var(--accent);
-      color: var(--on-accent);
+      background: var(--accent-light);
+    }
+
+    .ro-link:active {
+      transform: scale(0.98);
     }
 
     .ro-wait {
@@ -450,8 +427,8 @@ const SKELETON_COUNTS = [66, 61, 30, 27, 24, 22, 19, 17, 14, 10, 7];
     }
 
     @media (max-width: 1100px) {
-      .is-grouped .row {
-        grid-template-columns: 148px minmax(0, 1fr) 32px;
+      .row {
+        grid-template-columns: 140px minmax(0, 1fr) 32px;
         column-gap: 12px;
       }
     }
@@ -461,12 +438,12 @@ const SKELETON_COUNTS = [66, 61, 30, 27, 24, 22, 19, 17, 14, 10, 7];
         row-gap: 12px;
       }
 
-      .is-grouped .row {
+      .row {
         grid-template-columns: minmax(0, 1fr) auto;
         row-gap: 6px;
       }
 
-      .is-grouped .cells {
+      .cells {
         grid-column: 1 / -1;
         grid-row: 2;
       }
@@ -480,16 +457,10 @@ const SKELETON_COUNTS = [66, 61, 30, 27, 24, 22, 19, 17, 14, 10, 7];
         height: 10px;
       }
 
-      .lens {
-        width: 128px;
-        height: 128px;
-        margin: -64px 0 0 -64px;
-      }
-
       .readout {
         flex-wrap: wrap;
         gap: 8px 16px;
-        padding: 12px 16px;
+        padding: 12px 12px 12px 16px;
       }
 
       .ro-main {
@@ -511,22 +482,15 @@ export class MarketFieldComponent implements AfterViewInit, OnDestroy {
   private router = inject(Router);
 
   items = input<ScreenerItem[] | null>(null);
-  grouped = input(true);
   featured = input<string | null>(null);
 
   @ViewChild('stage') stageRef!: ElementRef<HTMLElement>;
-  @ViewChild('lens') lensRef!: ElementRef<HTMLElement>;
-  @ViewChild('lensView') lensViewRef!: ElementRef<HTMLElement>;
+  @ViewChild('card') cardRef!: ElementRef<HTMLElement>;
 
-  readonly zoom = 2.75;
-  readonly ticks = Array.from({ length: 24 }, (_, i) => i * 15);
-
-  boxes = signal<CellBox[]>([]);
-  focusIndex = signal(-1);
-  // On touch screens the lens waits for a first tap instead of covering
-  // the field before anyone has touched it
-  touched = signal(false);
-  readonly touch = window.matchMedia('(pointer: coarse)').matches;
+  /** Tile under the pointer or keyboard focus; drives the card and dimming */
+  activeIndex = signal(-1);
+  /** Last company looked at; drives the readout */
+  private lastIndex = signal(-1);
 
   ready = computed(() => (this.items()?.length ?? 0) > 0);
 
@@ -536,9 +500,8 @@ export class MarketFieldComponent implements AfterViewInit, OnDestroy {
 
     const groups = new Map<string, { name: string; list: ScreenerItem[] }>();
     for (const item of items) {
-      const key = this.grouped() ? item.sector_key : 'all';
-      if (!groups.has(key)) groups.set(key, { name: item.sector_name, list: [] });
-      groups.get(key)!.list.push(item);
+      if (!groups.has(item.sector_key)) groups.set(item.sector_key, { name: item.sector_name, list: [] });
+      groups.get(item.sector_key)!.list.push(item);
     }
 
     const rows: FieldRow[] = [...groups.entries()].map(([key, g]) => {
@@ -548,23 +511,27 @@ export class MarketFieldComponent implements AfterViewInit, OnDestroy {
         key,
         name: g.name,
         avg,
-        cells: sorted.map(i => ({
+        cells: sorted.map((i, c) => ({
           symbol: i.symbol,
-          short: shortSymbol(i.symbol),
           name: shortName(i.company_name),
           sector: i.sector_name,
           score: Math.round(i.composite_score),
           rating: i.rating,
           colour: bandVar(ratingBand(i.rating)),
-          level: ratingLevel(i.rating),
           index: 0,
+          row: 0,
+          rank: c + 1,
+          of: sorted.length,
         })),
       };
     });
 
     rows.sort((a, b) => b.avg - a.avg);
     let index = 0;
-    for (const row of rows) for (const cell of row.cells) cell.index = index++;
+    rows.forEach((row, r) => row.cells.forEach(cell => {
+      cell.index = index++;
+      cell.row = r;
+    }));
     return rows;
   });
 
@@ -572,44 +539,41 @@ export class MarketFieldComponent implements AfterViewInit, OnDestroy {
   displayRows = computed<FieldRow[]>(() => {
     const rows = this.rows();
     if (rows.length) return rows;
-    const counts = this.grouped() ? SKELETON_COUNTS : [48];
-    return counts.map((n, r) => ({
+    return SKELETON_COUNTS.map((n, r) => ({
       key: 'sk' + r,
       name: '',
       avg: 0,
       cells: Array.from({ length: n }, (_, c) => ({
-        symbol: `sk-${r}-${c}`, short: '', name: '', sector: '', score: 0,
-        rating: '', colour: '', level: 0, index: -1,
+        symbol: `sk-${r}-${c}`, name: '', sector: '', score: 0, rating: '',
+        colour: '', index: -1, row: r, rank: 0, of: 0,
       })),
     }));
   });
 
   cells = computed(() => this.rows().flatMap(r => r.cells));
 
-  focused = computed(() => {
-    const i = this.focusIndex();
+  active = computed(() => {
+    const i = this.activeIndex();
     return i >= 0 ? this.cells()[i] ?? null : null;
+  });
+
+  focused = computed(() => {
+    const cells = this.cells();
+    if (!cells.length) return null;
+    const last = this.lastIndex();
+    if (last >= 0 && cells[last]) return cells[last];
+    const featured = this.featured();
+    return cells.find(c => c.symbol === featured) ?? cells[0];
   });
 
   ariaLabel = computed(() =>
     `${this.cells().length} companies, one tile each, coloured by score band. ` +
-    'Use the arrow keys to move the lens and Enter to open a company.',
+    'Use the arrow keys to move between companies and Enter to open one.',
   );
 
-  private resizeObserver: ResizeObserver | null = null;
   private cleanup: (() => void)[] = [];
-  private frame = 0;
   private pointerType = 'mouse';
-  private focusedSymbol: string | null = null;
-  private bounds = { minX: 0, maxX: 0, minY: 0, maxY: 0 };
-
-  constructor() {
-    // Re-measure once the real tiles have rendered
-    effect(() => {
-      this.rows();
-      queueMicrotask(() => requestAnimationFrame(() => this.measure(true)));
-    });
-  }
+  private shown = false;
 
   bandOf(cell: FieldCell) {
     return ratingBand(cell.rating);
@@ -622,64 +586,94 @@ export class MarketFieldComponent implements AfterViewInit, OnDestroy {
   ngAfterViewInit(): void {
     const stage = this.stageRef.nativeElement;
     this.zone.runOutsideAngular(() => {
+      const indexOf = (target: EventTarget | null) => {
+        const el = (target as HTMLElement | null)?.closest<HTMLElement>('.cell[data-i]');
+        return el ? Number(el.dataset['i']) : -1;
+      };
+
       const onMove = (e: PointerEvent) => {
         this.pointerType = e.pointerType;
         if (e.pointerType !== 'mouse' || !this.ready()) return;
-        const rect = stage.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        cancelAnimationFrame(this.frame);
-        this.frame = requestAnimationFrame(() => this.moveLens(x, y));
+        const i = indexOf(e.target);
+        if (i >= 0) {
+          this.activate(i);
+          return;
+        }
+        // Not on a tile. Crossing the 2px gap beside the current tile keeps
+        // it, so the card doesn't flicker; anywhere else (labels, averages,
+        // the empty end of a short row) means nothing is pointed at.
+        const hot = this.activeIndex() >= 0
+          ? stage.querySelector<HTMLElement>(`.cell[data-i="${this.activeIndex()}"]`)
+          : null;
+        if (hot) {
+          const r = hot.getBoundingClientRect();
+          const pad = 3;
+          if (e.clientX >= r.left - pad && e.clientX <= r.right + pad &&
+              e.clientY >= r.top - pad && e.clientY <= r.bottom + pad) return;
+        }
+        this.clearActive();
       };
+      const onLeave = () => this.clearActive();
       const onDown = (e: PointerEvent) => {
         this.pointerType = e.pointerType;
       };
       const onClick = (e: MouseEvent) => {
-        if (!this.ready()) return;
-        if ((e.target as HTMLElement).closest('a')) return;
+        const i = indexOf(e.target);
+        if (i < 0) return;
+        const cell = this.cells()[i];
+        if (!cell) return;
         if (this.pointerType === 'mouse') {
-          const f = this.focused();
-          if (f) this.zone.run(() => this.router.navigate(['/ticker', f.symbol]));
-          return;
+          this.zone.run(() => this.router.navigate(['/ticker', cell.symbol]));
+        } else {
+          // Touch: a tap shows the card; the readout button opens it
+          this.activate(i);
         }
-        // Touch and pen: a tap moves the lens; the readout link opens it
-        if (!this.touched()) this.zone.run(() => this.touched.set(true));
-        const rect = stage.getBoundingClientRect();
-        this.glideTo(e.clientX - rect.left, e.clientY - rect.top);
       };
+
       stage.addEventListener('pointermove', onMove, { passive: true });
+      stage.addEventListener('pointerleave', onLeave);
       stage.addEventListener('pointerdown', onDown, { passive: true });
       stage.addEventListener('click', onClick);
+      // A tap anywhere else dismisses the card on touch screens
+      const onDocDown = (e: PointerEvent) => {
+        if (!stage.contains(e.target as Node)) this.clearActive();
+      };
+      document.addEventListener('pointerdown', onDocDown, { passive: true });
+      this.cleanup.push(() => document.removeEventListener('pointerdown', onDocDown));
       this.cleanup.push(() => {
         stage.removeEventListener('pointermove', onMove);
+        stage.removeEventListener('pointerleave', onLeave);
         stage.removeEventListener('pointerdown', onDown);
         stage.removeEventListener('click', onClick);
       });
-
-      this.resizeObserver = new ResizeObserver(() => this.measure(false));
-      this.resizeObserver.observe(stage);
     });
   }
 
   ngOnDestroy(): void {
     this.cleanup.forEach(fn => fn());
-    this.resizeObserver?.disconnect();
-    cancelAnimationFrame(this.frame);
   }
 
   onKey(event: KeyboardEvent): void {
     const rows = this.rows();
     if (!rows.length) return;
-    const current = this.focused();
-    let r = 0;
-    let c = 0;
-    if (current) {
-      r = rows.findIndex(row => row.cells.some(cell => cell.index === current.index));
-      c = rows[r].cells.findIndex(cell => cell.index === current.index);
+    const current = this.active() ?? this.focused();
+    if (!current) return;
+
+    if (event.key === 'Enter') {
+      this.router.navigate(['/ticker', current.symbol]);
+      return;
+    }
+    if (event.key === 'Escape') {
+      this.clearActive();
+      return;
     }
 
-    if (event.key === 'Enter' && current) {
-      this.router.navigate(['/ticker', current.symbol]);
+    let r = current.row;
+    let c = current.rank - 1;
+    // The first arrow press just shows the current company
+    if (this.activeIndex() < 0 && event.key.startsWith('Arrow')) {
+      event.preventDefault();
+      this.activate(current.index);
       return;
     }
     if (event.key === 'ArrowRight') c++;
@@ -691,105 +685,42 @@ export class MarketFieldComponent implements AfterViewInit, OnDestroy {
     event.preventDefault();
     r = Math.max(0, Math.min(rows.length - 1, r));
     c = Math.max(0, Math.min(rows[r].cells.length - 1, c));
-    this.glideToCell(rows[r].cells[c].index);
+    this.activate(rows[r].cells[c].index);
   }
 
-  // ── Geometry ──
+  clearActive(): void {
+    if (this.activeIndex() < 0) return;
+    this.shown = false;
+    this.zone.run(() => this.activeIndex.set(-1));
+  }
 
-  private measure(park: boolean): void {
-    if (!this.stageRef || !this.ready()) return;
-    const stage = this.stageRef.nativeElement;
-    const origin = stage.getBoundingClientRect();
-    const els = stage.querySelectorAll<HTMLElement>('.cells .cell');
-    const boxes: CellBox[] = [];
-    els.forEach((el) => {
-      const r = el.getBoundingClientRect();
-      boxes.push({ x: r.left - origin.left, y: r.top - origin.top, w: r.width, h: r.height });
+  private activate(index: number): void {
+    if (index === this.activeIndex()) return;
+    this.zone.run(() => {
+      this.activeIndex.set(index);
+      this.lastIndex.set(index);
     });
-    // Tiles animate in from a smaller scale; measure their resting size
-    const size = parseFloat(getComputedStyle(els[0] ?? stage).width) || 12;
-    for (const b of boxes) {
-      const cx = b.x + b.w / 2;
-      const cy = b.y + b.h / 2;
-      b.x = cx - size / 2;
-      b.y = cy - size / 2;
-      b.w = size;
-      b.h = size;
-    }
-    this.bounds = {
-      minX: Math.min(...boxes.map(b => b.x)),
-      maxX: Math.max(...boxes.map(b => b.x + b.w)),
-      minY: Math.min(...boxes.map(b => b.y)),
-      maxY: Math.max(...boxes.map(b => b.y + b.h)),
-    };
-    this.zone.run(() => this.boxes.set(boxes));
-
-    // Stay on the company already in focus (live data can replace the
-    // snapshot underneath the lens); otherwise park on the featured one
-    const cells = this.cells();
-    let idx = this.focusedSymbol ? cells.findIndex(c => c.symbol === this.focusedSymbol) : -1;
-    if (idx < 0 && park) {
-      const featured = this.featured();
-      idx = featured ? cells.findIndex(c => c.symbol === featured) : -1;
-      if (idx < 0) idx = Math.min(3, cells.length - 1);
-    }
-    if (idx >= 0) {
-      const target = idx;
-      requestAnimationFrame(() => this.glideToCell(target, false));
-    }
+    this.placeCard(index);
   }
 
-  private moveLens(x: number, y: number): void {
-    const boxes = this.boxes();
-    if (!boxes.length) return;
-    const { minX, maxX, minY, maxY } = this.bounds;
-    x = Math.max(minX, Math.min(maxX, x));
-    y = Math.max(minY, Math.min(maxY, y));
-    this.place(x, y);
+  // Centre the card above the tile, kept inside the field. It glides between
+  // tiles once visible, but appears in place the first time.
+  private placeCard(index: number): void {
+    const stage = this.stageRef.nativeElement;
+    const card = this.cardRef.nativeElement;
+    const tile = stage.querySelector<HTMLElement>(`.cell[data-i="${index}"]`);
+    if (!tile) return;
 
-    // Nearest tile becomes the focus
-    let best = -1;
-    let bestD = Infinity;
-    for (let i = 0; i < boxes.length; i++) {
-      const b = boxes[i];
-      const dx = b.x + b.w / 2 - x;
-      const dy = b.y + b.h / 2 - y;
-      const d = dx * dx + dy * dy;
-      if (d < bestD) {
-        bestD = d;
-        best = i;
-      }
-    }
-    if (best !== this.focusIndex()) this.setFocus(best);
-  }
+    const s = stage.getBoundingClientRect();
+    const t = tile.getBoundingClientRect();
+    const cardHeight = card.offsetHeight || 88;
+    const x = Math.max(0, Math.min(s.width - CARD_WIDTH, t.left - s.left + t.width / 2 - CARD_WIDTH / 2));
+    const y = t.top - s.top - cardHeight - 12;
 
-  private glideTo(x: number, y: number): void {
-    const lens = this.lensRef.nativeElement;
-    lens.classList.add('glide');
-    this.moveLens(x, y);
-    setTimeout(() => lens.classList.remove('glide'), 440);
-  }
-
-  private glideToCell(index: number, animate = true): void {
-    const b = this.boxes()[index];
-    if (!b) return;
-    const lens = this.lensRef.nativeElement;
-    if (animate) lens.classList.add('glide');
-    this.place(b.x + b.w / 2, b.y + b.h / 2);
-    this.setFocus(index);
-    if (animate) setTimeout(() => lens.classList.remove('glide'), 440);
-  }
-
-  private setFocus(index: number): void {
-    this.focusedSymbol = this.cells()[index]?.symbol ?? null;
-    this.zone.run(() => this.focusIndex.set(index));
-  }
-
-  private place(x: number, y: number): void {
-    const lens = this.lensRef.nativeElement;
-    const view = this.lensViewRef.nativeElement;
-    const radius = lens.offsetWidth / 2;
-    lens.style.transform = `translate(${x}px, ${y}px)`;
-    view.style.transform = `translate(${radius - x * this.zoom}px, ${radius - y * this.zoom}px)`;
+    const tileCentre = t.left - s.left + t.width / 2;
+    card.style.setProperty('--ax', `${Math.round(Math.max(16, Math.min(CARD_WIDTH - 16, tileCentre - x)))}px`);
+    card.classList.toggle('is-moving', this.shown);
+    card.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+    this.shown = true;
   }
 }

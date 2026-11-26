@@ -91,12 +91,8 @@ const MIX_LABELS: Record<Band, string> = {
               <table>
                 <thead>
                   <tr>
-                    <th class="col-rank">
-                      <button class="th-btn" (click)="toggleSort('rank')" [class.is-sorted]="sortColumn() === 'rank'">
-                        # @if (sortArrow('rank'); as a) { <ng-icon [svg]="a" size="12" strokeWidth="2" class="th-arrow" /> }
-                      </button>
-                    </th>
                     <th class="col-symbol">
+                      <span class="rank">#</span>
                       <button class="th-btn" (click)="toggleSort('symbol')" [class.is-sorted]="sortColumn() === 'symbol'">
                         Symbol @if (sortArrow('symbol'); as a) { <ng-icon [svg]="a" size="12" strokeWidth="2" class="th-arrow" /> }
                       </button>
@@ -134,8 +130,8 @@ const MIX_LABELS: Record<Band, string> = {
                 <tbody>
                   @for (item of sortedItems(); track item.symbol) {
                     <tr class="row" (click)="goToTicker(item.symbol)">
-                      <td class="col-rank">{{ rankOf(item.symbol) }}</td>
                       <td class="col-symbol">
+                        <span class="rank">{{ rankOf(item.symbol) }}</span>
                         <a class="symbol-link" [routerLink]="['/ticker', item.symbol]" (click)="$event.stopPropagation()">{{ item.symbol }}</a>
                       </td>
                       <td class="cell-name">{{ item.company_name }}</td>
@@ -452,27 +448,23 @@ const MIX_LABELS: Record<Band, string> = {
       background: var(--bg-hover);
     }
 
-    .col-rank {
+    // Rank and symbol share one sticky column so there's no seam between
+    // two separately pinned cells
+    .col-symbol {
       position: sticky;
       left: 0;
       z-index: 2;
-      width: 24px;
-      padding-right: 0;
+      box-shadow: inset -1px 0 0 var(--border);
+    }
+
+    .rank {
+      display: inline-block;
+      width: 20px;
+      margin-right: 12px;
       font-family: 'JetBrains Mono', monospace;
       font-size: 12px;
       color: var(--text-muted);
       text-align: right;
-    }
-
-    th.col-rank {
-      z-index: 3;
-    }
-
-    .col-symbol {
-      position: sticky;
-      left: 40px;
-      z-index: 2;
-      box-shadow: inset -1px 0 0 var(--border);
     }
 
     th.col-symbol {
@@ -713,9 +705,7 @@ const MIX_LABELS: Record<Band, string> = {
         padding: 0 12px;
       }
 
-      .col-symbol {
-        left: 36px;
-      }
+
 
       .cell-name {
         max-width: 140px;
