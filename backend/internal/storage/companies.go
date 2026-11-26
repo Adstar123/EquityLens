@@ -52,7 +52,11 @@ func (db *DB) UpsertCompany(ctx context.Context, company models.Company) error {
 		`INSERT INTO companies (id, symbol, name, sector_id, market_cap, last_updated)
 		 VALUES ($1, $2, $3, $4, $5, $6)
 		 ON CONFLICT (symbol) DO UPDATE
-		 SET name = EXCLUDED.name,
+		 SET name = CASE
+		         -- The ASX company list is all caps. Never let it overwrite a
+		         -- properly cased name (e.g. "BHP Group Limited") on each sync.
+		         WHEN EXCLUDED.name = UPPER(EXCLUDED.name) AND companies.name <> UPPER(companies.name)
+		         THEN companies.name ELSE EXCLUDED.name END,
 		     sector_id = COALESCE(EXCLUDED.sector_id, companies.sector_id),
 		     market_cap = COALESCE(EXCLUDED.market_cap, companies.market_cap),
 		     last_updated = COALESCE(EXCLUDED.last_updated, companies.last_updated)`,
@@ -91,7 +95,9 @@ func (db *DB) UpdateCompanyNames(ctx context.Context, names map[string]string) (
 	tag, err := db.Pool.Exec(ctx,
 		`UPDATE companies c SET name = v.name
 		 FROM (SELECT UNNEST($1::text[]) AS symbol, UNNEST($2::text[]) AS name) v
-		 WHERE c.symbol = v.symbol AND c.name IS DISTINCT FROM v.name`,
+		 WHERE c.symbol = v.symbol AND c.name IS DISTINCT FROM v.name
+		   -- An all-caps listing name never replaces the same name in proper case
+		   AND NOT (v.name = UPPER(v.name) AND LOWER(c.name) = LOWER(v.name))`,
 		symbols, values)
 	if err != nil {
 		return 0, err
