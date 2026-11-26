@@ -1,6 +1,8 @@
 package scoring
 
 import (
+	"math"
+
 	"github.com/Adstar123/equitylens/backend/internal/models"
 )
 
@@ -106,7 +108,9 @@ func ScoreCompany(config models.SectorConfig, financials map[string]float64) (*S
 	if compositeScore < 0 {
 		compositeScore = 0
 	}
-	rating := mapRating(compositeScore, config.RatingScale)
+	// Rate on the whole-number score people actually see, so a 44.6 shown as
+	// 45 never carries the band below the 45 cut-off.
+	rating := mapRating(math.Round(compositeScore), config.RatingScale)
 
 	// Extract context ratios (ctx_ prefixed) for display-only.
 	ctxNames := map[string]string{

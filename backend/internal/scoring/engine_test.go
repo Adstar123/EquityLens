@@ -522,3 +522,24 @@ func TestScoreCompany_ZeroDebtToEquityIsStrong(t *testing.T) {
 		}
 	}
 }
+
+func TestScoreCompany_RatingUsesDisplayedScore(t *testing.T) {
+	// 0.73*3 + 0.27*2 = 2.73 -> 54.6, shown as 55. With the hold cut-off at
+	// 55 the rating must be hold, matching the number on screen.
+	config := buildMiningConfig()
+	config.RatingScale.Hold = models.Range{Min: fp(55), Max: fp(65)}
+	config.RatingScale.Sell = models.Range{Min: fp(30), Max: fp(55)}
+	config.Ratios = config.Ratios[:2]
+	config.Ratios[0].Weight = 0.73 // pe_ratio 20 -> neutral (3)
+	config.Ratios[1].Weight = 0.27 // debt_to_equity 0.8 -> weak (2)
+	result, err := ScoreCompany(config, map[string]float64{"pe_ratio": 20, "debt_to_equity": 0.8})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := result.CompositeScore; got < 54.59 || got > 54.61 {
+		t.Fatalf("composite = %v, want 54.6", got)
+	}
+	if result.Rating != "hold" {
+		t.Errorf("54.6 displays as 55, rating = %q, want hold", result.Rating)
+	}
+}
