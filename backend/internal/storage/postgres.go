@@ -2,8 +2,12 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
+	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -69,10 +73,60 @@ func (db *DB) RunMigrations(databaseURL string, migrationsPath string) error {
 	if err != nil {
 		return fmt.Errorf("init migrations: %w", err)
 	}
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		return fmt.Errorf("run migrations: %w", err)
+
+	// The server, scorer and pricer all run migrations on start, and a deploy
+	// briefly overlaps the old and new server. Reading the version needs no
+	// lock, so skip Up entirely when the schema is already current instead of
+	// queueing for the advisory lock another process may be holding.
+	if latest, ok := latestMigration(migrationsPath); ok {
+		if v, dirty, err := m.Version(); err == nil && !dirty && v >= latest {
+			return nil
+		}
 	}
-	return nil
+
+	// A real migration is pending: wait out a concurrent holder of the lock.
+	const attempts = 4
+	for attempt := 1; ; attempt++ {
+		err := m.Up()
+		if err == nil || errors.Is(err, migrate.ErrNoChange) {
+			return nil
+		}
+		if !errors.Is(err, migrate.ErrLockTimeout) || attempt == attempts {
+			return fmt.Errorf("run migrations: %w", err)
+		}
+		log.Printf("migrations: lock busy (attempt %d/%d), retrying in 10s", attempt, attempts)
+		time.Sleep(10 * time.Second)
+	}
+}
+
+// latestMigration returns the highest version number among the *.up.sql
+// files in dir (e.g. 4 for 004_add_in_index.up.sql).
+func latestMigration(dir string) (uint, bool) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return 0, false
+	}
+	var latest uint
+	found := false
+	for _, e := range entries {
+		name := e.Name()
+		if !strings.HasSuffix(name, ".up.sql") {
+			continue
+		}
+		prefix, _, ok := strings.Cut(name, "_")
+		if !ok {
+			continue
+		}
+		n, err := strconv.ParseUint(prefix, 10, 64)
+		if err != nil {
+			continue
+		}
+		if uint(n) > latest {
+			latest = uint(n)
+		}
+		found = true
+	}
+	return latest, found
 }
 
 func (db *DB) Close() {
